@@ -1,9 +1,9 @@
-frmMain = 384, 140, 1257, 920, C, 160, 137, 972, 749, C
-modDeclares = 332, 231, 970, 753, C
-modFunctions = -16, 167, 601, 672, C
+frmMain = 137, 69, 1011, 849, , 160, 137, 972, 749, C
+modDeclares = 332, 231, 970, 753, 
+modFunctions = 204, 271, 821, 776, 
 PacketBuffer = 191, 40, 952, 495, C
-modBNLS = 233, 68, 1012, 495, Z
-modBNET = 87, 450, 876, 838, 
+modBNLS = 233, 68, 1012, 495, C
+modBNET = 87, 450, 876, 838, C
 modStatstring = 22, 22, 421, 418, C
 BnetBot = 225, 13, 975, 573, C
 frmAbout = 398, 53, 1301, 538, C, 7, 7, 565, 471, C
