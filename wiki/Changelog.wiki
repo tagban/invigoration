@@ -1,0 +1,18 @@
+#summary Changelog for Invigoration starting with 1.2.5.
+#labels Featured,Phase-Design
+
+= Invigoration 1.2.x Changelog =
+
+----
+==*1.2.5*== 
+_Released 9/12/2010_
+* Automatically reconnects after creation of an account
+* Fixed connection issues from 1.2.4
+* Began work on code to streamline connection speed.
+* Removed outdated/old code from bot (All depreciated code)
+* Updated links to proper update websites..
+* Added VersionCheck (1.2.4+)
+* Removed vercheck backdoor (Ability to check versions in channel, from Pre-Release)
+* Re-added CDKey2, in preparation to repair code to allow for D2XP and W3XP connections
+* Added BNLS/JBLS configuration, users can now input their own server info (Defaults to bnls.net)
+----
