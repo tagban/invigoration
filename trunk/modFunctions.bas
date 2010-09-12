@@ -40,7 +40,7 @@ Dim FullText As String
     BNET.ShowPing = GetStuff("BNET", "ShowPing")
     BNET.JoinNotify = GetStuff("BNET", "JoinNotify")
     BNET.Trigger = GetStuff("BNET", "Trigger")
-    BNET.BNLSServer = GetStuff("BNET", "Server")
+    BNET.BNLSServer = GetStuff("BNLS", "Server")
     BNET.Realm = GetStuff("BNET", "Realm")
 End Function
 
@@ -59,7 +59,7 @@ Dim FullText As String
     WriteStuff "BNET", "ShowPing", BNET.ShowPing
     WriteStuff "BNET", "JoinNotify", BNET.JoinNotify
     WriteStuff "BNET", "Trigger", BNET.Trigger
-    WriteStuff "BNET", "Server", BNET.BNLSServer
+    WriteStuff "BNLS", "Server", BNET.BNLSServer
     WriteStuff "BNET", "Realm", BNET.BattlenetServer
     
 End Function
@@ -74,16 +74,16 @@ Public Function StrToHex(ByVal String1 As String) As String
     StrToHex = strReturn
 End Function
 
-Public Function ToHex(Data As String) As String
+Public Function ToHex(data As String) As String
 Dim i As Integer
-For i = 1 To Len(Data)
-    ToHex = ToHex & Right("00" & Hex(Asc(Mid(Data, i, 1))), 2)
+For i = 1 To Len(data)
+    ToHex = ToHex & Right("00" & Hex(Asc(Mid(data, i, 1))), 2)
 Next i
 End Function
 
-Public Function GetWORD(Data As String) As Long
+Public Function GetWORD(data As String) As Long
 Dim lReturn As Long
-    Call CopyMemory(lReturn, ByVal Data, 2)
+    Call CopyMemory(lReturn, ByVal data, 2)
     GetWORD = lReturn
 End Function
 Public Function Rand(ByVal Low As Long, ByVal High As Long) As Long
@@ -133,7 +133,7 @@ Public Function KillNull(ByVal text As String) As String
     KillNull = Left(text, i - 1)
 End Function
 
-Public Sub Send(ByVal strText As String, Socket As Winsock, Optional Extra As Boolean)
+Public Sub Send(ByVal strText As String, SOCKET As Winsock, Optional Extra As Boolean)
 If Not frmMain.wsBnet.State = sckConnected Then Exit Sub
     With PBuffer
         .InsertNTString strText
@@ -200,17 +200,17 @@ Public Function ClearBuffers()
 End Function
 Public Function InvigDecrypt(strText As String)
     On Error GoTo Xit
-    Dim Combine As String, i As Integer, TEMP As String, Temp2 As Integer
+    Dim Combine As String, i As Integer, Temp As String, Temp2 As Integer
     Combine = vbNullString
     For i = 1 To Len(strText)
         Combine = Combine & Chr(Asc(Mid(strText, i, 1)) - 101)
     Next i
-    TEMP = vbNullString
+    Temp = vbNullString
     For i = 1 To Len(Combine) Step 3
         Temp2 = Mid(Combine, i, 3)
-        TEMP = TEMP & Chr(Temp2)
+        Temp = Temp & Chr(Temp2)
     Next i
-    InvigDecrypt = TEMP
+    InvigDecrypt = Temp
     Exit Function
 Xit:
     InvigDecrypt = "<< Invigoration Decryption Failed >>"
@@ -218,29 +218,29 @@ Xit:
 End Function
 Public Function InvigEncrypt(strText As String)
     On Error GoTo Xit
-    Dim Combine As String, i As Integer, TEMP As String
+    Dim Combine As String, i As Integer, Temp As String
     Combine = vbNullString
-    TEMP = vbNullString
+    Temp = vbNullString
     For i = 1 To Len(strText) - 1 Step 2
         If Len(Trim(Str(Asc(Mid(strText, i, 1))))) < 3 Then
-            TEMP = "0" & Trim(Str(Asc(Mid(strText, i, 1))))
+            Temp = "0" & Trim(Str(Asc(Mid(strText, i, 1))))
         Else
-            TEMP = Trim(Str(Asc(Mid(strText, i, 1))))
+            Temp = Trim(Str(Asc(Mid(strText, i, 1))))
         End If
-        Combine = Combine & TEMP
+        Combine = Combine & Temp
         If Len(Trim(Str(Asc(Mid(strText, i + 1, 1))))) < 3 Then
-            TEMP = "0" & Trim(Str(Asc(Mid(strText, i + 1, 1))))
+            Temp = "0" & Trim(Str(Asc(Mid(strText, i + 1, 1))))
         Else
-            TEMP = Trim(Str(Asc(Mid(strText, i + 1, 1))))
+            Temp = Trim(Str(Asc(Mid(strText, i + 1, 1))))
         End If
-        Combine = Combine & TEMP
+        Combine = Combine & Temp
     Next i
-    TEMP = vbNullString
+    Temp = vbNullString
     For i = 1 To Len(Combine)
-        TEMP = TEMP & Chr(Asc(Mid(Combine, i, 1)) + 101)
+        Temp = Temp & Chr(Asc(Mid(Combine, i, 1)) + 101)
     Next i
-    InvigEncrypt = TEMP
-    Clipboard.SetText TEMP
+    InvigEncrypt = Temp
+    Clipboard.SetText Temp
     Exit Function
 Xit:
     InvigEncrypt = "<< Invigoration Encryption Failed >>"

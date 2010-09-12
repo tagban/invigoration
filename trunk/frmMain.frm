@@ -722,39 +722,65 @@ Private Sub Form_Load()
     Set ChatBot = New BnetBot
     Dim lRet As Long
     frmMain.Caption = "Invigoration - http://www.BNET.cc"
-    LogChat = 1
+    LogChat = 0
     LoadConfig
-    Y = devNEWS.OpenURL("http://www.bnet.cc/invigoration/news.txt")
-    X = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
-    R = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
-    AddChat D2MedBlue, "Version Check: "
+    'Y = devNEWS.OpenURL("http://www.bnet.cc/invigoration/invigoration.txt")
+    'X = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
+    'R = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
+    'If LCase(BNET.BattlenetServer) = "useast.battle.net" Then
+    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/useast.txt")
+    'ElseIf LCase(BNET.BattlenetServer) = "uswest.battle.net" Then
+    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/uswest.txt")
+    'ElseIf LCase(BNET.BattlenetServer) = "asia.battle.net" Then
+    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/asia.txt")
+    'ElseIf LCase(BNET.BattlenetServer) = "europe.battle.net" Then
+    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/europe.txt")
+    'Else
+    '    BNET.BattlenetServer = BNET.BattlenetServer
+    'End If
+    'BNLSServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/bnls.txt")
+    'If InStr(BNLSServer, "<!DOCTYPE") Then
+        BNLSServer = "bnls.net"
+        BNET.BNLSServer = BNLSServer
+    'Else
+    '    BNET.BNLSServer = BNLSServer
+    'End If
+    '''''''''''''AddChat D2MedBlue, "Version Check: "
     connectstatus = False
-    If X = vernum Then
-        privatever = False
-        AddChat D2White, "You have the latest version of Invigoration."
-        AddChat D2Orange, "Version ", D2White, X, D2Orange, " Released on: ", D2White, R
-        mnuUpdate.Enabled = False
-    ElseIf X < vernum Then
-        privatever = True
-        AddChat D2White, "You are running Invigoration PRIVATE BETA."
-        Y = devNEWS.OpenURL("http://www.bnet.cc/invigoration/invigprivate.txt")
-        mnuUpdate.Enabled = False
-    Else
-        privatever = False
-        mnuUpdate.Enabled = True
-        AddChat HEXPINK, "---------------------------------------------------------------------"
-        AddChat D2Orange, "You need to update: Hold ", vbYellow, "CTRL ", D2Orange, "and press ", vbYellow, "U", D2Orange, " to launch update file."
-        AddChat D2Orange, "You can also activate the Updater via the ", D2Green, "Other ", D2Orange, "menu."
-        AddChat D2Orange, "Your version: " & vernum, D2White, "  Latest version: " & X
-        AddChat D2Orange, "Last Update: ", D2White, X, D2Orange, " on ", D2White, R
-        AddChat HEXPINK, "---------------------------------------------------------------------"
-        msg = MsgBox("You need to update Invigoration. Please try using CTRL+U, if that doesn't work, close your bot and visit: http://code.google.com/p/invigoration", vbOKOnly, "New Version Released!")
-     End If
+    'If X = vernum Then
+    '    privatever = False
+    '    AddChat D2White, "You have the latest version of Invigoration."
+    '    AddChat D2Orange, "Version ", D2White, X, D2Orange, " Released on: ", D2White, R
+    '    mnuUpdate.Enabled = False
+    'ElseIf X < vernum Then
+    '    privatever = True
+    '    AddChat D2White, "You are running Invigoration PRIVATE BETA."
+    '    Y = devNEWS.OpenURL("http://www.bnet.cc/invigoration/invigprivate.txt")
+    '    mnuUpdate.Enabled = False
+    'Else
+    '    privatever = False
+    '    mnuUpdate.Enabled = True
+    '    AddChat HEXPINK, "---------------------------------------------------------------------"
+    '    AddChat D2Orange, "You need to update: Hold ", vbYellow, "CTRL ", D2Orange, "and press ", vbYellow, "U", D2Orange, " to launch update file."
+    '    AddChat D2Orange, "You can also activate the Updater via the ", D2Green, "Other ", D2Orange, "menu."
+    '    AddChat D2Orange, "Your version: " & vernum, D2White, "  Latest version: " & X
+    '    AddChat D2Orange, "Last Update: ", D2White, X, D2Orange, " on ", D2White, R
+    '    AddChat HEXPINK, "---------------------------------------------------------------------"
+    '    msg = MsgBox("You need to update Invigoration. Please try using CTRL+U, if that doesn't work, close your bot and visit: http://www.bnet.cc/upgrade.html", vbOKOnly, "New Version Released!")
+        
+        
+    'End If
+    'AddChat D2Purple, "---------------------------------------------------"
+    'If X < vernum Then
+    '    AddChat D2Orange, "Invigoration PRIVATE BETA News: ", D2MedBlue, Y
+    'Else
+    '    AddChat D2Orange, "Invigoration News: ", D2MedBlue, Y
+    'End If
     AddChat D2Purple, "---------------------------------------------------"
     AddChat D2MedBlue, "()()"
     AddChat D2MedBlue, "(--)"
     AddChat D2MedBlue, "(')(')"
-    AddChat D2Green, "Invigoration Public Beta"
+    AddChat D2Green, "Invigoration Release Candidate 1"
     AddChat D2Orange, " oPublic release, updates NOT automatic yet. "
     AddChat D2Orange, "    Please check BNET.cc for future updates "
     AddChat D2MedBlue, "---------------------------------------------------"
@@ -963,8 +989,7 @@ Private Sub mnuKick_Click()
 End Sub
 
 Private Sub mnuBug_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/index.php/board,29.0.html", 0&, 0&, 0&
-    AddChat D2Red, "Bug Report: If a window didn't open, visit http://www.bnet.cc/ and find the Report Bugs forum under Invigoration."
+    AddChat D2White, "ERROR REPORTING SYSTEM IS DOWN!!"
 End Sub
 
 Private Sub mnuClearBufs_Click()
@@ -1129,8 +1154,8 @@ X = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
     If X = vernum Then
     ''
 Else
-    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/downloads/list", 0&, 0&, 0&
-    AddChat D2Red, "If a window didn't open, close Invig, then download the new version from: http://code.google.com/p/invigoration/downloads/list"
+    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/invigoration/upgrade.php", 0&, 0&, 0&
+    AddChat D2Red, "If a window didn't open, close Invig, then download the new version from: http://www.bnet.cc/invigoration/upgrade.php"
 End If
 connectstatus = False
 End Sub
@@ -1150,7 +1175,7 @@ Private Sub mnuViewProfile_Click()
 End Sub
 
 Private Sub mnuWebsite_Click()
-    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/invigoration/", 0&, 0&, 0&
 End Sub
 Private Sub mnuWhisper_Click()
     txtsendbnet.text = "/w " & lstChannel.SelectedItem
