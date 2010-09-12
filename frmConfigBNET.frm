@@ -1,5 +1,5 @@
 VERSION 5.00
-Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "mscomctl.ocx"
+Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
 Begin VB.Form frmConfigBNET 
    BackColor       =   &H00000000&
    BorderStyle     =   1  'Fixed Single
@@ -144,7 +144,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   240
-            TabIndex        =   33
+            TabIndex        =   31
             Text            =   "e-mail addr"
             Top             =   1440
             Width           =   1335
@@ -154,10 +154,9 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   3240
-            TabIndex        =   31
-            Text            =   "1234567891011"
+            TabIndex        =   29
+            Text            =   "CD Key 2 OFF"
             Top             =   600
-            Visible         =   0   'False
             Width           =   1335
          End
          Begin VB.TextBox txtTrigger 
@@ -226,7 +225,7 @@ Begin VB.Form frmConfigBNET
             Height          =   315
             ItemData        =   "frmConfigBNET.frx":09B3
             Left            =   840
-            List            =   "frmConfigBNET.frx":09C6
+            List            =   "frmConfigBNET.frx":09CC
             TabIndex        =   14
             Text            =   "PXES"
             ToolTipText     =   "Product ID (Backwards)"
@@ -248,7 +247,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   32
+            TabIndex        =   30
             Top             =   1200
             Width           =   1695
          End
@@ -259,9 +258,8 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   2400
-            TabIndex        =   30
+            TabIndex        =   28
             Top             =   600
-            Visible         =   0   'False
             Width           =   855
          End
          Begin VB.Label Label2 
@@ -319,23 +317,19 @@ Begin VB.Form frmConfigBNET
          BackColor       =   &H80000007&
          Caption         =   "Other Options"
          ForeColor       =   &H0000FFFF&
-         Height          =   2175
+         Height          =   3255
          Left            =   5040
          TabIndex        =   21
          Top             =   240
          Width           =   2175
-         Begin VB.ComboBox cmbLanguage 
+         Begin VB.TextBox txtBNLS 
             BackColor       =   &H00000040&
-            Enabled         =   0   'False
             ForeColor       =   &H000080FF&
-            Height          =   315
-            ItemData        =   "frmConfigBNET.frx":0A02
+            Height          =   285
             Left            =   120
-            List            =   "frmConfigBNET.frx":0A15
-            TabIndex        =   29
-            Text            =   "English"
-            Top             =   1680
-            Visible         =   0   'False
+            TabIndex        =   32
+            Text            =   "bnls.net"
+            Top             =   1560
             Width           =   1935
          End
          Begin VB.CheckBox chkJoinNotify 
@@ -360,16 +354,13 @@ Begin VB.Form frmConfigBNET
             Top             =   480
             Width           =   1095
          End
-         Begin VB.Label lblEmail 
-            BackStyle       =   0  'Transparent
-            Caption         =   "Language:"
-            ForeColor       =   &H0000FFFF&
+         Begin VB.Label Label8 
+            Caption         =   "BNLS/JBLS"
             Height          =   255
-            Left            =   120
-            TabIndex        =   28
+            Left            =   240
+            TabIndex        =   33
             Top             =   1320
-            Visible         =   0   'False
-            Width           =   1935
+            Width           =   1695
          End
       End
       Begin VB.Frame HomeChannel 
@@ -614,11 +605,8 @@ On Error GoTo Error
     ElseIf chkJoinNotify.value = vbChecked Then
         BNET.JoinNotify = 1
     End If
-    'BNET.UDP = txtUDP.text
-    'BNET.ShowPing = txtShowPing.text
-    'BNET.JoinNotify = txtJoinNotify.text
     BNET.Trigger = txtTrigger.text
-    BNET.BNLSServer = txtBNLSServer.text
+    BNET.BNLSServer = txtBNLS.text
     BNET.email = txtEmail.text
     BNET.Realm = txtBattlenet.text
     
@@ -648,9 +636,9 @@ On Error GoTo Error
     ElseIf BNET.Product = "VD2D" Then
         txtProduct.text = "Diablo 2"
     ElseIf BNET.Product = "PX2D" Then
-        txtProduct.text = "D2:LOD"
+        txtProduct.text = "Diablo 2: LOD"
     ElseIf BNET.Product = "PX3W" Then
-        txtProduct.text = "War3:TFT"
+        txtProduct.text = "Warcraft 3: FT"
     End If
     txtBattlenet.text = BNET.BattlenetServer
     txtEmail.text = BNET.email
@@ -672,7 +660,7 @@ On Error GoTo Error
         chkJoinNotify.value = vbChecked
     End If
     txtTrigger.text = BNET.Trigger
-    txtBNLSServer.text = BNET.BNLSServer
+    txtBNLS.text = BNET.BNLSServer
     txtEmail.text = BNET.email
     txtBattlenet.text = BNET.Realm
 Error:
@@ -693,8 +681,10 @@ Private Sub txtProduct_Change()
         txtProduct.text = "Warcraft 3"
     ElseIf BNET.Product = "PX3W" Then
         chkUDP.value = vbUnchecked
-        txtProduct.text = "Warcraft 3"
+        txtProduct.text = "Warcraft 3: FT"
     ElseIf BNET.Product = "VD2D" Then
         txtProduct.text = "Diablo 2"
+    ElseIf BNET.Product = "PX2D" Then
+        txtProduct.text = "D2XP"
     End If
 End Sub

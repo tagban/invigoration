@@ -38,75 +38,33 @@ Begin VB.Form frmAbout
       Width           =   1500
    End
    Begin VB.Label Label6 
-      BackColor       =   &H00000000&
-      Caption         =   "Clan SCC"
-      ForeColor       =   &H00C0C0C0&
+      BackColor       =   &H80000012&
+      Caption         =   "Project Page@GoogleCode"
+      ForeColor       =   &H8000000A&
       Height          =   255
-      Index           =   1
-      Left            =   120
-      TabIndex        =   13
-      Top             =   4440
-      Width           =   5655
-   End
-   Begin VB.Label lblDescription 
-      BackStyle       =   0  'Transparent
-      Caption         =   "By BNU-MaStEr (Aka: Tagban)"
-      BeginProperty Font 
-         Name            =   "Verdana"
-         Size            =   9
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      ForeColor       =   &H00C0FFFF&
-      Height          =   450
-      Left            =   240
-      TabIndex        =   1
-      Top             =   600
-      Width           =   4725
-   End
-   Begin VB.Label darkblizz 
-      BackColor       =   &H00000000&
-      Caption         =   "DarkBlizz.org"
-      ForeColor       =   &H00C0C0C0&
-      Height          =   255
-      Index           =   2
-      Left            =   120
-      TabIndex        =   12
-      Top             =   4200
-      Width           =   5655
-   End
-   Begin VB.Label bnetcc 
-      BackColor       =   &H00000000&
-      Caption         =   "BNET.cc"
-      ForeColor       =   &H00C0C0C0&
-      Height          =   255
-      Index           =   1
-      Left            =   120
+      Left            =   1680
       TabIndex        =   11
       Top             =   3960
-      Width           =   5655
+      Width           =   2295
    End
    Begin VB.Label Label5 
       BackColor       =   &H80000012&
-      Caption         =   "Special thanks to Myst of DarkBlizz.org for assistance with connections. :)"
-      ForeColor       =   &H000080FF&
-      Height          =   735
+      Caption         =   "DarkBlizz.org"
+      ForeColor       =   &H8000000A&
+      Height          =   255
       Left            =   120
       TabIndex        =   10
-      Top             =   1680
-      Width           =   5535
+      Top             =   3960
+      Width           =   1455
    End
    Begin VB.Label Label2 
       BackColor       =   &H80000007&
-      Caption         =   "BNU-Camel for helping to get Invigoration working with BNLS again."
+      Caption         =   "Myst of DarkBlizz for reviving my interest in this project and resolving a BNLS Issue I was having."
       ForeColor       =   &H8000000E&
-      Height          =   255
+      Height          =   495
       Left            =   120
-      TabIndex        =   9
-      Top             =   1440
+      TabIndex        =   8
+      Top             =   1200
       Width           =   5655
    End
    Begin VB.Label Label10 
@@ -115,10 +73,10 @@ Begin VB.Form frmAbout
       ForeColor       =   &H00C0C0C0&
       Height          =   255
       Index           =   0
-      Left            =   120
-      TabIndex        =   8
+      Left            =   1680
+      TabIndex        =   7
       Top             =   3720
-      Width           =   5655
+      Width           =   1935
    End
    Begin VB.Label lblVersion 
       BackColor       =   &H80000007&
@@ -134,34 +92,24 @@ Begin VB.Form frmAbout
       EndProperty
       ForeColor       =   &H000080FF&
       Height          =   255
-      Left            =   3120
-      TabIndex        =   7
-      Top             =   480
+      Left            =   4440
+      TabIndex        =   6
+      Top             =   120
       Width           =   2535
    End
    Begin VB.Label Label4 
       BackColor       =   &H80000012&
-      Caption         =   "Special thanks to all of the beta/Alpha testers of Invigoration. Without your help, it may have died in its infancy."
+      Caption         =   $"frmAbout.frx":000C
       ForeColor       =   &H8000000E&
-      Height          =   495
-      Left            =   120
-      TabIndex        =   6
-      Top             =   2760
-      Width           =   5415
-   End
-   Begin VB.Label Label3 
-      BackColor       =   &H80000007&
-      Caption         =   "Shutdown for making me keep Invigoration alive."
-      ForeColor       =   &H8000000E&
-      Height          =   255
+      Height          =   1095
       Left            =   120
       TabIndex        =   5
-      Top             =   1200
-      Width           =   4695
+      Top             =   2040
+      Width           =   5415
    End
    Begin VB.Label Label8 
       BackColor       =   &H00000000&
-      Caption         =   "Quick Sites:"
+      Caption         =   "Invigoration sites/contributors:"
       BeginProperty Font 
          Name            =   "Arial"
          Size            =   9
@@ -204,9 +152,28 @@ Begin VB.Form frmAbout
       Top             =   960
       Width           =   5535
    End
+   Begin VB.Label lblDescription 
+      BackStyle       =   0  'Transparent
+      Caption         =   "Written by BNU-Master (Aka Tagban) of BNET.cc and Clan BNU"
+      BeginProperty Font 
+         Name            =   "Verdana"
+         Size            =   9
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+      ForeColor       =   &H00C0FFFF&
+      Height          =   450
+      Left            =   360
+      TabIndex        =   1
+      Top             =   480
+      Width           =   4725
+   End
    Begin VB.Label lblTitle 
       BackStyle       =   0  'Transparent
-      Caption         =   "Invigoration REVIVED"
+      Caption         =   "Invigoration Open"
       BeginProperty Font 
          Name            =   "Impact"
          Size            =   24
@@ -230,6 +197,16 @@ Begin VB.Form frmAbout
       X2              =   5408.938
       Y1              =   662.609
       Y2              =   662.609
+   End
+   Begin VB.Label Label3 
+      BackColor       =   &H80000007&
+      Caption         =   "BNET.cc"
+      ForeColor       =   &H8000000A&
+      Height          =   255
+      Left            =   120
+      TabIndex        =   9
+      Top             =   3720
+      Width           =   1095
    End
 End
 Attribute VB_Name = "frmAbout"
@@ -268,10 +245,6 @@ Private Declare Function RegCloseKey Lib "advapi32" (ByVal hKey As Long) As Long
 
 Private Sub CmdSysinfo_Click()
   Call StartSysInfo
-End Sub
-
-Private Sub bnetcc_Click(Index As Integer)
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc", 0&, 0&, 0&
 End Sub
 
 Private Sub CmdOk_Click()
@@ -363,27 +336,23 @@ GetKeyError:      ' Cleanup After An Error Has Occured...
 End Function
 
 
-Private Sub darkblizz_Click(Index As Integer)
-    ShellExecute Me.hWnd, "Open", "http://www.darkblizz.org", 0&, 0&, 0&
-End Sub
-
 Private Sub Form_Load()
-lblVersion.Caption = botver
+    lblVersion.Caption = botver
 End Sub
 
 Private Sub Label10_Click(Index As Integer)
     ShellExecute Me.hWnd, "Open", "http://www.clanbnu.net", 0&, 0&, 0&
 End Sub
 
-Private Sub Label11_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/", 0&, 0&, 0&
+
+Private Sub Label3_Click()
+    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc", 0&, 0&, 0&
 End Sub
 
-Private Sub Label16_Click(Index As Integer)
-    ShellExecute Me.hWnd, "Open", "http://www.clanscc.net", 0&, 0&, 0&
+Private Sub Label5_Click()
+    ShellExecute Me.hWnd, "Open", "http://www.darkblizz.org", 0&, 0&, 0&
 End Sub
 
-Private Sub Label9_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/", 0&, 0&, 0&
+Private Sub Label6_Click()
+    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/", 0&, 0&, 0&
 End Sub
-
