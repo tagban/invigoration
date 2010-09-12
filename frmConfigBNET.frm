@@ -1,5 +1,5 @@
 VERSION 5.00
-Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
+Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "mscomctl.ocx"
 Begin VB.Form frmConfigBNET 
    BackColor       =   &H00000000&
    BorderStyle     =   1  'Fixed Single
@@ -68,9 +68,9 @@ Begin VB.Form frmConfigBNET
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   3480
+      Left            =   3720
       TabIndex        =   1
-      Top             =   3120
+      Top             =   3000
       Width           =   855
    End
    Begin VB.CommandButton cmdCommit 
@@ -86,9 +86,9 @@ Begin VB.Form frmConfigBNET
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   2280
+      Left            =   2640
       TabIndex        =   0
-      Top             =   3120
+      Top             =   3000
       Width           =   855
    End
    Begin VB.Frame frmBattlenet 
@@ -138,23 +138,13 @@ Begin VB.Form frmConfigBNET
          Left            =   120
          TabIndex        =   11
          Top             =   1560
-         Width           =   7095
-         Begin VB.TextBox txtBNLS 
-            BackColor       =   &H00000040&
-            ForeColor       =   &H000080FF&
-            Height          =   285
-            Left            =   5040
-            TabIndex        =   33
-            Text            =   "bnls.net"
-            Top             =   480
-            Width           =   1935
-         End
+         Width           =   4695
          Begin VB.TextBox txtEmail 
             BackColor       =   &H00000040&
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   240
-            TabIndex        =   31
+            TabIndex        =   33
             Text            =   "e-mail addr"
             Top             =   1440
             Width           =   1335
@@ -163,8 +153,8 @@ Begin VB.Form frmConfigBNET
             BackColor       =   &H00000040&
             ForeColor       =   &H000080FF&
             Height          =   285
-            Left            =   3120
-            TabIndex        =   29
+            Left            =   3240
+            TabIndex        =   31
             Text            =   "1234567891011"
             Top             =   600
             Visible         =   0   'False
@@ -174,7 +164,7 @@ Begin VB.Form frmConfigBNET
             BackColor       =   &H00000040&
             ForeColor       =   &H000080FF&
             Height          =   285
-            Left            =   4080
+            Left            =   4200
             MaxLength       =   1
             TabIndex        =   22
             Text            =   "!"
@@ -214,7 +204,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             IMEMode         =   3  'DISABLE
-            Left            =   3120
+            Left            =   3240
             TabIndex        =   15
             Text            =   "1234567891011"
             ToolTipText     =   "Input Product CD Key"
@@ -243,16 +233,6 @@ Begin VB.Form frmConfigBNET
             Top             =   240
             Width           =   975
          End
-         Begin VB.Label Label8 
-            BackColor       =   &H80000008&
-            Caption         =   "BNLS/JBLS Server"
-            ForeColor       =   &H0000FFFF&
-            Height          =   255
-            Left            =   4920
-            TabIndex        =   32
-            Top             =   240
-            Width           =   1695
-         End
          Begin VB.Label Label3 
             BackColor       =   &H00000000&
             Caption         =   "User e-Mail"
@@ -268,7 +248,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   30
+            TabIndex        =   32
             Top             =   1200
             Width           =   1695
          End
@@ -278,8 +258,8 @@ Begin VB.Form frmConfigBNET
             Caption         =   "EXP Key"
             ForeColor       =   &H0000FFFF&
             Height          =   255
-            Left            =   2280
-            TabIndex        =   28
+            Left            =   2400
+            TabIndex        =   30
             Top             =   600
             Visible         =   0   'False
             Width           =   855
@@ -289,7 +269,7 @@ Begin VB.Form frmConfigBNET
             Caption         =   "Bot Trigger"
             ForeColor       =   &H0000FFFF&
             Height          =   255
-            Left            =   2160
+            Left            =   2280
             TabIndex        =   23
             Top             =   1080
             Width           =   1455
@@ -310,7 +290,7 @@ Begin VB.Form frmConfigBNET
             Caption         =   "CDKey"
             ForeColor       =   &H0000FFFF&
             Height          =   255
-            Left            =   2400
+            Left            =   2520
             TabIndex        =   17
             Top             =   240
             Width           =   1335
@@ -339,11 +319,25 @@ Begin VB.Form frmConfigBNET
          BackColor       =   &H80000007&
          Caption         =   "Other Options"
          ForeColor       =   &H0000FFFF&
-         Height          =   1215
+         Height          =   2175
          Left            =   5040
          TabIndex        =   21
          Top             =   240
          Width           =   2175
+         Begin VB.ComboBox cmbLanguage 
+            BackColor       =   &H00000040&
+            Enabled         =   0   'False
+            ForeColor       =   &H000080FF&
+            Height          =   315
+            ItemData        =   "frmConfigBNET.frx":0A02
+            Left            =   120
+            List            =   "frmConfigBNET.frx":0A15
+            TabIndex        =   29
+            Text            =   "English"
+            Top             =   1680
+            Visible         =   0   'False
+            Width           =   1935
+         End
          Begin VB.CheckBox chkJoinNotify 
             Alignment       =   1  'Right Justify
             BackColor       =   &H80000012&
@@ -353,7 +347,6 @@ Begin VB.Form frmConfigBNET
             Left            =   240
             TabIndex        =   27
             Top             =   720
-            Value           =   1  'Checked
             Width           =   1815
          End
          Begin VB.CheckBox chkPing 
@@ -367,6 +360,17 @@ Begin VB.Form frmConfigBNET
             Top             =   480
             Width           =   1095
          End
+         Begin VB.Label lblEmail 
+            BackStyle       =   0  'Transparent
+            Caption         =   "Language:"
+            ForeColor       =   &H0000FFFF&
+            Height          =   255
+            Left            =   120
+            TabIndex        =   28
+            Top             =   1320
+            Visible         =   0   'False
+            Width           =   1935
+         End
       End
       Begin VB.Frame HomeChannel 
          BackColor       =   &H00000000&
@@ -375,7 +379,7 @@ Begin VB.Form frmConfigBNET
          Height          =   615
          Left            =   2280
          TabIndex        =   19
-         Top             =   840
+         Top             =   960
          Width           =   2535
          Begin VB.TextBox txtHomeChannel 
             BackColor       =   &H00000040&
@@ -531,7 +535,7 @@ Begin VB.Form frmConfigBNET
          Height          =   615
          Left            =   120
          TabIndex        =   3
-         Top             =   840
+         Top             =   960
          Width           =   2055
          Begin VB.TextBox txtPassword 
             BackColor       =   &H00000040&
@@ -614,7 +618,7 @@ On Error GoTo Error
     'BNET.ShowPing = txtShowPing.text
     'BNET.JoinNotify = txtJoinNotify.text
     BNET.Trigger = txtTrigger.text
-    BNET.BNLSServer = txtBNLS.text
+    BNET.BNLSServer = txtBNLSServer.text
     BNET.email = txtEmail.text
     BNET.Realm = txtBattlenet.text
     
@@ -668,7 +672,7 @@ On Error GoTo Error
         chkJoinNotify.value = vbChecked
     End If
     txtTrigger.text = BNET.Trigger
-    txtBNLS.text = BNET.BNLSServer
+    txtBNLSServer.text = BNET.BNLSServer
     txtEmail.text = BNET.email
     txtBattlenet.text = BNET.Realm
 Error:
