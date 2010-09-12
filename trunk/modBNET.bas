@@ -26,9 +26,9 @@ Public Sub Send0x51()
         .InsertDWORD &H0
         .InsertNonNTString CdkeyHash
         'AddChat D2Orange, StrToHex(CdkeyHash)
-        'If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-        '   .InsertNonNTString Cdkey2Hash
-        'nd If
+        If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
+           .InsertNonNTString Cdkey2Hash
+        End If
         .InsertNTString ExeInfo
         .InsertNTString BNET.username
         .SendPacket &H51
@@ -107,7 +107,7 @@ If BNET.ShowPing = "0" Then
     ElseIf BNET.ShowPing = "1" Then
      Select Case Ping
         Case Is < 0
-            GetPingCode = "Pwn"
+            GetPingCode = "-1"
         Case 0 To 200
             GetPingCode = "l"
         Case 200 To 300
@@ -119,7 +119,7 @@ If BNET.ShowPing = "0" Then
         Case 500 To 600
             GetPingCode = "lllll"
         Case Else
-            GetPingCode = "llllll"
+            GetPingCode = "SLOW"
         End Select
     Else
      Select Case Ping
@@ -247,7 +247,7 @@ Dim Product As String
 
     Select Case PacketId
         Case &H0
-        ''
+        '' Liquid sex?
         Case &H34
             HType = 1
             With PBuffer
@@ -260,14 +260,14 @@ Dim Product As String
                 P1 = Mid(data, 5, 16)
                 Server = Mid(data, 17, 8)
                 Bleh2 = Mid(Server, 5, 4)
-                'AddChat D2Green, "Current realm server: " & MakeServer(Bleh2)
+                AddChat D2Green, "Current realm server: " & MakeServer(Bleh2)
                 P2 = Mid(data, 29, 48)
                 frmMain.wsRealm.Close
                 frmMain.wsRealm.Connect MakeServer(Bleh2), 6112
         Case &H51
             Select Case GetWORD(Mid(data, 5, 2))
-                Case &H0
-                    'AddChat D2Green, "Version Check + CDKey Check"
+                Case &H0 'ToDo: Remove BNLS from password/Username/CD Key equation.
+                    AddChat D2Green, "Version Check + CDKey Check"
                     With PBuffer
                         If BNET.Product = "3RAW" Or BNET.Product = "PX3W" Then
                             .InsertNTString BNET.username
@@ -297,9 +297,9 @@ Dim Product As String
                 Case &H100
                     AddChat D2Red, "Game version out of date."
                 Case &H101
-                    AddChat D2Red, "Invalid Game Version."
+                    AddChat D2Red, "Invalid Game Version. What the FRAK?! Check BNLS/JBLS Server and try another one?"
                 Case &H102
-                    AddChat D2Red, "Game Version needs downgraded."
+                    AddChat D2Red, "Game Version needs downgraded. WHAT THE FRAK!? Downgraded!??!?!? Fawk you!"
                 Case &H200
                     AddChat D2Red, "Invalid CD Key."
                 Case &H201
@@ -392,7 +392,8 @@ Dim Product As String
                     frmMain.tmrAntiIdle.Enabled = True
                     connectstatus = True
                 End If
-            Case &HE ' Originally set as &HE
+            Case &HE    'Email Address, currently ignored
+                        'TODO: support email registration
                 AddChat D2Green, "Battle.net Logon Passed!"
                 AddChat D2Orange, "Battle.net requested an e-mail address. Invigoration currently doesn't have the functionality to handle this and so it bypassed it."
                 ConnectTry = 0
@@ -407,29 +408,7 @@ Dim Product As String
                     .SendPacket &HC
                 End With
             End Select
-        Case &H50
-           ' Servers = Val("&h" & StrToHex(StrReverse(Mid(Data, 9, 4))))
-           ' MPQName = Mid(Data, 25)
-           ' MPQName = Left$(MPQName, InStr(MPQName, Chr$(0)) - 1)
-           ' AddChat D2Purple, MPQName
-           ' If Len(MPQName) = 20 Then
-           '     hash = Mid$(Data, InStr(1, Data, "mpq") + 4)
-           '     AddChat D2Purple, StrToHex(hash)
-           '     mpqn = Val(Mid(MPQName, 15, 2))
-           '     AddChat D2Purple, StrToHex(mpqn)
-           ' Else
-           '     hash = Mid(Data, 25 + Len(MPQName) + 1)
-           '     hash = Left$(hash, InStr(hash, Chr$(0)) - 1)
-           '     mpqn = Val(Mid(MPQName, 10, 1))
-           '     AddChat D2Orange, StrToHex(mpqn)
-           ' End If
-           
-'(DWORD) Logon Type
-'(DWORD) Server Token
-'(DWORD) UDPValue *
-'(FILETIME) MPQ filetime
-'(STRING) IX86ver filename
-'(STRING) ValueString
+        Case &H50 'Updated 9/12/2010 - Tagban
            Dim pB As New Buffer
            With pB
                 .SetBuffer data
@@ -443,25 +422,6 @@ Dim Product As String
                 MPQName = .GetSTRING
                 hash = .GetSTRING
            End With
-            'With PBuffer
-            '    .InsertDWORD GetBNLSByte()
-            '    .InsertDWORD mpqn
-            '    .InsertNTString hash
-            '    .SendBNLSPacket &H9
-            'End With
-'(DWORD) Product ID.*
-'(DWORD) Flags.**
-'(DWORD) Cookie.
-'(ULONGLONG) Timestamp for version check archive.
-'(STRING) Version check archive filename.
-'(STRING) Checksum formula.
-         '''''''''''''''''''''''
-         '''''ADDED BY NINE'''''
-         ''''' &H1A FIX? '''''''
-         '''''''''''''''''''''''
-         ''''FIXED BY MYST''''''
-         '''''''''''''''''''''''
-         '''''''''''''''''''''''
             With PBuffer
                 .InsertDWORD GetBNLSByte()
                 .InsertDWORD &H0
@@ -472,9 +432,8 @@ Dim Product As String
                 .InsertNTString hash
                 .SendBNLSPacket &H1A
             End With
-        'End With
                       
-        Case &H46 ' get news reply
+        Case &H46 ' get news reply .... Defunct??
                 spltns() = Split(StrToHex(Mid(data, 22)), "0A")
                 For tmpnews = 0 To UBound(spltns) - 1
                     AddChat D2Purple, "News: " & HexToStr(spltns(tmpnews))
@@ -510,7 +469,7 @@ Dim Product As String
                     AddChat D2Green, "Battle.net Logon Passed!"
                     ConnectTry = 0
                     With PBuffer
-                        If LRealm = True And BNET.Product = "VD2D" Or BNET.Product = "PX2D" Then
+                        If LRealm = True And BNET.Product = "VD2D" Or BNET.Product = "PX2D" Then 'D2 Specialized Login
                             .InsertDWORD &H0
                             .InsertDWORD &H0
                             .InsertBYTE &H0
@@ -529,12 +488,9 @@ Dim Product As String
                 Case Else
             End Select
             Exit Sub
-        Case &H59
+        Case &H59 'Battle.net wants an email address to send to register your current account with them.
                 AddChat D2MedBlue, "Please set email to this account via the actual game window. Invigoration doesn't register accounts."
-                    'With PBuffer
-                        '.InsertNTString BNET.email
-                        '.SendPacket &H59
-                    'End With
+                ' This currently needs worked on - Tagban
         Case &HF
             frmMain.ChatBot.DispatchMessage data
             Exit Sub
@@ -542,6 +498,8 @@ Dim Product As String
                   '''''''''''''''''''' ACCOUNT CREATION ''''''''''''''''''''''
                 AddChat D2Orange, "Account created! :)"
                 AddChat D2Green, "Connecting with your NEW account!"
+                'Added Bnet Close to reconnect properly. 9/12/2010 - Tagban
+                frmMain.wsBnet.Close
                 AddChat D2Green, "Battle.net Login Server Connecting to " & BNET.BNLSServer & "..."
                 frmMain.wsBnls.Close
                 frmMain.wsBnls.Connect BNET.BNLSServer, 9367
@@ -551,7 +509,7 @@ Dim Product As String
                 frmMain.tmrAntiIdle.Enabled = True
                 'Case &H26
         
-        Case &HA
+        Case &HA 'Properly name game codes for better user experience during login process.
                 spltn() = Split(data, Chr(0), 5)
                 BNET.TrueUsername = spltn(3)
                 If BNET.Product = "RATS" Then
@@ -583,19 +541,19 @@ Dim Product As String
         Case &H19
             AddChat D2White, "[&H19]: " & Replace(Mid(data, 9, Len(data)), Chr(0), vbNullString)
             Exit Sub
-        Case &H15
+        Case &H15 ' Ad Change, not really needed, fuck it.
             
                 'asplt() = Split(Mid(data, 21), Chr(0), 3)
                 'AddChat D2White, "Ad banner is now " & asplt(0) & " [url=" & asplt(1) & "]"
-            Erase asplt()
+            'Erase asplt()
         Case &H2D
             
                 splti() = Split(Mid(data, 1, Len(data) - 1), Chr(1), 2)
                 'AddChat D2White, "Using " & splti(1) & " as icons file."
             Erase splti()
         Case &H75
-''''''''' FUCK THIS PACKET! I HATE IT
-        Case &H79
+                ''''''''' FUCK THIS PACKET! I HATE IT
+        Case &H79 ' Currently, needs worked on. 9/12/2010 - Tagban
                 AddChat D2Red, "Clan Invite recieved. Invigoration due to security reasons no longer allows Clan Invites to be auto-accepted. Please try again using a different bot or the client."
         Case &H66
         Case &H69
@@ -606,6 +564,6 @@ Dim Product As String
             Else
                 'AddChat D2White, "Unhandled Packet: 0x" & Hex(PacketId)
             End If
-            'AddChat StrToHex(data)
+            AddChat StrToHex(data)
     End Select
 End Sub

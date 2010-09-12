@@ -133,7 +133,7 @@ Public Function KillNull(ByVal text As String) As String
     KillNull = Left(text, i - 1)
 End Function
 
-Public Sub Send(ByVal strText As String, SOCKET As Winsock, Optional Extra As Boolean)
+Public Sub Send(ByVal strText As String, Socket As Winsock, Optional Extra As Boolean)
 If Not frmMain.wsBnet.State = sckConnected Then Exit Sub
     With PBuffer
         .InsertNTString strText
@@ -200,17 +200,17 @@ Public Function ClearBuffers()
 End Function
 Public Function InvigDecrypt(strText As String)
     On Error GoTo Xit
-    Dim Combine As String, i As Integer, Temp As String, Temp2 As Integer
+    Dim Combine As String, i As Integer, TEMP As String, Temp2 As Integer
     Combine = vbNullString
     For i = 1 To Len(strText)
         Combine = Combine & Chr(Asc(Mid(strText, i, 1)) - 101)
     Next i
-    Temp = vbNullString
+    TEMP = vbNullString
     For i = 1 To Len(Combine) Step 3
         Temp2 = Mid(Combine, i, 3)
-        Temp = Temp & Chr(Temp2)
+        TEMP = TEMP & Chr(Temp2)
     Next i
-    InvigDecrypt = Temp
+    InvigDecrypt = TEMP
     Exit Function
 Xit:
     InvigDecrypt = "<< Invigoration Decryption Failed >>"
@@ -218,29 +218,29 @@ Xit:
 End Function
 Public Function InvigEncrypt(strText As String)
     On Error GoTo Xit
-    Dim Combine As String, i As Integer, Temp As String
+    Dim Combine As String, i As Integer, TEMP As String
     Combine = vbNullString
-    Temp = vbNullString
+    TEMP = vbNullString
     For i = 1 To Len(strText) - 1 Step 2
         If Len(Trim(Str(Asc(Mid(strText, i, 1))))) < 3 Then
-            Temp = "0" & Trim(Str(Asc(Mid(strText, i, 1))))
+            TEMP = "0" & Trim(Str(Asc(Mid(strText, i, 1))))
         Else
-            Temp = Trim(Str(Asc(Mid(strText, i, 1))))
+            TEMP = Trim(Str(Asc(Mid(strText, i, 1))))
         End If
-        Combine = Combine & Temp
+        Combine = Combine & TEMP
         If Len(Trim(Str(Asc(Mid(strText, i + 1, 1))))) < 3 Then
-            Temp = "0" & Trim(Str(Asc(Mid(strText, i + 1, 1))))
+            TEMP = "0" & Trim(Str(Asc(Mid(strText, i + 1, 1))))
         Else
-            Temp = Trim(Str(Asc(Mid(strText, i + 1, 1))))
+            TEMP = Trim(Str(Asc(Mid(strText, i + 1, 1))))
         End If
-        Combine = Combine & Temp
+        Combine = Combine & TEMP
     Next i
-    Temp = vbNullString
+    TEMP = vbNullString
     For i = 1 To Len(Combine)
-        Temp = Temp & Chr(Asc(Mid(Combine, i, 1)) + 101)
+        TEMP = TEMP & Chr(Asc(Mid(Combine, i, 1)) + 101)
     Next i
-    InvigEncrypt = Temp
-    Clipboard.SetText Temp
+    InvigEncrypt = TEMP
+    Clipboard.SetText TEMP
     Exit Function
 Xit:
     InvigEncrypt = "<< Invigoration Encryption Failed >>"

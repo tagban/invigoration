@@ -91,17 +91,17 @@ Select Case Asc(Mid(data, 3, 1))
             .SetBuffer data
             .Skip 3
             Success = .GetBoolean
-                'AddChat D2Purple, Success
             version = .GetDWORD
-                'AddChat D2Purple, version
             CheckSum = .GetDWORD
-                'AddChat D2Purple, CheckSum
             statstring = .GetSTRING
-                'AddChat D2Purple, statstring
             cookie = .GetDWORD
-                'AddChat D2Purple, cookie
             versioncode = .GetDWORD
-                'AddChat D2Purple, versioncode
+            If debugmode = 1 Then
+                AddChat D2Purple, "VersionCode: " & versioncode
+                AddChat D2Purple, "CheckSum: " & CheckSum
+                AddChat D2Purple, "Cookie: " & cookie
+                AddChat D2Purple, "Statstring: " & statstring
+            End If
          End With
          
 '(DWORD) Client Token
@@ -141,14 +141,6 @@ Select Case Asc(Mid(data, 3, 1))
         End If
          
     Case &H9
-'(BOOL) Success*
-'(DWORD) Version.
-'(DWORD) Checksum.
-'(STRING) Version check stat string.'
-'(DWORD) Cookie.
-'(DWORD) The latest version code for this product.
-
-        
         If varproduct = "PX2D" Or varproduct = "PX3W" Then
             With PBuffer
                 .InsertDWORD &H0
@@ -193,9 +185,6 @@ Select Case Asc(Mid(data, 3, 1))
         If debugmode = 1 Then
             AddChat HEXPINK, "BNLS PACKET 0x1"
         End If
-        '(BOOLEAN) Result
-        '(DWORD) Client Token
-        '(DWORD[9]) CD key data for SID_AUTH_CHECK
             With pB
                 .SetBuffer data
                 .Skip 3
@@ -207,32 +196,34 @@ Select Case Asc(Mid(data, 3, 1))
                 GTC = .GetDWORD
                 CdkeyHash = .GetRaw(36)
                     If debugmode = 1 Then
-                        AddChat HEXPINK, "CD Key HASH???"
+                        AddChat HEXPINK, "CD Key HASH: " & CdkeyHash
                     End If
             End With
-            'CdkeyHash = Mid(Data, 12)
-            'GTC = Val("&H" & StrToHex(StrReverse(Mid(Data, 8, 4))))
-            'GTC = CLng(GTC)
             
             With PBuffer
                 .InsertDWORD GTC
-                'AddChat D2Orange, "GTC", GTC
                 .InsertDWORD version
-                'AddChat D2Orange, "Version", version
                 .InsertDWORD CheckSum
-                'AddChat D2Orange, "CheckSum", CheckSum
-                'If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-                '    .InsertDWORD &H2
-                'Else
+                If debugmode = 1 Then
+                    AddChat D2Orange, "CheckSum", CheckSum
+                    AddChat D2Orange, "Version", version
+                    AddChat D2Orange, "GTC", GTC
+                End If
+                If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
+                    .InsertDWORD &H2
+                Else
                     .InsertDWORD &H1
-                'End If
+                End If
                 .InsertDWORD &H0
                 .InsertNonNTString CdkeyHash
-                'AddChat D2Orange, "CD Key Hash", CdkeyHash
-                'AddChat D2Orange, "CD Key Hash length", Len(CdkeyHash)
-                'If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-                '   .InsertNonNTString Cdkey2Hash
-                'nd If
+                If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
+                   .InsertNonNTString Cdkey2Hash
+                End If
+                If debugmode = 1 Then
+                    AddChat D2Orange, "CD Key Hash: " & CdkeyHash
+                    AddChat D2Orange, "CD Key Hash length :" & Len(CdkeyHash)
+                    AddChat D2Orange, "Sent H51.."
+                End If
                 .InsertNTString statstring
                 .InsertNTString BNET.username
                 .SendPacket &H51
@@ -306,6 +297,9 @@ Select Case Asc(Mid(data, 3, 1))
                 hash(0) = PBuffer.MakeDWORD(GTC)
                 hash(1) = PBuffer.MakeDWORD(Servers)
                 hash(2) = Mid(data, 4, Len(data) - 3)
+                If debugmode = 1 Then
+                    AddChat HEXPINK, "Hash2: " & Hash2
+                End If
                 With PBuffer
                     .InsertDWORD &H1C
                     .InsertDWORD &H1

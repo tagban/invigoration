@@ -69,7 +69,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
                 ElseIf tmp(1) = "ver" Then
                     Send LastCW & "Idle message set.[Version]", frmMain.wsBnet
                     LastCW = vbNullString
-                    idleMessage = "/me is an Invigoration v" & botver & " by Tagban - http://www.bnet.cc/"
+                    idleMessage = "/me is an Invigoration v" & botver & " by Tagban - http://www.BNET.cc"
                 Else
                     idleMessage = tmp(1)
                     Send LastCW & "Idle message set.", frmMain.wsBnet
@@ -106,13 +106,13 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
         Send OSVersion & " on for " & WindowsRunTime & " seconds.", frmMain.wsBnet
         LastCW = vbNullString
     Case "ver"
-        Send LastCW & "/me is an Invigoration v" & botver & " by BNU-MaStEr - http://www.bnet.cc/", frmMain.wsBnet
+        Send LastCW & "/me is an Invigoration v" & botver & " by Tagban - http://www.BNET.cc/", frmMain.wsBnet
         LastCW = vbNullString
     Case "uptime"
         Send LastCW & "/me has been online for: " & uptimemonth & " months, " & uptimeweek & " weeks, " & uptimedays & " days, " & uptimehour & " hours, " & uptimemin & " minutes, and " & uptimesec & " seconds.", frmMain.wsBnet
         LastCW = vbNullString
     Case "about"
-        Send LastCW & "Invigoration was written in Visual Basic by BNU-MaStEr (c)2004-06 -- http://www.bnet.cc/", frmMain.wsBnet
+        Send LastCW & "Invigoration was written in Visual Basic by Tagban Since 2004 -- http://www.bnet.cc", frmMain.wsBnet
         LastCW = vbNullString
     Case "say"
         Send Rest, frmMain.wsBnet

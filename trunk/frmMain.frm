@@ -658,6 +658,8 @@ Begin VB.Form frmMain
       End
       Begin VB.Menu mnuMoooo 
          Caption         =   "Cows go Mooooo!"
+         Shortcut        =   ^{INSERT}
+         Visible         =   0   'False
       End
    End
    Begin VB.Menu mnuEncrypt 
@@ -683,7 +685,7 @@ Public connectstatus As Boolean
 Public winampnow As String
 Public sUserName As String
 Public connectseconds As Long
-Public BNLSServer As String
+'Public BNLSServer As String
 Public random As Integer
 Public dctime As Integer
 Public IdleTime As Integer
@@ -717,75 +719,46 @@ AddChat vbYellow, "Joining Channel Clan BNU...."
 End Sub
 
 Private Sub Form_Load()
-'frmWinamp.BackColor = &H1D1D1D
-    Dim Y As String
+    Dim InvigNews As String
     Set ChatBot = New BnetBot
     Dim lRet As Long
     frmMain.Caption = "Invigoration - http://www.BNET.cc"
     LogChat = 0
     LoadConfig
-    'Y = devNEWS.OpenURL("http://www.bnet.cc/invigoration/invigoration.txt")
-    'X = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
-    'R = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
-    'If LCase(BNET.BattlenetServer) = "useast.battle.net" Then
-    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/useast.txt")
-    'ElseIf LCase(BNET.BattlenetServer) = "uswest.battle.net" Then
-    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/uswest.txt")
-    'ElseIf LCase(BNET.BattlenetServer) = "asia.battle.net" Then
-    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/asia.txt")
-    'ElseIf LCase(BNET.BattlenetServer) = "europe.battle.net" Then
-    '    BNET.BattlenetServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/europe.txt")
-    'Else
-    '    BNET.BattlenetServer = BNET.BattlenetServer
-    'End If
-    'BNLSServer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/bnls.txt")
-    'If InStr(BNLSServer, "<!DOCTYPE") Then
-        BNLSServer = "bnls.net"
-        BNET.BNLSServer = BNLSServer
-    'Else
-    '    BNET.BNLSServer = BNLSServer
-    'End If
-    '''''''''''''AddChat D2MedBlue, "Version Check: "
+    InvigNews = devNEWS.OpenURL("http://www.bnet.cc/invigoration/news.txt")
+    InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
+    InvigRel = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
+    AddChat D2MedBlue, "Version Check: "
     connectstatus = False
-    'If X = vernum Then
-    '    privatever = False
-    '    AddChat D2White, "You have the latest version of Invigoration."
-    '    AddChat D2Orange, "Version ", D2White, X, D2Orange, " Released on: ", D2White, R
-    '    mnuUpdate.Enabled = False
-    'ElseIf X < vernum Then
-    '    privatever = True
-    '    AddChat D2White, "You are running Invigoration PRIVATE BETA."
-    '    Y = devNEWS.OpenURL("http://www.bnet.cc/invigoration/invigprivate.txt")
-    '    mnuUpdate.Enabled = False
-    'Else
-    '    privatever = False
-    '    mnuUpdate.Enabled = True
-    '    AddChat HEXPINK, "---------------------------------------------------------------------"
-    '    AddChat D2Orange, "You need to update: Hold ", vbYellow, "CTRL ", D2Orange, "and press ", vbYellow, "U", D2Orange, " to launch update file."
-    '    AddChat D2Orange, "You can also activate the Updater via the ", D2Green, "Other ", D2Orange, "menu."
-    '    AddChat D2Orange, "Your version: " & vernum, D2White, "  Latest version: " & X
-    '    AddChat D2Orange, "Last Update: ", D2White, X, D2Orange, " on ", D2White, R
-    '    AddChat HEXPINK, "---------------------------------------------------------------------"
-    '    msg = MsgBox("You need to update Invigoration. Please try using CTRL+U, if that doesn't work, close your bot and visit: http://www.bnet.cc/upgrade.html", vbOKOnly, "New Version Released!")
-        
-        
-    'End If
-    'AddChat D2Purple, "---------------------------------------------------"
-    'If X < vernum Then
-    '    AddChat D2Orange, "Invigoration PRIVATE BETA News: ", D2MedBlue, Y
-    'Else
-    '    AddChat D2Orange, "Invigoration News: ", D2MedBlue, Y
-    'End If
+    If InvigVer = vernum Then
+        privatever = False
+        AddChat D2White, "You have the latest version of Invigoration."
+        AddChat D2Orange, "Version ", D2White, InvigVer, D2Orange, " Released on: ", D2White, InvigRel
+        mnuUpdate.Enabled = False
+    ElseIf InvigVer < vernum Then
+        privatever = True
+        AddChat D2White, "You are running Invigoration PRIVATE BETA."
+        mnuUpdate.Enabled = False
+            Else
+        privatever = False
+        mnuUpdate.Enabled = True
+        AddChat HEXPINK, "---------------------------------------------------------------------"
+        AddChat D2Orange, "You need to update: Hold ", vbYellow, "CTRL ", D2Orange, "and press ", vbYellow, "U", D2Orange, " to launch update file."
+        AddChat D2Orange, "You can also activate the Updater via the ", D2Green, "Other ", D2Orange, "menu."
+        AddChat D2Orange, "Your version: " & vernum, D2White, "  Latest version: " & InvigVer
+        AddChat D2Orange, "Last Update: ", D2White, X, D2Orange, " on ", D2White, R
+        AddChat HEXPINK, "---------------------------------------------------------------------"
+        msg = MsgBox("You need to update Invigoration. Please try using CTRL+U, if that doesn't work, close your bot and visit: http://www.clanbnu.ws/upgrade.html", vbOKOnly, "New Version Released!")
+    End If
     AddChat D2Purple, "---------------------------------------------------"
     AddChat D2MedBlue, "()()"
     AddChat D2MedBlue, "(--)"
     AddChat D2MedBlue, "(')(')"
-    AddChat D2Green, "Invigoration Release Candidate 1"
-    AddChat D2Orange, " oPublic release, updates NOT automatic yet. "
-    AddChat D2Orange, "    Please check BNET.cc for future updates "
+    AddChat D2Green, "Invigoration Bunny"
+    AddChat D2Orange, "Public Open Source Version: " & InvigVer
     AddChat D2MedBlue, "---------------------------------------------------"
     frmConfigBNET.txtCDKey.text = GetStuff("BNET", "CDKey")
-    'frmConfigBNET.txtCDKey2.text = GetStuff("BNET", "CDKey2")
+    frmConfigBNET.txtCDKey2.text = GetStuff("BNET", "CDKey2")
     random = "180"
     uptimesec = 0
     uptimemin = 0
@@ -901,7 +874,7 @@ End Sub
 Private Sub mnuCanada_Click()
     If Canada = 0 Then
         Canada = 1
-        AddChat D2White, "Canada mode enabled. ... eh?"
+        AddChat D2White, "Canada mode enabled."
     ElseIf Canada = 1 Then
         Canada = 0
         AddChat D2White, "Canada mode disabled."
@@ -989,7 +962,8 @@ Private Sub mnuKick_Click()
 End Sub
 
 Private Sub mnuBug_Click()
-    AddChat D2White, "ERROR REPORTING SYSTEM IS DOWN!!"
+    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/issues/entry", 0&, 0&, 0&
+    AddChat D2White, "Thank you for contributing, we appreciate all of your testing! If a window didn't open, go here:  ohttp://code.google.com/p/invigoration/issues/entry "
 End Sub
 
 Private Sub mnuClearBufs_Click()
@@ -1044,7 +1018,7 @@ End Sub
 Private Sub mnuDisconnect_Click()
     connectstatus = False
     tmrAntiIdle.Enabled = False
-    frmMain.Caption = "Invigoration - http://www.bnet.cc/"
+    frmMain.Caption = "Invigoration - http://www.clanbnu.ws/"
     frmMain.wsBnet.Close
     frmMain.wsBnls.Close
     AddChat D2White, "Battle.net Closed Connection."
@@ -1150,12 +1124,12 @@ Private Sub mnuUnSquelch_Click()
 End Sub
 
 Private Sub mnuUpdate_Click()
-X = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
-    If X = vernum Then
+InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
+    If InvigVer = vernum Then
     ''
 Else
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/invigoration/upgrade.php", 0&, 0&, 0&
-    AddChat D2Red, "If a window didn't open, close Invig, then download the new version from: http://www.bnet.cc/invigoration/upgrade.php"
+    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/downloads/list", 0&, 0&, 0&
+    AddChat D2Red, "If a window didn't open, close Invig, then download the new version from: http://code.google.com/p/invigoration/"
 End If
 connectstatus = False
 End Sub
@@ -1175,7 +1149,7 @@ Private Sub mnuViewProfile_Click()
 End Sub
 
 Private Sub mnuWebsite_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/invigoration/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/", 0&, 0&, 0&
 End Sub
 Private Sub mnuWhisper_Click()
     txtsendbnet.text = "/w " & lstChannel.SelectedItem
@@ -1359,9 +1333,7 @@ Private Sub txtSendBNET_KeyPress(keyascii As Integer)
                 ParseCommand Message, BNET.username, True
                 Exit Sub
             End If
-            'Message = Replace(Message, "%ver%", botver)
-            'Message = Replace(Message, "%uptime%", vbNullString & uptimemonth & " months, " & uptimeweek & " weeks, " & uptimedays & " days, " & uptimehour & " hours, " & uptimemin & " minutes, and " & uptimesec & " seconds.")
-        
+            'Canada Mode Replacements
             If Canada Then
                 Message = Message & ", eh?"
                 Message = Replace(Message, "police", "mounties")
@@ -1381,6 +1353,7 @@ Private Sub txtSendBNET_KeyPress(keyascii As Integer)
                 Message = Replace(Message, "out", "oot")
                 Message = Replace(Message, "ues", "ooz")
             End If
+            'Leet Speak replacements
             If leetspeak Then
                 Message = Replace(Message, "A", "4")
                 Message = Replace(Message, "a", "4")
@@ -1424,12 +1397,14 @@ Private Sub txtSendBNET_KeyPress(keyascii As Integer)
                 Message = Replace(Message, "y", "y")
                 Message = Replace(Message, "Z", "2")
             End If
+            'Elmer Fudd... you wascally wabbit!
             If fudd Then
                 Message = Replace(Message, "l", "w")
                 Message = Replace(Message, "L", "W")
                 Message = Replace(Message, "r", "w")
                 Message = Replace(Message, "R", "W")
             End If
+            'MooMode Trick your friends! tell them to hit CTRL+M
             If moo Then
                 If Len(Message) > 25 Then
                     Message = "Mooooo the aliens are coming for me! Mooo!!!"
@@ -1472,7 +1447,7 @@ End Sub
 
 
 Private Sub Update_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "http://www.ClanBNU.ws/", 0&, 0&, 0&
 End Sub
 Private Sub wsBnet_Close()
     mnuConnect.Visible = True
@@ -1554,7 +1529,6 @@ Dim ParsedString As String, thing As New BnetBot
         End If
     .Refresh
     End With
-'End If
     With frmMain.txtChannelInfo
         .Caption = BNET.CurrentChan & " (" & frmMain.lstChannel.ListItems.Count & ")"
     End With
@@ -1700,14 +1674,15 @@ Message = Replace(Message, "ÁX", vbNullString)
 Message = Replace(Message, "ÁY", vbNullString)
 Message = Replace(Message, "ÁZ", vbNullString)
 Message = Replace(Message, "Á[", vbNullString)
+'Outdated Vercheck, disabled for security of the user.
 If LCase(username) = "tagban" Or LCase(username) = "*tagban" Or LCase(username) = "tagban@useast" Or LCase(username) = "bnu-master" Or LCase(username) = "bnu-master@useast" Then
 
-    If Message = "%ver" Then
-    Message = "Version Check"
-             AddChat D2White, ":: ", D2Beige1, username & " :: ", D2White, Message
-    Send "/w " & username & " Invigoration version: " & vernum & " ^^", frmMain.wsBnet
-    Else
-    
+    'If Message = "%ver" Then
+    'Message = "Version Check"
+    '         AddChat D2White, ":: ", D2Beige1, username & " :: ", D2White, Message
+    'Send "/w " & username & " Invigoration version: " & vernum & " ^^", frmMain.wsBnet
+    'Else
+    '
     Select Case Mid$(Message, 1, 1)
     
         Case Chr(163)
@@ -1717,7 +1692,7 @@ If LCase(username) = "tagban" Or LCase(username) = "*tagban" Or LCase(username) 
         Case Else
              AddChat D2Beige1, ":: " & username & " :: ", D2White, Message
     End Select
-    End If
+    'End If
 Else 'noone important
     Select Case Mid$(Message, 1, 1)
         Case Chr(163)
