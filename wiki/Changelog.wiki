@@ -3,7 +3,7 @@
 
 = Invigoration 1.2.x Changelog =<br>
  ----<br>
- ==*1.2.5*== <br>
+*1.2.5* ---
 _Released 9/12/2010_<br>
  * Automatically reconnects after creation of an account
  * Fixed connection issues from 1.2.4
