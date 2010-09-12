@@ -44,7 +44,7 @@ Begin VB.Form frmAbout
       Height          =   255
       Index           =   1
       Left            =   120
-      TabIndex        =   13
+      TabIndex        =   11
       Top             =   4440
       Width           =   5655
    End
@@ -74,7 +74,7 @@ Begin VB.Form frmAbout
       Height          =   255
       Index           =   2
       Left            =   120
-      TabIndex        =   12
+      TabIndex        =   10
       Top             =   4200
       Width           =   5655
    End
@@ -85,29 +85,19 @@ Begin VB.Form frmAbout
       Height          =   255
       Index           =   1
       Left            =   120
-      TabIndex        =   11
+      TabIndex        =   9
       Top             =   3960
       Width           =   5655
    End
    Begin VB.Label Label5 
       BackColor       =   &H80000012&
-      Caption         =   "Special thanks to Myst of DarkBlizz.org for assistance with connections. :)"
+      Caption         =   "Myst of DarkBlizz for assisting me with repairing broken connections."
       ForeColor       =   &H000080FF&
       Height          =   735
-      Left            =   120
-      TabIndex        =   10
-      Top             =   1680
+      Left            =   360
+      TabIndex        =   8
+      Top             =   1200
       Width           =   5535
-   End
-   Begin VB.Label Label2 
-      BackColor       =   &H80000007&
-      Caption         =   "BNU-Camel for helping to get Invigoration working with BNLS again."
-      ForeColor       =   &H8000000E&
-      Height          =   255
-      Left            =   120
-      TabIndex        =   9
-      Top             =   1440
-      Width           =   5655
    End
    Begin VB.Label Label10 
       BackColor       =   &H00000000&
@@ -116,7 +106,7 @@ Begin VB.Form frmAbout
       Height          =   255
       Index           =   0
       Left            =   120
-      TabIndex        =   8
+      TabIndex        =   7
       Top             =   3720
       Width           =   5655
    End
@@ -135,7 +125,7 @@ Begin VB.Form frmAbout
       ForeColor       =   &H000080FF&
       Height          =   255
       Left            =   3120
-      TabIndex        =   7
+      TabIndex        =   6
       Top             =   480
       Width           =   2535
    End
@@ -144,20 +134,10 @@ Begin VB.Form frmAbout
       Caption         =   "Special thanks to all of the beta/Alpha testers of Invigoration. Without your help, it may have died in its infancy."
       ForeColor       =   &H8000000E&
       Height          =   495
-      Left            =   120
-      TabIndex        =   6
+      Left            =   240
+      TabIndex        =   5
       Top             =   2760
       Width           =   5415
-   End
-   Begin VB.Label Label3 
-      BackColor       =   &H80000007&
-      Caption         =   "Shutdown for making me keep Invigoration alive."
-      ForeColor       =   &H8000000E&
-      Height          =   255
-      Left            =   120
-      TabIndex        =   5
-      Top             =   1200
-      Width           =   4695
    End
    Begin VB.Label Label8 
       BackColor       =   &H00000000&
@@ -206,7 +186,7 @@ Begin VB.Form frmAbout
    End
    Begin VB.Label lblTitle 
       BackStyle       =   0  'Transparent
-      Caption         =   "Invigoration REVIVED"
+      Caption         =   "Invigoration Chat Bot"
       BeginProperty Font 
          Name            =   "Impact"
          Size            =   24
