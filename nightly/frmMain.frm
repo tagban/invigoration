@@ -756,7 +756,7 @@ Private Sub Form_Load()
     AddChat D2MedBlue, "(--)"
     AddChat D2MedBlue, "(')(')"
     AddChat D2Green, "Invigoration  rNightly  gBunny"
-    AddChat D2Orange, "Public Open Source Version: " & InvigVer
+    AddChat D2Orange, "Public Open Source Version: " & vernum
     AddChat D2MedBlue, "---------------------------------------------------"
     frmConfigBNET.txtCDKey.text = GetStuff("BNET", "CDKey")
     frmConfigBNET.txtCDKey2.text = GetStuff("BNET", "CDKey2")
