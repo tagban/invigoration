@@ -77,6 +77,8 @@ Public Type BotData
     NewPass As String
     CurrentChan As String
     FontSize As String
+    ZEROPING As String
+    NEGPING As String
 End Type
 Public BNET As BotData
 Public Type BotNetData

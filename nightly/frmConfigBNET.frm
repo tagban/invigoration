@@ -110,7 +110,7 @@ Begin VB.Form frmConfigBNET
       TabIndex        =   2
       Top             =   0
       Width           =   7335
-      Begin VB.CheckBox chkUDP 
+      Begin VB.CheckBox chkNEGPING 
          Alignment       =   1  'Right Justify
          BackColor       =   &H00000000&
          Caption         =   "-1ms"
@@ -322,6 +322,30 @@ Begin VB.Form frmConfigBNET
          TabIndex        =   21
          Top             =   240
          Width           =   2175
+         Begin VB.CheckBox chkUDP 
+            Alignment       =   1  'Right Justify
+            BackColor       =   &H00000000&
+            Caption         =   "Plug UDP"
+            ForeColor       =   &H0000C0C0&
+            Height          =   195
+            Left            =   960
+            MaskColor       =   &H00000000&
+            TabIndex        =   35
+            Top             =   720
+            Width           =   1095
+         End
+         Begin VB.CheckBox chkZEROPING 
+            Alignment       =   1  'Right Justify
+            BackColor       =   &H00000000&
+            Caption         =   " 0ms"
+            ForeColor       =   &H0000C0C0&
+            Height          =   195
+            Left            =   960
+            MaskColor       =   &H00000000&
+            TabIndex        =   34
+            Top             =   480
+            Width           =   1095
+         End
          Begin VB.TextBox txtBNLS 
             BackColor       =   &H00000040&
             ForeColor       =   &H000080FF&
@@ -329,7 +353,7 @@ Begin VB.Form frmConfigBNET
             Left            =   240
             TabIndex        =   32
             Text            =   "bnls.net"
-            Top             =   1560
+            Top             =   2880
             Width           =   1815
          End
          Begin VB.CheckBox chkJoinNotify 
@@ -340,7 +364,7 @@ Begin VB.Form frmConfigBNET
             Height          =   375
             Left            =   240
             TabIndex        =   27
-            Top             =   720
+            Top             =   1800
             Width           =   1815
          End
          Begin VB.CheckBox chkPing 
@@ -351,7 +375,7 @@ Begin VB.Form frmConfigBNET
             Height          =   255
             Left            =   960
             TabIndex        =   26
-            Top             =   480
+            Top             =   2160
             Width           =   1095
          End
          Begin VB.Label Label8 
@@ -361,7 +385,7 @@ Begin VB.Form frmConfigBNET
             Height          =   255
             Left            =   120
             TabIndex        =   33
-            Top             =   1320
+            Top             =   2640
             Width           =   1695
          End
       End
@@ -560,6 +584,21 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = False
 Attribute VB_PredeclaredId = True
 Attribute VB_Exposed = False
+Private Sub chkNEGPING_Click() 'Added 9/14/2010 to avoid accidental activation of BOTH boxes... - Tagban
+    If chkNEGPING.value = vbChecked Then
+        chkZEROPING.value = vbUnchecked
+    Else
+        'Do nothing
+    End If
+End Sub
+Private Sub chkZEROPING_Click() 'Added 9/14/2010 to avoid accidental activation of BOTH boxes... - Tagban
+    If chkZEROPING.value = vbChecked Then
+        chkNEGPING.value = vbUnchecked
+    Else
+        'Do nothing
+    End If
+End Sub
+
 Private Sub CmdCancel_Click()
     Me.Visible = False
 End Sub
@@ -607,6 +646,16 @@ On Error GoTo Error
     ElseIf chkJoinNotify.value = vbChecked Then
         BNET.JoinNotify = 1
     End If
+    If chkZEROPING.value = vbUnchecked Then
+        BNET.ZEROPING = 0
+    ElseIf chkZEROPING.value = vbChecked Then
+        BNET.ZEROPING = 1
+    End If
+    If chkNEGPING.value = vbUnchecked Then
+        BNET.NEGPING = 0
+    ElseIf chkNEGPING.value = vbChecked Then
+        BNET.NEGPING = 1
+    End If
     BNET.Trigger = txtTrigger.text
     BNET.BNLSServer = txtBNLS.text
     BNET.email = txtEmail.text
@@ -650,6 +699,16 @@ On Error GoTo Error
         chkUDP.value = vbUnchecked
     Else
         chkUDP.value = vbChecked
+    End If
+    If BNET.ZEROPING = 0 Then
+        chkZEROPING.value = vbUnchecked
+    Else
+        chkZEROPING.value = vbChecked
+    End If
+    If BNET.NEGPING = 0 Then
+        chkNEGPING.value = vbUnchecked
+    Else
+        chkNEGPING.value = vbChecked
     End If
     If BNET.ShowPing = 0 Then
         chkPing.value = vbUnchecked
