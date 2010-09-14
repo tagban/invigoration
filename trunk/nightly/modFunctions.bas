@@ -37,6 +37,8 @@ Dim FullText As String
     BNET.HomeChannel = GetStuff("BNET", "Home")
     BNET.BotMaster = GetStuff("BNET", "BotMaster")
     BNET.UDP = GetStuff("BNET", "UDP")
+    BNET.ZEROPING = GetStuff("BNET", "ZEROPING")
+    BNET.NEGPING = GetStuff("BNET", "NEGPING")
     BNET.ShowPing = GetStuff("BNET", "ShowPing")
     BNET.JoinNotify = GetStuff("BNET", "JoinNotify")
     BNET.Trigger = GetStuff("BNET", "Trigger")
@@ -56,6 +58,8 @@ Dim FullText As String
     WriteStuff "BNET", "Home", BNET.HomeChannel
     WriteStuff "BNET", "BotMaster", BNET.BotMaster
     WriteStuff "BNET", "UDP", BNET.UDP
+    WriteStuff "BNET", "ZEROPING", BNET.ZEROPING
+    WriteStuff "BNET", "NEGPING", BNET.NEGPING
     WriteStuff "BNET", "ShowPing", BNET.ShowPing
     WriteStuff "BNET", "JoinNotify", BNET.JoinNotify
     WriteStuff "BNET", "Trigger", BNET.Trigger
@@ -74,16 +78,16 @@ Public Function StrToHex(ByVal String1 As String) As String
     StrToHex = strReturn
 End Function
 
-Public Function ToHex(data As String) As String
+Public Function ToHex(Data As String) As String
 Dim i As Integer
-For i = 1 To Len(data)
-    ToHex = ToHex & Right("00" & Hex(Asc(Mid(data, i, 1))), 2)
+For i = 1 To Len(Data)
+    ToHex = ToHex & Right("00" & Hex(Asc(Mid(Data, i, 1))), 2)
 Next i
 End Function
 
-Public Function GetWORD(data As String) As Long
+Public Function GetWORD(Data As String) As Long
 Dim lReturn As Long
-    Call CopyMemory(lReturn, ByVal data, 2)
+    Call CopyMemory(lReturn, ByVal Data, 2)
     GetWORD = lReturn
 End Function
 Public Function Rand(ByVal Low As Long, ByVal High As Long) As Long
