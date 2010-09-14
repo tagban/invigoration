@@ -103,7 +103,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
            Send Chr(149) & InvigEncrypt(Rest & "-"), frmMain.wsBnet
            LastCW = vbNullString
     Case "sysinfo"
-        Send OSVersion & " on for " & WindowsRunTime & " seconds.", frmMain.wsBnet
+        Send "Invigoration running on: " & OSVersion & ". -- Runtime: " & WindowsRunTime & " hours.", frmMain.wsBnet
         LastCW = vbNullString
     Case "ver"
         Send LastCW & "/me is an Invigoration v" & botver & " by Tagban - http://www.BNET.cc/", frmMain.wsBnet
@@ -152,6 +152,14 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
         End If
     Case "ban"
         Send "/ban " & Rest, frmMain.wsBnet
+    Case "join"
+        With PBuffer
+            .SendPacket &H10
+            .InsertDWORD 2
+            .InsertNTString Rest
+            .SendPacket &HC
+            'AddChat D2Orange, Rest
+        End With
     Case "user"
         targetuser = Rest & " : "
         targetusername = Rest
