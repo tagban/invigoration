@@ -1,6 +1,6 @@
 Attribute VB_Name = "modDeclares"
-Public Const botver = "1.2.6 [Nightly]"
-Public Const vernum = "1.2.6"
+Public Const botver = "1.2.7[Nightly]"
+Public Const vernum = "1.2.7"
 'webbotsite = "http://webbot.bnetweb.org/webbot.php?u=" & webbotuser & "&p=" & webbotpass
 ''''''''''''''''''''''''''''''''''''''''''''''
 Public Declare Function GetTickCount& Lib "KERNEL32" ()

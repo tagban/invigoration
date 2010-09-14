@@ -461,6 +461,7 @@ Begin VB.Form frmMain
       _ExtentY        =   7646
       _Version        =   393217
       BackColor       =   2368548
+      Enabled         =   -1  'True
       ReadOnly        =   -1  'True
       ScrollBars      =   2
       DisableNoScroll =   -1  'True
@@ -684,7 +685,6 @@ Public connectstatus As Boolean
 Public winampnow As String
 Public sUserName As String
 Public connectseconds As Long
-'Public BNLSServer As String
 Public random As Integer
 Public dctime As Integer
 Public IdleTime As Integer
