@@ -5,7 +5,7 @@ Object = "{3B7C8863-D78F-101B-B9B5-04021C009402}#1.2#0"; "RICHTX32.OCX"
 Object = "{48E59290-9880-11CF-9754-00AA00C00908}#1.0#0"; "MSINET.OCX"
 Begin VB.Form frmMain 
    BackColor       =   &H001D1D1D&
-   Caption         =   "Invigoration Private 1.2.1"
+   Caption         =   "Invigoration [Nightly]"
    ClientHeight    =   5625
    ClientLeft      =   255
    ClientTop       =   1005
@@ -461,7 +461,6 @@ Begin VB.Form frmMain
       _ExtentY        =   7646
       _Version        =   393217
       BackColor       =   2368548
-      Enabled         =   -1  'True
       ReadOnly        =   -1  'True
       ScrollBars      =   2
       DisableNoScroll =   -1  'True
@@ -685,7 +684,6 @@ Public connectstatus As Boolean
 Public winampnow As String
 Public sUserName As String
 Public connectseconds As Long
-'Public BNLSServer As String
 Public random As Integer
 Public dctime As Integer
 Public IdleTime As Integer
@@ -727,6 +725,7 @@ Private Sub Form_Load()
     LoadConfig
     InvigNews = devNEWS.OpenURL("http://www.bnet.cc/invigoration/news.txt")
     InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
+    'InvigNight = devNEWS.OpenURL("http://www.bnet.cc/invigoration/nversion.txt")
     InvigRel = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
     AddChat D2MedBlue, "Version Check: "
     connectstatus = False
@@ -737,7 +736,8 @@ Private Sub Form_Load()
         mnuUpdate.Enabled = False
     ElseIf InvigVer < vernum Then
         privatever = True
-        AddChat D2White, "You are running Invigoration PRIVATE BETA."
+        
+        AddChat D2White, "You are running Invigoration Nightly Build...."
         mnuUpdate.Enabled = False
             Else
         privatever = False
@@ -754,8 +754,8 @@ Private Sub Form_Load()
     AddChat D2MedBlue, "()()"
     AddChat D2MedBlue, "(--)"
     AddChat D2MedBlue, "(')(')"
-    AddChat D2Green, "Invigoration Bunny"
-    AddChat D2Orange, "Public Open Source Version: " & InvigVer
+    AddChat D2Green, "Invigoration  rNightly  gBunny"
+    AddChat D2Orange, "Public Open Source Version: " & vernum
     AddChat D2MedBlue, "---------------------------------------------------"
     frmConfigBNET.txtCDKey.text = GetStuff("BNET", "CDKey")
     frmConfigBNET.txtCDKey2.text = GetStuff("BNET", "CDKey2")
@@ -1329,6 +1329,7 @@ Private Sub txtSendBNET_KeyPress(keyascii As Integer)
                 Message = txtsendbnet.text
                 DoAddToSendList txtsendbnet.text
                 txtsendbnet.text = vbNullString
+                Dim channel As String
             If Left$(Message, 1) = "/" Then
                 ParseCommand Message, BNET.username, True
                 Exit Sub
@@ -1447,7 +1448,7 @@ End Sub
 
 
 Private Sub Update_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.ClanBNU.ws/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/", 0&, 0&, 0&
 End Sub
 Private Sub wsBnet_Close()
     mnuConnect.Visible = True
@@ -1506,16 +1507,38 @@ Private Sub ChatBot_OnUser(ByVal username As String, ByVal Flags As Long, ByVal 
 Dim ParsedString As String, thing As New BnetBot
     Call ParseStatString(Message, ParsedString)
     newest = username
+    '''''''''''''''''''''''''''''''''''''''''''''''
+    'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
+    'All developers for Invigoration are recommended to add their own.
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "myst" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "bnu-bot" Then
+        Flags = &H800000
+    Else
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
+    End If
+    'End of Special Flags Code
+    ''''''''''''''''''''''''''''''''''''''''''''''''''
     With frmMain.lstChannel
             '.ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add
         If Flags = "2" Then
             .ListItems.Add 1, , username, , thing.GetIconCode(Message, Flags)
             .ListItems(1).ListSubItems.Add , , GetPingCode(Ping)
-            .ListItems(1).ToolTipText = "[" & ParsedString & "](" & Ping & "ms) moderator"
+            .ListItems(1).ToolTipText = "[" & ParsedString & "](" & Ping & "ms) MODERATOR"
         ElseIf Flags = "1" Then
             .ListItems.Add 1, , username, , thing.GetIconCode(Message, Flags)
             .ListItems(1).ListSubItems.Add , , GetPingCode(Ping)
             .ListItems(1).ToolTipText = "Blizzard Representative"
+        ElseIf Flags = "&H80000" Then
+            .ListItems.Add , , username, , thing.GetIconCode(Message, Flags)
+            .ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add , , GetPingCode(Ping)
+            .ListItems(frmMain.lstChannel.ListItems.Count).ToolTipText = "[Invigoration Development Team]"
         Else
             .ListItems.Add , , username, , thing.GetIconCode(Message, Flags)
             .ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add , , GetPingCode(Ping)
@@ -1550,7 +1573,7 @@ Private Sub ChatBot_OnChannel(ByVal ChannelName As String, ByVal Flags As Long)
         Refresh
     End With
     BNET.CurrentChan = ChannelName
-    AddChat D2Orange, "Joining (" & GetChannelType(Flags) & ") " & ChannelName & "."
+    AddChat D2Orange, "Joining (" & GetChannelType(Flags) & ") " & ChannelName & " w/Flags: " & Flags & "."
 End Sub
 
 Private Sub ChatBot_OnEmote(ByVal username As String, ByVal Flags As Long, ByVal Message As String)
@@ -1587,6 +1610,24 @@ End Sub
 
 Private Sub ChatBot_OnFlags(ByVal username As String, ByVal Flags As Long, ByVal Message As String, ByVal Ping As Long)
 Dim thing As New BnetBot
+    '''''''''''''''''''''''''''''''''''''''''''''''
+    'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
+    'All developers for Invigoration are recommended to add their own.
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "myst" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "bnu-bot" Then
+        Flags = &H800000
+    Else
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
+    End If
+    'End of Special Flags Code
+    ''''''''''''''''''''''''''''''''''''''''''''''''''
     For X = 1 To frmMain.lstChannel.ListItems.Count
         If frmMain.lstChannel.ListItems.Item(X).text = username Then
             With frmMain.lstChannel
@@ -1608,6 +1649,24 @@ Private Sub ChatBot_OnJoin(ByVal username As String, ByVal Flags As Long, ByVal 
 Dim ParsedString As String, thing As New BnetBot
     Call ParseStatString(Message, ParsedString)
     With frmMain.lstChannel
+    '''''''''''''''''''''''''''''''''''''''''''''''
+    'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
+    'All developers for Invigoration are recommended to add their own.
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "myst" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "bnu-bot" Then
+        Flags = &H800000
+    Else
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
+    End If
+    'End of Special Flags Code
+    ''''''''''''''''''''''''''''''''''''''''''''''''''
     If LCase(frmMain.lstChannel.ListItems.Count) = LCase(BNET.username) Then
          '' Do Something
     Else
@@ -1624,9 +1683,9 @@ Dim ParsedString As String, thing As New BnetBot
     End If
         GetPingColor username, Flags, Ping
         If BNET.JoinNotify = "1" Then
-        AddChat D2Green, username & " has entered the channel. Ping: " & Ping & "ms"
+            AddChat D2Green, username & " has entered the channel. Ping: " & Ping & "ms"
         Else
-    End If
+        End If
 End If
     With frmMain.txtChannelInfo
         .Caption = BNET.CurrentChan & " (" & frmMain.lstChannel.ListItems.Count & ")"
@@ -1635,6 +1694,21 @@ End If
 End With
 End Sub
 Private Sub ChatBot_OnLeave(ByVal username As String, ByVal Flags As Long)
+    '''''''''''''''''''''''''''''''''''''''''''''''
+    'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+        Flags = &H80000
+    ElseIf LCase(username) = "bnu-bot" Then
+        Flags = &H800000
+        If BNET.BNCCICON = 1 Then
+             ElseIf LCase(username) = BNET.username Then
+        Flags = &H800000
+        Else
+        End If
+    Else
+    End If
+    'End of Special Flags Code
+    ''''''''''''''''''''''''''''''''''''''''''''''''''
 On Error Resume Next
     With frmMain.lstChannel
         .ListItems.Remove frmMain.lstChannel.FindItem(username).Index
@@ -1644,56 +1718,37 @@ On Error Resume Next
     End With
     
     If BNET.JoinNotify = "1" Then
-    AddChat D2Green, username & " has left the channel."
+        AddChat D2Green, username & " has left the channel."
     Else
     End If
 End Sub
 
 Private Sub ChatBot_OnTalk(ByVal username As String, ByVal Flags As Long, ByVal Message As String, ByVal Ping As Long)
-Message = Replace(Message, "ÿC1", vbNullString)
-Message = Replace(Message, "ÿC2", vbNullString)
-Message = Replace(Message, "ÿC3", vbNullString)
-Message = Replace(Message, "ÿC4", vbNullString)
-Message = Replace(Message, "ÿC5", vbNullString)
-Message = Replace(Message, "ÿC6", vbNullString)
-Message = Replace(Message, "ÿC7", vbNullString)
-Message = Replace(Message, "ÿC8", vbNullString)
-Message = Replace(Message, "ÿC9", vbNullString)
-Message = Replace(Message, "ÿC:", vbNullString)
-Message = Replace(Message, "ÿC;", vbNullString)
-Message = Replace(Message, "ÿC<", vbNullString)
-Message = Replace(Message, "ÁP", vbNullString)
-Message = Replace(Message, "ÁQ", vbNullString)
-Message = Replace(Message, "ÁR", vbNullString)
-Message = Replace(Message, "ÁS", vbNullString)
-Message = Replace(Message, "ÁT", vbNullString)
-Message = Replace(Message, "ÁU", vbNullString)
-Message = Replace(Message, "ÁV", vbNullString)
-Message = Replace(Message, "ÁW", vbNullString)
-Message = Replace(Message, "ÁX", vbNullString)
-Message = Replace(Message, "ÁY", vbNullString)
-Message = Replace(Message, "ÁZ", vbNullString)
-Message = Replace(Message, "Á[", vbNullString)
-'Outdated Vercheck, disabled for security of the user.
-If LCase(username) = "tagban" Or LCase(username) = "*tagban" Or LCase(username) = "tagban@useast" Or LCase(username) = "bnu-master" Or LCase(username) = "bnu-master@useast" Then
-
-    'If Message = "%ver" Then
-    'Message = "Version Check"
-    '         AddChat D2White, ":: ", D2Beige1, username & " :: ", D2White, Message
-    'Send "/w " & username & " Invigoration version: " & vernum & " ^^", frmMain.wsBnet
-    'Else
-    '
-    Select Case Mid$(Message, 1, 1)
-    
-        Case Chr(163)
-            AddChat D2Beige1, ":: " & username & " :: ", HEXPINK, "[HEX] " & HexToStr(Mid$(Message, 2, Len(Message)))
-        Case Chr(149)
-            AddChat D2Beige1, ":: " & username & " :: ", HEXPINK, "[INVIG] " & InvigDecrypt(Mid$(Message, 2, Len(Message)))
-        Case Else
-             AddChat D2Beige1, ":: " & username & " :: ", D2White, Message
-    End Select
-    'End If
-Else 'noone important
+    Message = Replace(Message, "ÿC1", vbNullString)
+    Message = Replace(Message, "ÿC2", vbNullString)
+    Message = Replace(Message, "ÿC3", vbNullString)
+    Message = Replace(Message, "ÿC4", vbNullString)
+    Message = Replace(Message, "ÿC5", vbNullString)
+    Message = Replace(Message, "ÿC6", vbNullString)
+    Message = Replace(Message, "ÿC7", vbNullString)
+    Message = Replace(Message, "ÿC8", vbNullString)
+    Message = Replace(Message, "ÿC9", vbNullString)
+    Message = Replace(Message, "ÿC:", vbNullString)
+    Message = Replace(Message, "ÿC;", vbNullString)
+    Message = Replace(Message, "ÿC<", vbNullString)
+    Message = Replace(Message, "ÁP", vbNullString)
+    Message = Replace(Message, "ÁQ", vbNullString)
+    Message = Replace(Message, "ÁR", vbNullString)
+    Message = Replace(Message, "ÁS", vbNullString)
+    Message = Replace(Message, "ÁT", vbNullString)
+    Message = Replace(Message, "ÁU", vbNullString)
+    Message = Replace(Message, "ÁV", vbNullString)
+    Message = Replace(Message, "ÁW", vbNullString)
+    Message = Replace(Message, "ÁX", vbNullString)
+    Message = Replace(Message, "ÁY", vbNullString)
+    Message = Replace(Message, "ÁZ", vbNullString)
+    Message = Replace(Message, "Á[", vbNullString)
+    'Message Data
     Select Case Mid$(Message, 1, 1)
         Case Chr(163)
             AddChat D2Beige1, ":: " & username & " :: ", HEXPINK, "[HEX] " & HexToStr(Mid$(Message, 2, Len(Message)))
@@ -1702,7 +1757,6 @@ Else 'noone important
         Case Else
              AddChat D2Beige1, ":: " & username & " :: ", D2White, Message
         End Select
-    End If
 ParseCommand Message, username 'send commands to parser
 Call fBotColors
 End Sub

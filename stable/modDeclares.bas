@@ -1,6 +1,7 @@
 Attribute VB_Name = "modDeclares"
-Public Const botver = "1.2.5 [Open]"
-Public Const vernum = "1.2.5"
+Public Const botver = "1.2.9[Stable]"
+Public Const vernum = "1.2.9"
+'webbotsite = "http://webbot.bnetweb.org/webbot.php?u=" & webbotuser & "&p=" & webbotpass
 ''''''''''''''''''''''''''''''''''''''''''''''
 Public Declare Function GetTickCount& Lib "KERNEL32" ()
 'World-Accessable declares
@@ -76,6 +77,9 @@ Public Type BotData
     NewPass As String
     CurrentChan As String
     FontSize As String
+    ZEROPING As String
+    NEGPING As String
+    BNCCICON As String
 End Type
 Public BNET As BotData
 Public Type BotNetData
@@ -110,6 +114,8 @@ Public hash(2) As String
 Public Temporary As String
 Public Function WindowsRunTime() As Long
     WindowsRunTime = GetTickCount()
+    WindowsRunTime = WindowsRunTime / 60
+    WindowsRunTime = WindowsRunTime / 60
 End Function
 Public Function OSVersion() As String
     
@@ -127,6 +133,18 @@ Public Function OSVersion() As String
     lPlatformID = udtOSVersion.dwPlatformId
     
     Select Case lMajorVersion
+        Case 7
+            sAns = "Pure Fucking Awesomeness!"
+        Case 6
+            If lMinorVersion = 0 Then
+            
+                sAns = "Windows Vista"
+                
+            ElseIf lMinorVersion = 1 Then
+            
+                sAns = "Windows 7"
+            
+            End If
         Case 5
         
             ' Added the following to give suppport for Windows XP!
