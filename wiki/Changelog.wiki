@@ -3,6 +3,21 @@
 
 = Invigoration 1.2.x Changelog =<br>
  ----<br>
+*1.2.9* ---
+_Released 9/14/2010_<br>
+ * Fixed Configuration Screen glitches
+ * Added support for 0ms Ping
+ * Added support for -1ms Ping
+ * Started work on flag modifications (eventually allowing users to set flags)
+ * *RESOLVED* Glitch with connection that would fail unexpectedly
+ * *RESOLVED* User not being able to 'Focus' on Moderators in channel.
+ * *FEATURE* Added BNU`Bot and BNET.cc icons to Invigoration (Currently hardcoded, eventually added with flags feature)
+ * *TODO*: Ping Spoof Option (Wait time in ms)
+ * *TODO*: Clan Creation/Accept/Decline options. (TO handle Voided/Muted users also)
+ * * This may result in a separate clan creation program entirely.. not sure yet.
+ * *RESOLVED* When account is closed, would crash bot. (Status Code handler added to packet)
+ * *RESOLVED* Color Codes not working properly<br>
+
 *1.2.5* ---
 _Released 9/12/2010_<br>
  * Automatically reconnects after creation of an account
