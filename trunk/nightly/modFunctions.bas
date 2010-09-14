@@ -44,6 +44,7 @@ Dim FullText As String
     BNET.Trigger = GetStuff("BNET", "Trigger")
     BNET.BNLSServer = GetStuff("BNLS", "Server")
     BNET.Realm = GetStuff("BNET", "Realm")
+    BNET.BNCCICON = GetStuff("BNET", "BNCCICON")
 End Function
 
 Public Function SaveConfig()
@@ -65,6 +66,7 @@ Dim FullText As String
     WriteStuff "BNET", "Trigger", BNET.Trigger
     WriteStuff "BNLS", "Server", BNET.BNLSServer
     WriteStuff "BNET", "Realm", BNET.BattlenetServer
+    WriteStuff "BNET", "BNCCICON", BNET.BNCCICON
     
 End Function
 
