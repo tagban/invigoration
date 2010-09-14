@@ -326,11 +326,11 @@ Begin VB.Form frmConfigBNET
             BackColor       =   &H00000040&
             ForeColor       =   &H000080FF&
             Height          =   285
-            Left            =   120
+            Left            =   240
             TabIndex        =   32
             Text            =   "bnls.net"
             Top             =   1560
-            Width           =   1935
+            Width           =   1815
          End
          Begin VB.CheckBox chkJoinNotify 
             Alignment       =   1  'Right Justify
@@ -355,9 +355,11 @@ Begin VB.Form frmConfigBNET
             Width           =   1095
          End
          Begin VB.Label Label8 
+            BackColor       =   &H80000007&
             Caption         =   "BNLS/JBLS"
+            ForeColor       =   &H0000FFFF&
             Height          =   255
-            Left            =   240
+            Left            =   120
             TabIndex        =   33
             Top             =   1320
             Width           =   1695
