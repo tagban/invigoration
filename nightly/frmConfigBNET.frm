@@ -33,7 +33,7 @@ Begin VB.Form frmConfigBNET
       ItemData        =   "frmConfigBNET.frx":08CA
       Left            =   2520
       List            =   "frmConfigBNET.frx":08DA
-      TabIndex        =   24
+      TabIndex        =   2
       Text            =   "BNET Servers"
       Top             =   480
       Width           =   2175
@@ -41,7 +41,7 @@ Begin VB.Form frmConfigBNET
    Begin MSComctlLib.ListView lstchannels 
       Height          =   30
       Left            =   240
-      TabIndex        =   13
+      TabIndex        =   26
       Top             =   3120
       Visible         =   0   'False
       Width           =   135
@@ -69,7 +69,7 @@ Begin VB.Form frmConfigBNET
       EndProperty
       Height          =   375
       Left            =   3720
-      TabIndex        =   1
+      TabIndex        =   16
       Top             =   3000
       Width           =   855
    End
@@ -87,7 +87,7 @@ Begin VB.Form frmConfigBNET
       EndProperty
       Height          =   375
       Left            =   2640
-      TabIndex        =   0
+      TabIndex        =   15
       Top             =   3000
       Width           =   855
    End
@@ -107,7 +107,7 @@ Begin VB.Form frmConfigBNET
       ForeColor       =   &H00FFFFFF&
       Height          =   3615
       Left            =   120
-      TabIndex        =   2
+      TabIndex        =   17
       Top             =   0
       Width           =   7335
       Begin VB.CheckBox chkNEGPING 
@@ -118,7 +118,7 @@ Begin VB.Form frmConfigBNET
          Height          =   195
          Left            =   6000
          MaskColor       =   &H00000000&
-         TabIndex        =   25
+         TabIndex        =   8
          Top             =   480
          Width           =   1095
       End
@@ -136,7 +136,7 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   1935
          Left            =   120
-         TabIndex        =   11
+         TabIndex        =   24
          Top             =   1560
          Width           =   4695
          Begin VB.TextBox txtEmail 
@@ -144,7 +144,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   240
-            TabIndex        =   31
+            TabIndex        =   35
             Text            =   "e-mail addr"
             Top             =   1440
             Width           =   1335
@@ -154,7 +154,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   3240
-            TabIndex        =   29
+            TabIndex        =   33
             Text            =   "CD Key 2 OFF"
             Top             =   600
             Width           =   1335
@@ -163,9 +163,9 @@ Begin VB.Form frmConfigBNET
             BackColor       =   &H00000040&
             ForeColor       =   &H000080FF&
             Height          =   285
-            Left            =   4200
+            Left            =   4080
             MaxLength       =   1
-            TabIndex        =   22
+            TabIndex        =   7
             Text            =   "!"
             Top             =   1080
             Width           =   375
@@ -184,7 +184,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   240
-            TabIndex        =   16
+            TabIndex        =   5
             ToolTipText     =   $"frmConfigBNET.frx":0928
             Top             =   840
             Width           =   1335
@@ -204,7 +204,7 @@ Begin VB.Form frmConfigBNET
             Height          =   285
             IMEMode         =   3  'DISABLE
             Left            =   3240
-            TabIndex        =   15
+            TabIndex        =   6
             Text            =   "1234567891011"
             ToolTipText     =   "Input Product CD Key"
             Top             =   240
@@ -226,7 +226,7 @@ Begin VB.Form frmConfigBNET
             ItemData        =   "frmConfigBNET.frx":09B3
             Left            =   840
             List            =   "frmConfigBNET.frx":09CC
-            TabIndex        =   14
+            TabIndex        =   4
             Text            =   "PXES"
             ToolTipText     =   "Product ID (Backwards)"
             Top             =   240
@@ -247,7 +247,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   30
+            TabIndex        =   34
             Top             =   1200
             Width           =   1695
          End
@@ -258,7 +258,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   2400
-            TabIndex        =   28
+            TabIndex        =   32
             Top             =   600
             Width           =   855
          End
@@ -268,7 +268,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   2280
-            TabIndex        =   23
+            TabIndex        =   31
             Top             =   1080
             Width           =   1455
          End
@@ -278,7 +278,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   18
+            TabIndex        =   28
             Top             =   600
             Width           =   1095
          End
@@ -289,7 +289,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   2520
-            TabIndex        =   17
+            TabIndex        =   27
             Top             =   240
             Width           =   1335
          End
@@ -308,7 +308,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   12
+            TabIndex        =   25
             Top             =   240
             Width           =   2055
          End
@@ -319,9 +319,23 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   3255
          Left            =   5040
-         TabIndex        =   21
+         TabIndex        =   30
          Top             =   240
          Width           =   2175
+         Begin VB.CheckBox chkBNCCICON 
+            Alignment       =   1  'Right Justify
+            BackColor       =   &H00000000&
+            Caption         =   "BNET.cc Flags"
+            Enabled         =   0   'False
+            ForeColor       =   &H0000C0C0&
+            Height          =   195
+            Left            =   480
+            MaskColor       =   &H00000000&
+            TabIndex        =   11
+            Top             =   960
+            Visible         =   0   'False
+            Width           =   1575
+         End
          Begin VB.CheckBox chkUDP 
             Alignment       =   1  'Right Justify
             BackColor       =   &H00000000&
@@ -330,7 +344,7 @@ Begin VB.Form frmConfigBNET
             Height          =   195
             Left            =   960
             MaskColor       =   &H00000000&
-            TabIndex        =   35
+            TabIndex        =   10
             Top             =   720
             Width           =   1095
          End
@@ -342,7 +356,7 @@ Begin VB.Form frmConfigBNET
             Height          =   195
             Left            =   960
             MaskColor       =   &H00000000&
-            TabIndex        =   34
+            TabIndex        =   9
             Top             =   480
             Width           =   1095
          End
@@ -351,7 +365,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   240
-            TabIndex        =   32
+            TabIndex        =   14
             Text            =   "bnls.net"
             Top             =   2880
             Width           =   1815
@@ -363,7 +377,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000C0C0&
             Height          =   375
             Left            =   240
-            TabIndex        =   27
+            TabIndex        =   12
             Top             =   1800
             Width           =   1815
          End
@@ -374,7 +388,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000C0C0&
             Height          =   255
             Left            =   960
-            TabIndex        =   26
+            TabIndex        =   13
             Top             =   2160
             Width           =   1095
          End
@@ -384,7 +398,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   33
+            TabIndex        =   36
             Top             =   2640
             Width           =   1695
          End
@@ -395,7 +409,7 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   615
          Left            =   2280
-         TabIndex        =   19
+         TabIndex        =   29
          Top             =   960
          Width           =   2535
          Begin VB.TextBox txtHomeChannel 
@@ -413,7 +427,7 @@ Begin VB.Form frmConfigBNET
             Height          =   285
             IMEMode         =   3  'DISABLE
             Left            =   120
-            TabIndex        =   20
+            TabIndex        =   3
             Text            =   "Clan BNU"
             ToolTipText     =   "Your Home Channel"
             Top             =   240
@@ -434,7 +448,7 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   615
          Left            =   2280
-         TabIndex        =   7
+         TabIndex        =   20
          Top             =   240
          Width           =   2535
          Begin VB.TextBox aSDASD 
@@ -452,7 +466,7 @@ Begin VB.Form frmConfigBNET
             Height          =   285
             Index           =   0
             Left            =   2520
-            TabIndex        =   8
+            TabIndex        =   21
             Top             =   1320
             Visible         =   0   'False
             Width           =   2295
@@ -472,7 +486,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   10
+            TabIndex        =   23
             Top             =   0
             Width           =   1335
          End
@@ -490,7 +504,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H00000000&
             Height          =   255
             Left            =   2520
-            TabIndex        =   9
+            TabIndex        =   22
             Top             =   1320
             Visible         =   0   'False
             Width           =   2295
@@ -511,7 +525,7 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   615
          Left            =   120
-         TabIndex        =   5
+         TabIndex        =   19
          Top             =   240
          Width           =   2055
          Begin VB.TextBox txtUsername 
@@ -529,7 +543,7 @@ Begin VB.Form frmConfigBNET
             Height          =   285
             Left            =   120
             MaxLength       =   15
-            TabIndex        =   6
+            TabIndex        =   0
             Text            =   "InvigNetUser"
             ToolTipText     =   "Input Battle.net Username Here"
             Top             =   240
@@ -551,7 +565,7 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   615
          Left            =   120
-         TabIndex        =   3
+         TabIndex        =   18
          Top             =   960
          Width           =   2055
          Begin VB.TextBox txtPassword 
@@ -570,7 +584,7 @@ Begin VB.Form frmConfigBNET
             IMEMode         =   3  'DISABLE
             Left            =   120
             PasswordChar    =   "º"
-            TabIndex        =   4
+            TabIndex        =   1
             Text            =   "Password"
             ToolTipText     =   "Password"
             Top             =   240
@@ -631,6 +645,11 @@ On Error GoTo Error
     BNET.HomeChannel = txtHomeChannel.text
     BNET.BotMaster = txtBotMaster.text
     'BNET.Trigger = txtTrigger.text
+    If chkBNCCICON.value = vbUnchecked Then
+        BNET.BNCCICON = 0
+    ElseIf chkBNCCICON.value = vbChecked Then
+        BNET.BNCCICON = 1
+    End If
     If chkUDP.value = vbUnchecked Then
         BNET.UDP = 0
     ElseIf chkUDP.value = vbChecked Then
@@ -699,6 +718,11 @@ On Error GoTo Error
         chkUDP.value = vbUnchecked
     Else
         chkUDP.value = vbChecked
+    End If
+    If BNET.BNCCICON = 0 Then
+        chkBNCCICON.value = vbUnchecked
+    Else
+        chkBNCCICON.value = vbChecked
     End If
     If BNET.ZEROPING = 0 Then
         chkZEROPING.value = vbUnchecked

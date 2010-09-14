@@ -113,7 +113,7 @@ If BNET.ShowPing = "0" Then
     ElseIf BNET.ShowPing = "1" Then
      Select Case Ping
         Case Is < 0
-            GetPingCode = "-1"
+            GetPingCode = "lllll"
         Case 0 To 200
             GetPingCode = "l"
         Case 200 To 300
@@ -125,12 +125,12 @@ If BNET.ShowPing = "0" Then
         Case 500 To 600
             GetPingCode = "lllll"
         Case Else
-            GetPingCode = "SLOW"
+            GetPingCode = "lllll"
         End Select
     Else
      Select Case Ping
         Case Is < 0
-            GetPingCode = "-1"
+            GetPingCode = "l"
         Case 0 To 200
             GetPingCode = "l"
         Case 200 To 300
@@ -142,7 +142,7 @@ If BNET.ShowPing = "0" Then
         Case 500 To 600
             GetPingCode = "lllll"
         Case Else
-            GetPingCode = "llllll"
+            GetPingCode = "lllll"
     End Select
     End If
 End Function
