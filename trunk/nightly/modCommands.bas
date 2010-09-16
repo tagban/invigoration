@@ -176,8 +176,8 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
         AddChat D2MedBlue, Rest & " will be displayed after each send."
         AddChat D2MedBlue, "To deactivate, type: '/postpend' with nothig after it."
         postpend = Rest & vbNullString
-    Case "join"
-        Send "/join " & Rest, frmMain.wsBnet
+   ' Case "join"
+        'Send "/join " & Rest, frmMain.wsBnet
     Case "setmaster"
         BNET.BotMaster = Rest
         Send LastCW & " Bot master changed!", frmMain.wsBnet
@@ -286,6 +286,8 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
                 Send LastCW & "Cows are off...", frmMain.wsBnet
                 LastCW = vbNullString
             End If
+    Case "l"
+            Send LastCW & "/f m " & Rest, frmMain.wsBnet
         'Elmer Fudd Mode
 '''''''WINAMP COMMANDS''''''''''''''''''
     Case "winamp"
