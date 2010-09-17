@@ -30,21 +30,12 @@ Dim FullText As String
     BNET.username = GetStuff("BNET", "Username")
     BNET.Password = GetStuff("BNET", "Password")
     BNET.CDKey = GetStuff("BNET", "CDKey")
-    BNET.CDKey2 = GetStuff("BNET", "CDKey2")
     BNET.Product = GetStuff("BNET", "Product")
-    BNET.email = GetStuff("BNET", "Email")
     BNET.BattlenetServer = GetStuff("BNET", "Server")
     BNET.HomeChannel = GetStuff("BNET", "Home")
-    BNET.BotMaster = GetStuff("BNET", "BotMaster")
-    BNET.UDP = GetStuff("BNET", "UDP")
-    BNET.ZEROPING = GetStuff("BNET", "ZEROPING")
-    BNET.NEGPING = GetStuff("BNET", "NEGPING")
-    BNET.ShowPing = GetStuff("BNET", "ShowPing")
-    BNET.JoinNotify = GetStuff("BNET", "JoinNotify")
-    BNET.Trigger = GetStuff("BNET", "Trigger")
+    BNET.WebUser = GetStuff("BNET", "WebUser")
+    BNET.WebPass = GetStuff("BNET", "WebPass")
     BNET.BNLSServer = GetStuff("BNLS", "Server")
-    BNET.Realm = GetStuff("BNET", "Realm")
-    BNET.BNCCICON = GetStuff("BNET", "BNCCICON")
 End Function
 
 Public Function SaveConfig()
@@ -52,22 +43,12 @@ Dim FullText As String
     WriteStuff "BNET", "Username", BNET.username
     WriteStuff "BNET", "Password", BNET.Password
     WriteStuff "BNET", "CDKey", BNET.CDKey
-    WriteStuff "BNET", "CDKey2", BNET.CDKey2
     WriteStuff "BNET", "Product", BNET.Product
-    WriteStuff "BNET", "Owner", BNET.email
     WriteStuff "BNET", "Server", BNET.BattlenetServer
     WriteStuff "BNET", "Home", BNET.HomeChannel
-    WriteStuff "BNET", "BotMaster", BNET.BotMaster
-    WriteStuff "BNET", "UDP", BNET.UDP
-    WriteStuff "BNET", "ZEROPING", BNET.ZEROPING
-    WriteStuff "BNET", "NEGPING", BNET.NEGPING
-    WriteStuff "BNET", "ShowPing", BNET.ShowPing
-    WriteStuff "BNET", "JoinNotify", BNET.JoinNotify
-    WriteStuff "BNET", "Trigger", BNET.Trigger
+    WriteStuff "BNET", "WebUser", BNET.WebUser
+    WriteStuff "BNET", "WebPass", BNET.WebPass
     WriteStuff "BNLS", "Server", BNET.BNLSServer
-    WriteStuff "BNET", "Realm", BNET.BattlenetServer
-    WriteStuff "BNET", "BNCCICON", BNET.BNCCICON
-    
 End Function
 
 Public Function StrToHex(ByVal String1 As String) As String
@@ -80,16 +61,16 @@ Public Function StrToHex(ByVal String1 As String) As String
     StrToHex = strReturn
 End Function
 
-Public Function ToHex(Data As String) As String
+Public Function ToHex(data As String) As String
 Dim i As Integer
-For i = 1 To Len(Data)
-    ToHex = ToHex & Right("00" & Hex(Asc(Mid(Data, i, 1))), 2)
+For i = 1 To Len(data)
+    ToHex = ToHex & Right("00" & Hex(Asc(Mid(data, i, 1))), 2)
 Next i
 End Function
 
-Public Function GetWORD(Data As String) As Long
+Public Function GetWORD(data As String) As Long
 Dim lReturn As Long
-    Call CopyMemory(lReturn, ByVal Data, 2)
+    Call CopyMemory(lReturn, ByVal data, 2)
     GetWORD = lReturn
 End Function
 Public Function Rand(ByVal Low As Long, ByVal High As Long) As Long
@@ -126,7 +107,20 @@ On Error Resume Next
        End With
     Next i
     frmMain.rtbChat.SelText = vbCrLf
-    Call fBotColors
+End Sub
+Public Sub AddChat2(ParamArray Message() As Variant)
+On Error Resume Next
+
+    Dim i As Integer
+   For i = LBound(Message) To UBound(Message) Step 2
+       With frmMain.rtbChat
+           .SelStart = Len(.text)
+           .SelLength = 0
+           .SelColor = Message(i)
+           .SelText = Message(i + 1)
+       End With
+    Next i
+    frmMain.rtbChat.SelText = vbCrLf
 End Sub
 
 Public Function KillNull(ByVal text As String) As String
@@ -145,16 +139,7 @@ If Not frmMain.wsBnet.State = sckConnected Then Exit Sub
         .InsertNTString strText
         .SendPacket &HE
     End With
-    If Left(strText, 1) = "/" Then
-        Exit Sub
-    End If
-    If Left(strText, 1) = Chr(163) Then
-        AddChat D2White, ":: " & BNET.TrueUsername & " ::  ", HEXPINK, "[HEX] " & HexToStr(Mid$(strText, 2, Len(strText)))
-    ElseIf Left(strText, 1) = Chr(149) Then
-        AddChat D2White, ":: " & BNET.TrueUsername & " :: ", HEXPINK, "[INVIG] " & InvigDecrypt(Mid$(strText, 2, Len(strText)))
-    Else
         AddChat D2White, ":: " & BNET.TrueUsername & " :: " & strText
-    End If
 End Sub
 
 Public Function WriteStuff(appname As String, key As String, sString As String, Optional strIni As String) As Boolean
@@ -201,56 +186,7 @@ End Function
 
 Public Function ClearBuffers()
     frmMain.rtbChat.text = vbNullString
-    frmMain.txtsendbnet.Clear
     AddChat D2White, "Every buffer cleared."
-End Function
-Public Function InvigDecrypt(strText As String)
-    On Error GoTo Xit
-    Dim Combine As String, i As Integer, TEMP As String, Temp2 As Integer
-    Combine = vbNullString
-    For i = 1 To Len(strText)
-        Combine = Combine & Chr(Asc(Mid(strText, i, 1)) - 101)
-    Next i
-    TEMP = vbNullString
-    For i = 1 To Len(Combine) Step 3
-        Temp2 = Mid(Combine, i, 3)
-        TEMP = TEMP & Chr(Temp2)
-    Next i
-    InvigDecrypt = TEMP
-    Exit Function
-Xit:
-    InvigDecrypt = "<< Invigoration Decryption Failed >>"
-    Exit Function
-End Function
-Public Function InvigEncrypt(strText As String)
-    On Error GoTo Xit
-    Dim Combine As String, i As Integer, TEMP As String
-    Combine = vbNullString
-    TEMP = vbNullString
-    For i = 1 To Len(strText) - 1 Step 2
-        If Len(Trim(Str(Asc(Mid(strText, i, 1))))) < 3 Then
-            TEMP = "0" & Trim(Str(Asc(Mid(strText, i, 1))))
-        Else
-            TEMP = Trim(Str(Asc(Mid(strText, i, 1))))
-        End If
-        Combine = Combine & TEMP
-        If Len(Trim(Str(Asc(Mid(strText, i + 1, 1))))) < 3 Then
-            TEMP = "0" & Trim(Str(Asc(Mid(strText, i + 1, 1))))
-        Else
-            TEMP = Trim(Str(Asc(Mid(strText, i + 1, 1))))
-        End If
-        Combine = Combine & TEMP
-    Next i
-    TEMP = vbNullString
-    For i = 1 To Len(Combine)
-        TEMP = TEMP & Chr(Asc(Mid(Combine, i, 1)) + 101)
-    Next i
-    InvigEncrypt = TEMP
-    Clipboard.SetText TEMP
-    Exit Function
-Xit:
-    InvigEncrypt = "<< Invigoration Encryption Failed >>"
-    Exit Function
 End Function
 
 

@@ -9,8 +9,8 @@ Private spltns() As String, spltn() As String, strss As String, Split0B() As Str
 
 
 
-Public Function MakeServer(Data As String) As String
-    MakeServer = CLng("&H" & ToHex(Mid(Data, 1, 1))) & "." & CLng("&H" & ToHex(Mid(Data, 2, 1))) & "." & CLng("&H" & ToHex(Mid(Data, 3, 1))) & "." & CLng("&H" & ToHex(Mid(Data, 4, 1)))
+Public Function MakeServer(data As String) As String
+    MakeServer = CLng("&H" & ToHex(Mid(data, 1, 1))) & "." & CLng("&H" & ToHex(Mid(data, 2, 1))) & "." & CLng("&H" & ToHex(Mid(data, 3, 1))) & "." & CLng("&H" & ToHex(Mid(data, 4, 1)))
 End Function
 
 Public Sub Send0x51()
@@ -18,17 +18,9 @@ Public Sub Send0x51()
         .InsertDWORD GTC
         .InsertDWORD version
         .InsertDWORD CheckSum
-        If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-            .InsertDWORD &H2
-        Else
-            .InsertDWORD &H1
-        End If
+        .InsertDWORD &H1
         .InsertDWORD &H0
         .InsertNonNTString CdkeyHash
-        'AddChat D2Orange, StrToHex(CdkeyHash)
-        If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-           .InsertNonNTString Cdkey2Hash
-        End If
         .InsertNTString ExeInfo
         .InsertNTString BNET.username
         .SendPacket &H51
@@ -56,12 +48,9 @@ Public Sub Send0x50()
         .InsertNTString "USA"
         .InsertNTString "United States"
         .SendPacket &H50
-        If BNET.ZEROPING = 1 Then
             .InsertDWORD &H0
             .SendPacket &H25
-        Else
-            'Do Nothing
-        End If
+
     End With
 End Sub
 Public Sub Send0x07()
@@ -75,10 +64,7 @@ If frmMain.wsBnet.State = sckConnected Then
         On Error GoTo Error:
     End With
 ElseIf frmMain.wsBnet.State = sckClosed Then
-    frmMain.tmrAntiIdle.Enabled = False
-    With frmMain.lstChannel
-        .ListItems.Clear
-    End With
+
 Else
 Error:
 End If
@@ -90,96 +76,6 @@ Public Sub RequestBnetNews()
         .SendPacket &H46
     End With
 End Sub
-
-Public Function GetPingCode(ByVal Ping As Long) As String
-'frmConfigBNET.chkShowPing.value = GetStuff("BNET", "ShowPing")
-If BNET.ShowPing = "0" Then
-    Select Case Ping
-        Case Is < 0
-            GetPingCode = "-1"
-        Case 0 To 200
-            GetPingCode = Ping
-        Case 200 To 300
-            GetPingCode = Ping
-        Case 300 To 400
-            GetPingCode = Ping
-        Case 400 To 500
-            GetPingCode = Ping
-        Case 500 To 600
-            GetPingCode = Ping
-        Case Else
-            GetPingCode = Ping
-    End Select
-    ElseIf BNET.ShowPing = "1" Then
-     Select Case Ping
-        Case Is < 0
-            GetPingCode = "lllll"
-        Case 0 To 200
-            GetPingCode = "l"
-        Case 200 To 300
-            GetPingCode = "ll"
-        Case 300 To 400
-            GetPingCode = "lll"
-        Case 400 To 500
-            GetPingCode = "llll"
-        Case 500 To 600
-            GetPingCode = "lllll"
-        Case Else
-            GetPingCode = "lllll"
-        End Select
-    Else
-     Select Case Ping
-        Case Is < 0
-            GetPingCode = "l"
-        Case 0 To 200
-            GetPingCode = "l"
-        Case 200 To 300
-            GetPingCode = "ll"
-        Case 300 To 400
-            GetPingCode = "lll"
-        Case 400 To 500
-            GetPingCode = "llll"
-        Case 500 To 600
-            GetPingCode = "lllll"
-        Case Else
-            GetPingCode = "lllll"
-    End Select
-    End If
-End Function
-
-Public Function GetPingColor(User As String, Flags, Ping)
-'frmConfigBNET.chkShowPing.value = GetStuff("BNET", "ShowPing")
-If (Flags And &H10) = &H10 Then
-
-    Exit Function
-Else
-
-End If
-
-    Select Case Ping
-        Case Is < 0
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = D2MedBlue
-        Case 0 To 200
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = D2Green
-        Case 200 To 300
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = D2Green
-        Case 300 To 400
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = vbYellow
-        Case 400 To 500
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = vbYellow
-        Case 500 To 600
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = D2Red
-        Case Else
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).ForeColor = D2Purple
-    End Select
-    If BNET.ShowPing = "0" Then
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).Bold = False
-    ElseIf BNET.ShowPing = "1" Then
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).Bold = True
-    Else
-            frmMain.lstChannel.ListItems(frmMain.lstChannel.FindItem(User).Index).ListSubItems.Item(1).Bold = True
-    End If
-End Function
 
 Public Function GetChannelType(ByVal Flags As Long) As String
     Select Case Flags
@@ -196,62 +92,15 @@ Public Function GetChannelType(ByVal Flags As Long) As String
     End Select
 End Function
 
-Public Function GetIconTier(ByVal IconNum As Long, ByVal Race As String) As String
-    Select Case Race
-        Case "H"
-            Select Case IconNum
-                Case 1: GetIconTier = "footman"
-                Case 2: GetIconTier = "knight"
-                Case 3: GetIconTier = "archmage"
-                Case 4: GetIconTier = "medivh"
-                Case Else: GetIconTier = "unknown human"
-            End Select
-        Case "O"
-            Select Case IconNum
-                Case 1: GetIconTier = "grunt"
-                Case 2: GetIconTier = "tauren"
-                Case 3: GetIconTier = "far seer"
-                Case 4: GetIconTier = "thrall"
-                Case Else: GetIconTier = "unknown orc"
-            End Select
-        Case "N"
-            Select Case IconNum
-                Case 1: GetIconTier = "archer"
-                Case 2: GetIconTier = "druid of the claw"
-                Case 3: GetIconTier = "priestess of the moon"
-                Case 4: GetIconTier = "furion stomrage"
-                Case Else: GetIconTier = "unknown night elf"
-            End Select
-        Case "U"
-            Select Case IconNum
-                Case 1: GetIconTier = "ghoul"
-                Case 2: GetIconTier = "abomination"
-                Case 3: GetIconTier = "lich"
-                Case 4: GetIconTier = "tichondrius"
-                Case Else: GetIconTier = "unknown undead"
-            End Select
-        Case "R"
-            Select Case IconNum
-                Case 1: GetIconTier = "green dragon whelp"
-                Case 2: GetIconTier = "blue dragon"
-                Case 3: GetIconTier = "red dragon"
-                Case 4: GetIconTier = "deathwing"
-                Case Else: GetIconTier = "unknown random"
-            End Select
-        Case Else
-            GetIconTier = "unknown race"
-    End Select
-End Function
-
-Public Sub ParseBnet(Data As String)
-Dim PacketID As Byte, RP As Long, outb As String
+Public Sub ParseBnet(data As String)
+Dim PacketId As Byte, RP As Long, outb As String
 Dim accountHash As String
 Dim Product As String
 
     
-    PacketID = Asc(Mid(Data, 2, 1))
+    PacketId = Asc(Mid(data, 2, 1))
 
-    Select Case PacketID
+    Select Case PacketId
         Case &H0
         '' Liquid sex?
         Case &H34
@@ -263,15 +112,13 @@ Dim Product As String
                 .SendBNLSPacket &HB
             End With
         Case &H3E
-                P1 = Mid(Data, 5, 16)
-                Server = Mid(Data, 17, 8)
+                P1 = Mid(data, 5, 16)
+                Server = Mid(data, 17, 8)
                 Bleh2 = Mid(Server, 5, 4)
                 AddChat D2Green, "Current realm server: " & MakeServer(Bleh2)
-                P2 = Mid(Data, 29, 48)
-                frmMain.wsRealm.Close
-                frmMain.wsRealm.Connect MakeServer(Bleh2), 6112
+                P2 = Mid(data, 29, 48)
         Case &H51
-            Select Case GetWORD(Mid(Data, 5, 2))
+            Select Case GetWORD(Mid(data, 5, 2))
                 Case &H0 'ToDo: Remove BNLS from password/Username/CD Key equation.
                     AddChat D2Green, "Version Check + CDKey Check"
                     With PBuffer
@@ -280,11 +127,7 @@ Dim Product As String
                             .InsertNTString BNET.Password
                             .SendBNLSPacket &H2
                         Else
-                            If BNET.UDP = 1 Then
                                 .InsertNonNTString "bnet"
-                            Else
-                                .InsertNonNTString "tenb"
-                            End If
                             .SendPacket &H14
                             .SendPacket &H2D
                             If Cpass = False Then
@@ -321,25 +164,16 @@ Dim Product As String
                     AddChat D2Red, "Current cdkey is banned from Battle.net."
             End Select
     Case &H25 'Negative Ping 0x25 No Response!
-                'Do not respond for -1ms
-                If frmConfigBNET.chkNEGPING.value = vbChecked Then
-                    ' No response, -1 MS
-                Else
-                    If frmConfigBNET.chkZEROPING.value = vbChecked Then
-                    ' Do nothing
-                    Else
                         PBuffer.InsertDWORD &H0
                         PBuffer.SendPacket &H25
-                    End If
-                End If
     Case &H66
-            AddChat D2Green, "Friendlist Data has been changed: &H66"
+
     Case &H67
-            AddChat D2Green, "Added friend to friendlist: &H67"
+
     Case &H68
-            AddChat D2Red, "Friend has been removed from flist: &H68"
+
     Case &H53
-            If Asc(Mid$(Data, 5, 4)) = &H1 Then
+            If Asc(Mid$(data, 5, 4)) = &H1 Then
             'Account Doesn't Exist
                 If BNET.Product = "3RAW" Then
                     AddChat D2Red, "Account doesn't exist, unable to create using Warcraft III."
@@ -353,12 +187,12 @@ Dim Product As String
                 End If
             Else
                 With PBuffer
-                    .InsertNonNTString Mid(Data, 9, 64)
+                    .InsertNonNTString Mid(data, 9, 64)
                     .SendBNLSPacket &H3
                 End With
             End If
         Case &H52
-            Select Case GetWORD(Mid(Data, 5, 2))
+            Select Case GetWORD(Mid(data, 5, 2))
                 Case &H0
                     With PBuffer
                         .InsertNTString BNET.username
@@ -368,13 +202,13 @@ Dim Product As String
                 Case Else
             End Select
         Case &H54
-            Select Case GetWORD(Mid(Data, 5, 2))
+            Select Case GetWORD(Mid(data, 5, 2))
             Case &H0 ' Originally set as &H0
                 AddChat D2Green, "Battle.net Logon Passed!"
                 ConnectTry = 0
                 With PBuffer
                     .InsertNTString BNET.username
-                    .InsertByte 0
+                    .InsertBYTE 0
                     .SendPacket &HA
                     .InsertNonNTString BNET.Product
                     .SendPacket &HB
@@ -399,21 +233,17 @@ Dim Product As String
                     AddChat D2Green, "Battle.net Login Server Connecting to " & BNET.BNLSServer & "..."
                     frmMain.wsBnls.Close
                     frmMain.wsBnls.Connect BNET.BNLSServer, 9367
-                    frmMain.Caption = "Invigoration - [ Connecting to: " & BNET.BNLSServer & " ]"
-                    txtChannelInfo.Caption = "Connecting"
-                    txtChannelInfo.ForeColor = D2Green
-                    antiidlesecond = 0
-                    frmMain.tmrAntiIdle.Enabled = True
+                    frmMain.Caption = "BNET.cc - [ Connecting to: " & BNET.BNLSServer & " ]"
                     connectstatus = True
                 End If
             Case &HE    'Email Address, currently ignored
                         'TODO: support email registration
                 AddChat D2Green, "Battle.net Logon Passed!"
-                AddChat D2Orange, "Battle.net requested an e-mail address. Invigoration currently doesn't have the functionality to handle this and so it bypassed it."
+                AddChat D2Orange, "Battle.net requested an e-mail address. BNET.cc currently doesn't have the functionality to handle this and so it bypassed it."
                 ConnectTry = 0
                 With PBuffer
                     .InsertNTString BNET.username
-                    .InsertByte 0
+                    .InsertBYTE 0
                     .SendPacket &HA
                     .InsertNonNTString BNET.Product
                     .SendPacket &HB
@@ -425,7 +255,7 @@ Dim Product As String
         Case &H50 'Updated 9/12/2010 - Tagban
            Dim pB As New Buffer
            With pB
-                .SetBuffer Data
+                .SetBuffer data
                 .Skip 8
                 
                 Servers = .GetDWORD
@@ -448,7 +278,7 @@ Dim Product As String
             End With
                       
         Case &H46 ' get news reply .... Defunct??
-                spltns() = Split(StrToHex(Mid(Data, 22)), "0A")
+                spltns() = Split(StrToHex(Mid(data, 22)), "0A")
                 For tmpnews = 0 To UBound(spltns) - 1
                     AddChat D2Purple, "News: " & HexToStr(spltns(tmpnews))
                 Next tmpnews
@@ -456,14 +286,14 @@ Dim Product As String
             Erase spltns()
             
         Case &H31 ' password change reply
-            If InStr(Data, Chr(&H1)) Then
+            If InStr(data, Chr(&H1)) Then
                 AddChat D2MedBlue, "Password changed, logging on."
             Else
                 AddChat D2MedBlue, "Password not changed."
             End If
             
         Case &H3A ' account login reply
-            Select Case Asc(Mid(Data, 5, 1))
+            Select Case Asc(Mid(data, 5, 1))
                 Case &H1
                     AddChat D2Red, "Battle.net Logon failed!"
                     If AttemptedC = False Then
@@ -474,7 +304,6 @@ Dim Product As String
                             .InsertNonNTString BNET.Password
                             .SendBNLSPacket &HB
                         End With
-                    frmMain.tmrAntiIdle.Enabled = False
                     ElseIf AttemptedC = True Then
                     End If
                 Case &H2
@@ -485,14 +314,14 @@ Dim Product As String
                     AddChat D2Green, "Battle.net Logon Passed!"
                     ConnectTry = 0
                     With PBuffer
-                        If LRealm = True And BNET.Product = "VD2D" Or BNET.Product = "PX2D" Then 'D2 Specialized Login
+                        If LRealm = True And BNET.Product = "VD2D" Then 'D2 Specialized Login
                             .InsertDWORD &H0
                             .InsertDWORD &H0
-                            .InsertByte &H0
+                            .InsertBYTE &H0
                             .SendPacket &H34
                         Else
                             .InsertNTString BNET.username
-                            .InsertByte 0
+                            .InsertBYTE 0
                             .SendPacket &HA
                             .InsertNonNTString BNET.Product
                             .SendPacket &HB
@@ -504,29 +333,23 @@ Dim Product As String
                 Case Else
             End Select
             Exit Sub
-        Case &H59 'Battle.net wants an email address to send to register your current account with them.
-                AddChat D2MedBlue, "Please set email to this account via the actual game window. Invigoration doesn't register accounts."
-                ' This currently needs worked on - Tagban
+        Case &H59
+                AddChat D2MedBlue, "Please set email to this account via the actual game window. BNET.cc doesn't register accounts."
         Case &HF
-            frmMain.ChatBot.DispatchMessage Data
+            frmMain.ChatBot.DispatchMessage data
             Exit Sub
         Case &H2A
-                  '''''''''''''''''''' ACCOUNT CREATION ''''''''''''''''''''''
                 AddChat D2Orange, "Account created! :)"
                 AddChat D2Green, "Connecting with your NEW account!"
-                'Added Bnet Close to reconnect properly. 9/12/2010 - Tagban
                 frmMain.wsBnet.Close
                 AddChat D2Green, "Battle.net Login Server Connecting to " & BNET.BNLSServer & "..."
                 frmMain.wsBnls.Close
                 frmMain.wsBnls.Connect BNET.BNLSServer, 9367
-                frmMain.Caption = "Invigoration - [ Connecting to: " & BNET.BNLSServer & " ]"
-                frmMain.txtChannelInfo.Caption = "Connecting"
-                frmMain.txtChannelInfo.ForeColor = D2Green
-                frmMain.tmrAntiIdle.Enabled = True
+                frmMain.Caption = "BNET.cc - [ Connecting to: " & BNET.BNLSServer & " ]"
                 'Case &H26
         
         Case &HA 'Properly name game codes for better user experience during login process.
-                spltn() = Split(Data, Chr(0), 5)
+                spltn() = Split(data, Chr(0), 5)
                 BNET.TrueUsername = spltn(3)
                 If BNET.Product = "RATS" Then
                     Product = "Starcraft"
@@ -548,38 +371,30 @@ Dim Product As String
             Erase spltn()
             Exit Sub
         Case &HB
-                Split0B() = Split(Mid(Data, 5, Len(Data)), Chr(0))
-                For z = 0 To UBound(Split0B) - 2
-                    frmConfigBNET.lstchannels.ListItems.Add , , Split0B(z)
-                Next z
+                Split0B() = Split(Mid(data, 5, Len(data)), Chr(0))
+' What is HB ?
             Erase Split0B()
             Exit Sub
         Case &H19
-            AddChat D2White, "[&H19]: " & Replace(Mid(Data, 9, Len(Data)), Chr(0), vbNullString)
+            AddChat D2White, "[&H19]: " & Replace(Mid(data, 9, Len(data)), Chr(0), vbNullString)
             Exit Sub
         Case &H15 ' Ad Change, not really needed, fuck it.
             
-                'asplt() = Split(Mid(data, 21), Chr(0), 3)
-                'AddChat D2White, "Ad banner is now " & asplt(0) & " [url=" & asplt(1) & "]"
-            'Erase asplt()
         Case &H2D
-            
-                splti() = Split(Mid(Data, 1, Len(Data) - 1), Chr(1), 2)
-                'AddChat D2White, "Using " & splti(1) & " as icons file."
+                splti() = Split(Mid(data, 1, Len(data) - 1), Chr(1), 2)
             Erase splti()
         Case &H75
-                ''''''''' FUCK THIS PACKET! I HATE IT
+
         Case &H79 ' Currently, needs worked on. 9/12/2010 - Tagban
-                AddChat D2Red, "Clan Invite recieved. Invigoration due to security reasons no longer allows Clan Invites to be auto-accepted. Please try again using a different bot or the client."
         Case &H66
         Case &H69
         Case &H78
         Case Else
-            If Len(PacketID) = 1 Then
-                'AddChat D2White, "Unhandled Packet: 0x0" & Hex(PacketId)
+            If Len(PacketId) = 1 Then
+                AddChat D2White, "Unhandled Packet: 0x0" & Hex(PacketId)
             Else
-                'AddChat D2White, "Unhandled Packet: 0x" & Hex(PacketId)
+                AddChat D2White, "Unhandled Packet: 0x" & Hex(PacketId)
             End If
-            AddChat StrToHex(Data)
+            AddChat StrToHex(data)
     End Select
 End Sub

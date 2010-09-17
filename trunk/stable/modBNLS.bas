@@ -62,16 +62,12 @@ Select Case BNET.Product
         GetBNLSByte = &H1
     Case "PXES"
         GetBNLSByte = &H2
-    Case "PX2D"
-        GetBNLSByte = &H5
     Case "VD2D"
         GetBNLSByte = &H4
     Case "NB2W"
         GetBNLSByte = &H3
     Case "3RAW"
         GetBNLSByte = &H7
-    Case "PX3W"
-        GetBNLSByte = &H8
     Case Else
         AddChat "BNLS Can't find your game type."
 End Select
@@ -104,60 +100,18 @@ Select Case Asc(Mid(data, 3, 1))
             End If
          End With
          
-'(DWORD) Client Token
-'(DWORD) EXE Version
-'(DWORD) EXE Hash
-'(DWORD) Number of CD-keys in this packet
-'(BOOLEAN) Spawn CD-key
-
-'For Each Key:'
-
-   ' (DWORD) Key Length
-   ' (DWORD) CD-key's product value
-   ' (DWORD) CD-key's public value
-   ' (DWORD) Unknown (0)
-   ' (DWORD) [5] Hashed Key Data
-
-
-'(STRING) Exe Information
-'(STRING) CD-Key owner name
-
-        If varproduct = "PX2D" Or varproduct = "PX3W" Then
-            With PBuffer
-                .InsertDWORD &H0
-                .InsertBYTE &H2
-                .InsertDWORD &H1
-                .InsertDWORD Servers
-                .InsertNTString frmConfigBNET.txtCDKey.text
-                .InsertNTString frmConfigBNET.txtCDKey2.text
-                .SendBNLSPacket &HC
-            End With
-        Else
             With PBuffer
                .InsertDWORD Servers
                .InsertNTString frmConfigBNET.txtCDKey.text
                .SendBNLSPacket &H1
             End With
-        End If
          
     Case &H9
-        If varproduct = "PX2D" Or varproduct = "PX3W" Then
-            With PBuffer
-                .InsertDWORD &H0
-                .InsertBYTE &H2
-                .InsertDWORD &H1
-                .InsertDWORD Servers
-                .InsertNTString frmConfigBNET.txtCDKey.text
-                .InsertNTString frmConfigBNET.txtCDKey2.text
-                .SendBNLSPacket &HC
-            End With
-        Else
             With PBuffer
                .InsertDWORD Servers
                .InsertNTString frmConfigBNET.txtCDKey.text
                .SendBNLSPacket &H1
             End With
-        End If
     Case &H4
         With PBuffer
             .InsertNonNTString Mid$(data, 4)
@@ -216,14 +170,6 @@ Select Case Asc(Mid(data, 3, 1))
                 End If
                 .InsertDWORD &H0
                 .InsertNonNTString CdkeyHash
-                If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-                   .InsertNonNTString Cdkey2Hash
-                End If
-                If debugmode = 1 Then
-                    AddChat D2Orange, "CD Key Hash: " & CdkeyHash
-                    AddChat D2Orange, "CD Key Hash length :" & Len(CdkeyHash)
-                    AddChat D2Orange, "Sent H51.."
-                End If
                 .InsertNTString statstring
                 .InsertNTString BNET.username
                 .SendPacket &H51
@@ -232,7 +178,7 @@ Select Case Asc(Mid(data, 3, 1))
         Case &HE
             Dim key As Long, key2 As Long
             key2 = GetDWORD(Mid(data, 4, 4))
-            key = BNLSChecksum("Invigoration", key2)
+            key = BNLSChecksum("BNET.cc", key2)
             With PBuffer
                 .InsertDWORD key
                 .SendBNLSPacket &HF
@@ -246,13 +192,7 @@ Select Case Asc(Mid(data, 3, 1))
             AddChat HEXPINK, "HType = 1"
         End If
           CB = CB + 1
-                If debugmode = 1 Then
-                    AddChat HEXPINK, "CB: " & CB
-                End If
             If CB = 1 Then
-                If debugmode = 1 Then
-                    AddChat HEXPINK, "CB = 1 "
-                End If
                 hash(0) = PBuffer.MakeDWORD(GTC)
                 hash(1) = PBuffer.MakeDWORD(Servers)
                 hash(2) = Mid(data, 4, Len(data) - 3)
@@ -278,7 +218,6 @@ Select Case Asc(Mid(data, 3, 1))
                     Else
                         .InsertDWORD GTC
                         .InsertNonNTString Mid(data, 4, Len(data) - 3)
-                        .InsertNTString BNET.Realm
                         .SendPacket &H3E
                         CB = 0
                     End If

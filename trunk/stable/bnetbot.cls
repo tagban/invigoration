@@ -31,7 +31,6 @@ Private Const BNFLAGS_PLUG = &H10
 Private Const BNFLAGS_SQUELCH = &H20
 Private Const BNFLAGS_GLASSES = &H40
 Private Const BNFLAGS_GFPLAYER = &H200000
-Private Const INVIG = &H80000
 Private Const bnu = &H800000
 Private Const HACK = &H8000000
 Private Const WARCRAFT3 = &H80000000
@@ -51,7 +50,7 @@ Private Const pidBLIZZ = 63
 Private Const pidOP = 2
 Private Const pidSQU = 14
 Private Const pidW3XP = 62
-'' Invigoration Icons
+'' BNET.cc Icons
 '' id: 66 - BNET.cc Icon
 '' id: 67 - BNU`Bot Icon
 '' id: 68 - HACKER
@@ -142,7 +141,7 @@ Product = Mid(statstring, 1, 4)
     ElseIf (BNFLAGS_GLASSES And Flags) = BNFLAGS_GLASSES Then
         GetIconCode = 65
         Exit Function
-    ElseIf (INVIG And Flags) = INVIG Then
+    ElseIf (BNETcc And Flags) = BNETcc Then
         GetIconCode = 66
         Exit Function
     ElseIf (bnu And Flags) = bnu Then
