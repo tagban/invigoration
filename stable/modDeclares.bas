@@ -1,7 +1,6 @@
 Attribute VB_Name = "modDeclares"
-Public Const botver = "1.2.9[Stable]"
-Public Const vernum = "1.2.9"
-'webbotsite = "http://webbot.bnetweb.org/webbot.php?u=" & webbotuser & "&p=" & webbotpass
+Public Const botver = "1.0.0[BnetWeb]"
+Public Const vernum = "1.0.0"
 ''''''''''''''''''''''''''''''''''''''''''''''
 Public Declare Function GetTickCount& Lib "KERNEL32" ()
 'World-Accessable declares
@@ -11,22 +10,6 @@ Public Declare Function WritePrivateProfileString Lib "KERNEL32" Alias "WritePri
 Public Declare Function GetPrivateProfileString Lib "KERNEL32" Alias "GetPrivateProfileStringA" (ByVal lpApplicationName As String, ByVal lpKeyName As Any, ByVal lpDefault As String, ByVal lpReturnedString As String, ByVal nSize As Long, ByVal lpFileName As String) As Long
 Public Declare Function ShellExecute Lib "shell32.dll" Alias "ShellExecuteA" (ByVal hWnd As Long, ByVal lpOperation As String, ByVal lpFile As String, ByVal lpParameters As String, ByVal lpDirectory As String, ByVal nShowCmd As Long) As Long
 'Public constants
-Private Type OSVERSIONINFOEX
-    dwOSVersionInfoSize As Long
-    dwMajorVersion As Long
-    dwMinorVersion As Long
-    dwBuildNumber As Long
-    dwPlatformId As Long
-    szCSDVersion As String * 128
-End Type
-
-Private Const VER_PLATFORM_WIN32s = 0
-Private Const VER_PLATFORM_WIN32_WINDOWS = 1
-Private Const VER_PLATFORM_WIN32_NT = 2
-
-Private Declare Function GetVersionEx Lib "KERNEL32" _
-Alias "GetVersionExA" (lpVersionInformation As _
-OSVERSIONINFOEX) As Long
 
 Public Const CRC32_POLYNOMIAL As Long = &HEDB88320
 Public Const vbBage = &H80000000
@@ -61,25 +44,16 @@ Public Type BotData
     username As String
     Password As String
     CDKey As String
-    BotMaster As String
-    Trigger As String
-    UDP As String
-    email As String
-    ShowPing As String
-    JoinNotify As String
-    CDKey2 As String
     BattlenetServer As String
     BNLSServer As String
     HomeChannel As String
     Product As String
-    Realm As String
     TrueUsername As String
     NewPass As String
     CurrentChan As String
     FontSize As String
-    ZEROPING As String
-    NEGPING As String
-    BNCCICON As String
+    WebUser As String
+    WebPass As String
 End Type
 Public BNET As BotData
 Public Type BotNetData
@@ -88,6 +62,8 @@ Public Type BotNetData
     Database As String
     DatabasePassword As String
     Connected As Integer
+    WebUser As String
+    WebPass As String
 End Type
 Public BOTNET As BotNetData
 Public PBuffer As New PacketBuffer
@@ -99,7 +75,6 @@ Public CheckSum As Long
 Public ExeInfo As String
 Public Servers As Long
 Public CdkeyHash As String
-Public Cdkey2Hash As String
 Public GTC As Long
 Public HType As Long
 Public CB As Long
@@ -112,71 +87,3 @@ Public LRealm As Boolean
 Public CRC32Table(0 To 255) As Long
 Public hash(2) As String
 Public Temporary As String
-Public Function WindowsRunTime() As Long
-    WindowsRunTime = GetTickCount()
-    WindowsRunTime = WindowsRunTime / 60
-    WindowsRunTime = WindowsRunTime / 60
-End Function
-Public Function OSVersion() As String
-    
-    Dim udtOSVersion As OSVERSIONINFOEX
-    Dim lMajorVersion  As Long
-    Dim lMinorVersion As Long
-    Dim lPlatformID As Long
-    Dim sAns As String
-    
-    
-    udtOSVersion.dwOSVersionInfoSize = Len(udtOSVersion)
-    GetVersionEx udtOSVersion
-    lMajorVersion = udtOSVersion.dwMajorVersion
-    lMinorVersion = udtOSVersion.dwMinorVersion
-    lPlatformID = udtOSVersion.dwPlatformId
-    
-    Select Case lMajorVersion
-        Case 7
-            sAns = "Pure Fucking Awesomeness!"
-        Case 6
-            If lMinorVersion = 0 Then
-            
-                sAns = "Windows Vista"
-                
-            ElseIf lMinorVersion = 1 Then
-            
-                sAns = "Windows 7"
-            
-            End If
-        Case 5
-        
-            ' Added the following to give suppport for Windows XP!
-            If lMinorVersion = 0 Then
-            
-                sAns = "Windows 2000"
-                
-            ElseIf lMinorVersion = 1 Then
-            
-                sAns = "Windows XP"
-            
-            End If
-        Case 4
-            If lPlatformID = VER_PLATFORM_WIN32_NT Then
-                sAns = "Windows NT 4.0"
-            Else
-                sAns = IIf(lMinorVersion = 0, _
-                "Windows 95", "Windows 98")
-            End If
-        Case 3
-            If lPlatformID = VER_PLATFORM_WIN32_NT Then
-                sAns = "Windows NT 3.x"
-              'below should only happen if person has Win32s
-                'installed
-            Else
-                sAns = "Windows 3.x"
-            End If
-            
-        Case Else
-            sAns = "Unknown Windows Version"
-    End Select
-                    
-    OSVersion = sAns
-    
-End Function
