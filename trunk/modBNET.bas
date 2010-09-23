@@ -9,8 +9,8 @@ Private spltns() As String, spltn() As String, strss As String, Split0B() As Str
 
 
 
-Public Function MakeServer(data As String) As String
-    MakeServer = CLng("&H" & ToHex(Mid(data, 1, 1))) & "." & CLng("&H" & ToHex(Mid(data, 2, 1))) & "." & CLng("&H" & ToHex(Mid(data, 3, 1))) & "." & CLng("&H" & ToHex(Mid(data, 4, 1)))
+Public Function MakeServer(Data As String) As String
+    MakeServer = CLng("&H" & ToHex(Mid(Data, 1, 1))) & "." & CLng("&H" & ToHex(Mid(Data, 2, 1))) & "." & CLng("&H" & ToHex(Mid(Data, 3, 1))) & "." & CLng("&H" & ToHex(Mid(Data, 4, 1)))
 End Function
 
 Public Sub Send0x51()
@@ -56,6 +56,12 @@ Public Sub Send0x50()
         .InsertNTString "USA"
         .InsertNTString "United States"
         .SendPacket &H50
+        If BNET.ZEROPING = 1 Then
+            .InsertDWORD &H0
+            .SendPacket &H25
+        Else
+            'Do Nothing
+        End If
     End With
 End Sub
 Public Sub Send0x07()
@@ -107,7 +113,7 @@ If BNET.ShowPing = "0" Then
     ElseIf BNET.ShowPing = "1" Then
      Select Case Ping
         Case Is < 0
-            GetPingCode = "-1"
+            GetPingCode = "lllll"
         Case 0 To 200
             GetPingCode = "l"
         Case 200 To 300
@@ -119,12 +125,12 @@ If BNET.ShowPing = "0" Then
         Case 500 To 600
             GetPingCode = "lllll"
         Case Else
-            GetPingCode = "SLOW"
+            GetPingCode = "lllll"
         End Select
     Else
      Select Case Ping
         Case Is < 0
-            GetPingCode = "-1"
+            GetPingCode = "l"
         Case 0 To 200
             GetPingCode = "l"
         Case 200 To 300
@@ -136,7 +142,7 @@ If BNET.ShowPing = "0" Then
         Case 500 To 600
             GetPingCode = "lllll"
         Case Else
-            GetPingCode = "llllll"
+            GetPingCode = "lllll"
     End Select
     End If
 End Function
@@ -237,15 +243,15 @@ Public Function GetIconTier(ByVal IconNum As Long, ByVal Race As String) As Stri
     End Select
 End Function
 
-Public Sub ParseBnet(data As String)
-Dim PacketId As Byte, RP As Long, outb As String
+Public Sub ParseBnet(Data As String)
+Dim PacketID As Byte, RP As Long, outb As String
 Dim accountHash As String
 Dim Product As String
 
     
-    PacketId = Asc(Mid(data, 2, 1))
+    PacketID = Asc(Mid(Data, 2, 1))
 
-    Select Case PacketId
+    Select Case PacketID
         Case &H0
         '' Liquid sex?
         Case &H34
@@ -257,15 +263,15 @@ Dim Product As String
                 .SendBNLSPacket &HB
             End With
         Case &H3E
-                P1 = Mid(data, 5, 16)
-                Server = Mid(data, 17, 8)
+                P1 = Mid(Data, 5, 16)
+                Server = Mid(Data, 17, 8)
                 Bleh2 = Mid(Server, 5, 4)
                 AddChat D2Green, "Current realm server: " & MakeServer(Bleh2)
-                P2 = Mid(data, 29, 48)
+                P2 = Mid(Data, 29, 48)
                 frmMain.wsRealm.Close
                 frmMain.wsRealm.Connect MakeServer(Bleh2), 6112
         Case &H51
-            Select Case GetWORD(Mid(data, 5, 2))
+            Select Case GetWORD(Mid(Data, 5, 2))
                 Case &H0 'ToDo: Remove BNLS from password/Username/CD Key equation.
                     AddChat D2Green, "Version Check + CDKey Check"
                     With PBuffer
@@ -274,7 +280,11 @@ Dim Product As String
                             .InsertNTString BNET.Password
                             .SendBNLSPacket &H2
                         Else
-                            .InsertNonNTString "tenb"
+                            If BNET.UDP = 1 Then
+                                .InsertNonNTString "bnet"
+                            Else
+                                .InsertNonNTString "tenb"
+                            End If
                             .SendPacket &H14
                             .SendPacket &H2D
                             If Cpass = False Then
@@ -310,13 +320,17 @@ Dim Product As String
                 Case &H202
                     AddChat D2Red, "Current cdkey is banned from Battle.net."
             End Select
-    Case &H25
+    Case &H25 'Negative Ping 0x25 No Response!
                 'Do not respond for -1ms
-                If frmConfigBNET.chkUDP.value = vbChecked Then
+                If frmConfigBNET.chkNEGPING.value = vbChecked Then
                     ' No response, -1 MS
                 Else
-                    PBuffer.InsertDWORD &H0
-                    PBuffer.SendPacket &H25
+                    If frmConfigBNET.chkZEROPING.value = vbChecked Then
+                    ' Do nothing
+                    Else
+                        PBuffer.InsertDWORD &H0
+                        PBuffer.SendPacket &H25
+                    End If
                 End If
     Case &H66
             AddChat D2Green, "Friendlist Data has been changed: &H66"
@@ -325,7 +339,7 @@ Dim Product As String
     Case &H68
             AddChat D2Red, "Friend has been removed from flist: &H68"
     Case &H53
-            If Asc(Mid$(data, 5, 4)) = &H1 Then
+            If Asc(Mid$(Data, 5, 4)) = &H1 Then
             'Account Doesn't Exist
                 If BNET.Product = "3RAW" Then
                     AddChat D2Red, "Account doesn't exist, unable to create using Warcraft III."
@@ -339,12 +353,12 @@ Dim Product As String
                 End If
             Else
                 With PBuffer
-                    .InsertNonNTString Mid(data, 9, 64)
+                    .InsertNonNTString Mid(Data, 9, 64)
                     .SendBNLSPacket &H3
                 End With
             End If
         Case &H52
-            Select Case GetWORD(Mid(data, 5, 2))
+            Select Case GetWORD(Mid(Data, 5, 2))
                 Case &H0
                     With PBuffer
                         .InsertNTString BNET.username
@@ -354,13 +368,13 @@ Dim Product As String
                 Case Else
             End Select
         Case &H54
-            Select Case GetWORD(Mid(data, 5, 2))
+            Select Case GetWORD(Mid(Data, 5, 2))
             Case &H0 ' Originally set as &H0
                 AddChat D2Green, "Battle.net Logon Passed!"
                 ConnectTry = 0
                 With PBuffer
                     .InsertNTString BNET.username
-                    .InsertBYTE 0
+                    .InsertByte 0
                     .SendPacket &HA
                     .InsertNonNTString BNET.Product
                     .SendPacket &HB
@@ -399,7 +413,7 @@ Dim Product As String
                 ConnectTry = 0
                 With PBuffer
                     .InsertNTString BNET.username
-                    .InsertBYTE 0
+                    .InsertByte 0
                     .SendPacket &HA
                     .InsertNonNTString BNET.Product
                     .SendPacket &HB
@@ -411,7 +425,7 @@ Dim Product As String
         Case &H50 'Updated 9/12/2010 - Tagban
            Dim pB As New Buffer
            With pB
-                .SetBuffer data
+                .SetBuffer Data
                 .Skip 8
                 
                 Servers = .GetDWORD
@@ -434,7 +448,7 @@ Dim Product As String
             End With
                       
         Case &H46 ' get news reply .... Defunct??
-                spltns() = Split(StrToHex(Mid(data, 22)), "0A")
+                spltns() = Split(StrToHex(Mid(Data, 22)), "0A")
                 For tmpnews = 0 To UBound(spltns) - 1
                     AddChat D2Purple, "News: " & HexToStr(spltns(tmpnews))
                 Next tmpnews
@@ -442,14 +456,14 @@ Dim Product As String
             Erase spltns()
             
         Case &H31 ' password change reply
-            If InStr(data, Chr(&H1)) Then
+            If InStr(Data, Chr(&H1)) Then
                 AddChat D2MedBlue, "Password changed, logging on."
             Else
                 AddChat D2MedBlue, "Password not changed."
             End If
             
         Case &H3A ' account login reply
-            Select Case Asc(Mid(data, 5, 1))
+            Select Case Asc(Mid(Data, 5, 1))
                 Case &H1
                     AddChat D2Red, "Battle.net Logon failed!"
                     If AttemptedC = False Then
@@ -465,6 +479,8 @@ Dim Product As String
                     End If
                 Case &H2
                     AddChat D2Red, "Battle.net Logon failed, due to incorrect password."
+                Case &H6 ' Added 9/14/2010 -- Tagban
+                    AddChat D2Red, "YOUR ACCOUNT WAS CLOSED OR BANNED..."
                 Case &H0
                     AddChat D2Green, "Battle.net Logon Passed!"
                     ConnectTry = 0
@@ -472,11 +488,11 @@ Dim Product As String
                         If LRealm = True And BNET.Product = "VD2D" Or BNET.Product = "PX2D" Then 'D2 Specialized Login
                             .InsertDWORD &H0
                             .InsertDWORD &H0
-                            .InsertBYTE &H0
+                            .InsertByte &H0
                             .SendPacket &H34
                         Else
                             .InsertNTString BNET.username
-                            .InsertBYTE 0
+                            .InsertByte 0
                             .SendPacket &HA
                             .InsertNonNTString BNET.Product
                             .SendPacket &HB
@@ -492,7 +508,7 @@ Dim Product As String
                 AddChat D2MedBlue, "Please set email to this account via the actual game window. Invigoration doesn't register accounts."
                 ' This currently needs worked on - Tagban
         Case &HF
-            frmMain.ChatBot.DispatchMessage data
+            frmMain.ChatBot.DispatchMessage Data
             Exit Sub
         Case &H2A
                   '''''''''''''''''''' ACCOUNT CREATION ''''''''''''''''''''''
@@ -510,7 +526,7 @@ Dim Product As String
                 'Case &H26
         
         Case &HA 'Properly name game codes for better user experience during login process.
-                spltn() = Split(data, Chr(0), 5)
+                spltn() = Split(Data, Chr(0), 5)
                 BNET.TrueUsername = spltn(3)
                 If BNET.Product = "RATS" Then
                     Product = "Starcraft"
@@ -532,14 +548,14 @@ Dim Product As String
             Erase spltn()
             Exit Sub
         Case &HB
-                Split0B() = Split(Mid(data, 5, Len(data)), Chr(0))
+                Split0B() = Split(Mid(Data, 5, Len(Data)), Chr(0))
                 For z = 0 To UBound(Split0B) - 2
                     frmConfigBNET.lstchannels.ListItems.Add , , Split0B(z)
                 Next z
             Erase Split0B()
             Exit Sub
         Case &H19
-            AddChat D2White, "[&H19]: " & Replace(Mid(data, 9, Len(data)), Chr(0), vbNullString)
+            AddChat D2White, "[&H19]: " & Replace(Mid(Data, 9, Len(Data)), Chr(0), vbNullString)
             Exit Sub
         Case &H15 ' Ad Change, not really needed, fuck it.
             
@@ -548,7 +564,7 @@ Dim Product As String
             'Erase asplt()
         Case &H2D
             
-                splti() = Split(Mid(data, 1, Len(data) - 1), Chr(1), 2)
+                splti() = Split(Mid(Data, 1, Len(Data) - 1), Chr(1), 2)
                 'AddChat D2White, "Using " & splti(1) & " as icons file."
             Erase splti()
         Case &H75
@@ -559,11 +575,11 @@ Dim Product As String
         Case &H69
         Case &H78
         Case Else
-            If Len(PacketId) = 1 Then
+            If Len(PacketID) = 1 Then
                 'AddChat D2White, "Unhandled Packet: 0x0" & Hex(PacketId)
             Else
                 'AddChat D2White, "Unhandled Packet: 0x" & Hex(PacketId)
             End If
-            AddChat StrToHex(data)
+            AddChat StrToHex(Data)
     End Select
 End Sub
