@@ -1,0 +1,12 @@
+frmMain = 0, 0, 0, 0, C, 0, 0, 0, 0, C
+modDeclares = 0, 0, 0, 0, C
+modFunctions = 0, 0, 0, 0, C
+PacketBuffer = 0, 0, 0, 0, C
+modBNLS = 0, 0, 0, 0, C
+modBNET = 0, 0, 0, 0, C
+modStatstring = 0, 0, 0, 0, C
+BnetBot = 0, 0, 0, 0, C
+frmAbout = 0, 0, 0, 0, C, 0, 0, 0, 0, C
+frmConfigBNET = 0, 0, 0, 0, C, 0, 0, 0, 0, C
+Buffer = 0, 0, 0, 0, C
+inet = 25, 25, 996, 742, 
