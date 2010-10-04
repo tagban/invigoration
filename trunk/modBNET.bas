@@ -268,8 +268,6 @@ Dim Product As String
                 Bleh2 = Mid(Server, 5, 4)
                 AddChat D2Green, "Current realm server: " & MakeServer(Bleh2)
                 P2 = Mid(Data, 29, 48)
-                frmMain.wsRealm.Close
-                frmMain.wsRealm.Connect MakeServer(Bleh2), 6112
         Case &H51
             Select Case GetWORD(Mid(Data, 5, 2))
                 Case &H0 'ToDo: Remove BNLS from password/Username/CD Key equation.
