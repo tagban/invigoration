@@ -1,13 +1,13 @@
 VERSION 5.00
-Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
+Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "mscomctl.ocx"
 Begin VB.Form frmConfigBNET 
    BackColor       =   &H00000000&
    BorderStyle     =   1  'Fixed Single
    Caption         =   "Battle.net Configuration"
-   ClientHeight    =   3690
+   ClientHeight    =   3360
    ClientLeft      =   1875
    ClientTop       =   1935
-   ClientWidth     =   7575
+   ClientWidth     =   10710
    ControlBox      =   0   'False
    FillColor       =   &H00000080&
    BeginProperty Font 
@@ -24,11 +24,11 @@ Begin VB.Form frmConfigBNET
    LinkTopic       =   "Form1"
    MaxButton       =   0   'False
    MinButton       =   0   'False
-   ScaleHeight     =   3690
-   ScaleWidth      =   7575
+   ScaleHeight     =   3360
+   ScaleWidth      =   10710
    Begin VB.ComboBox txtBattlenet 
-      BackColor       =   &H00000040&
-      ForeColor       =   &H000080FF&
+      BackColor       =   &H00400000&
+      ForeColor       =   &H00FFFF80&
       Height          =   315
       ItemData        =   "frmConfigBNET.frx":08CA
       Left            =   2520
@@ -41,7 +41,7 @@ Begin VB.Form frmConfigBNET
    Begin MSComctlLib.ListView lstchannels 
       Height          =   30
       Left            =   240
-      TabIndex        =   26
+      TabIndex        =   25
       Top             =   3120
       Visible         =   0   'False
       Width           =   135
@@ -68,9 +68,9 @@ Begin VB.Form frmConfigBNET
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   3720
-      TabIndex        =   16
-      Top             =   3000
+      Left            =   6720
+      TabIndex        =   15
+      Top             =   2640
       Width           =   855
    End
    Begin VB.CommandButton cmdCommit 
@@ -86,9 +86,9 @@ Begin VB.Form frmConfigBNET
          Strikethrough   =   0   'False
       EndProperty
       Height          =   375
-      Left            =   2640
-      TabIndex        =   15
-      Top             =   3000
+      Left            =   5520
+      TabIndex        =   14
+      Top             =   2640
       Width           =   855
    End
    Begin VB.Frame frmBattlenet 
@@ -105,16 +105,16 @@ Begin VB.Form frmConfigBNET
          Strikethrough   =   0   'False
       EndProperty
       ForeColor       =   &H00FFFFFF&
-      Height          =   3615
+      Height          =   3255
       Left            =   120
-      TabIndex        =   17
+      TabIndex        =   16
       Top             =   0
-      Width           =   7335
+      Width           =   10215
       Begin VB.CheckBox chkNEGPING 
          Alignment       =   1  'Right Justify
          BackColor       =   &H00000000&
          Caption         =   "-1ms"
-         ForeColor       =   &H0000C0C0&
+         ForeColor       =   &H8000000D&
          Height          =   195
          Left            =   6000
          MaskColor       =   &H00000000&
@@ -134,34 +134,24 @@ Begin VB.Form frmConfigBNET
             Strikethrough   =   0   'False
          EndProperty
          ForeColor       =   &H0000FFFF&
-         Height          =   1935
+         Height          =   1575
          Left            =   120
-         TabIndex        =   24
+         TabIndex        =   23
          Top             =   1560
          Width           =   4695
-         Begin VB.TextBox txtEmail 
-            BackColor       =   &H00000040&
-            ForeColor       =   &H000080FF&
-            Height          =   285
-            Left            =   240
-            TabIndex        =   35
-            Text            =   "e-mail addr"
-            Top             =   1440
-            Width           =   1335
-         End
          Begin VB.TextBox txtCDKey2 
-            BackColor       =   &H00000040&
-            ForeColor       =   &H000080FF&
+            BackColor       =   &H00400000&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             Left            =   3240
-            TabIndex        =   33
+            TabIndex        =   32
             Text            =   "CD Key 2 OFF"
             Top             =   600
             Width           =   1335
          End
          Begin VB.TextBox txtTrigger 
-            BackColor       =   &H00000040&
-            ForeColor       =   &H000080FF&
+            BackColor       =   &H00400000&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             Left            =   4080
             MaxLength       =   1
@@ -171,7 +161,7 @@ Begin VB.Form frmConfigBNET
             Width           =   375
          End
          Begin VB.TextBox txtBotMaster 
-            BackColor       =   &H00000040&
+            BackColor       =   &H00400000&
             BeginProperty Font 
                Name            =   "Tahoma"
                Size            =   8.25
@@ -181,16 +171,16 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H000080FF&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
-            Left            =   240
+            Left            =   480
             TabIndex        =   5
             ToolTipText     =   $"frmConfigBNET.frx":0928
             Top             =   840
             Width           =   1335
          End
          Begin VB.TextBox txtCDKey 
-            BackColor       =   &H00000040&
+            BackColor       =   &H00400000&
             BeginProperty Font 
                Name            =   "Tahoma"
                Size            =   8.25
@@ -200,7 +190,7 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H000080FF&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             IMEMode         =   3  'DISABLE
             Left            =   3240
@@ -211,7 +201,7 @@ Begin VB.Form frmConfigBNET
             Width           =   1335
          End
          Begin VB.ComboBox txtProduct 
-            BackColor       =   &H00000040&
+            BackColor       =   &H00400000&
             BeginProperty Font 
                Name            =   "Tahoma"
                Size            =   8.25
@@ -221,7 +211,7 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H000080FF&
+            ForeColor       =   &H00FFFF80&
             Height          =   315
             ItemData        =   "frmConfigBNET.frx":09B3
             Left            =   840
@@ -232,53 +222,34 @@ Begin VB.Form frmConfigBNET
             Top             =   240
             Width           =   975
          End
-         Begin VB.Label Label3 
-            BackColor       =   &H00000000&
-            Caption         =   "User e-Mail"
-            BeginProperty Font 
-               Name            =   "Tahoma"
-               Size            =   8.25
-               Charset         =   0
-               Weight          =   400
-               Underline       =   0   'False
-               Italic          =   0   'False
-               Strikethrough   =   0   'False
-            EndProperty
-            ForeColor       =   &H0000FFFF&
-            Height          =   255
-            Left            =   120
-            TabIndex        =   34
-            Top             =   1200
-            Width           =   1695
-         End
          Begin VB.Label Label7 
             BackColor       =   &H80000007&
             BackStyle       =   0  'Transparent
             Caption         =   "EXP Key"
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   2400
-            TabIndex        =   32
+            TabIndex        =   31
             Top             =   600
             Width           =   855
          End
          Begin VB.Label Label2 
             BackStyle       =   0  'Transparent
             Caption         =   "Bot Trigger"
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
-            Left            =   2280
-            TabIndex        =   31
+            Left            =   2520
+            TabIndex        =   30
             Top             =   1080
             Width           =   1455
          End
          Begin VB.Label Label6 
             BackStyle       =   0  'Transparent
             Caption         =   "Bot Master"
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   120
-            TabIndex        =   28
+            TabIndex        =   27
             Top             =   600
             Width           =   1095
          End
@@ -286,10 +257,10 @@ Begin VB.Form frmConfigBNET
             BackColor       =   &H00000080&
             BackStyle       =   0  'Transparent
             Caption         =   "CDKey"
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   2520
-            TabIndex        =   27
+            TabIndex        =   26
             Top             =   240
             Width           =   1335
          End
@@ -305,10 +276,10 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   120
-            TabIndex        =   25
+            TabIndex        =   24
             Top             =   240
             Width           =   2055
          End
@@ -316,31 +287,78 @@ Begin VB.Form frmConfigBNET
       Begin VB.Frame Other 
          BackColor       =   &H80000007&
          Caption         =   "Other Options"
-         ForeColor       =   &H0000FFFF&
-         Height          =   3255
+         ForeColor       =   &H8000000D&
+         Height          =   2295
          Left            =   5040
-         TabIndex        =   30
+         TabIndex        =   29
          Top             =   240
-         Width           =   2175
-         Begin VB.CheckBox chkBNCCICON 
-            Alignment       =   1  'Right Justify
-            BackColor       =   &H00000000&
-            Caption         =   "BNET.cc Flags"
-            Enabled         =   0   'False
-            ForeColor       =   &H0000C0C0&
-            Height          =   195
-            Left            =   480
-            MaskColor       =   &H00000000&
-            TabIndex        =   11
-            Top             =   960
-            Visible         =   0   'False
-            Width           =   1575
+         Width           =   4935
+         Begin VB.Frame Frame5 
+            BackColor       =   &H80000012&
+            Caption         =   "Webbot"
+            ForeColor       =   &H8000000D&
+            Height          =   2055
+            Left            =   2400
+            TabIndex        =   34
+            Top             =   120
+            Width           =   2415
+            Begin VB.TextBox txtWebPass 
+               BackColor       =   &H00400000&
+               ForeColor       =   &H00FFFF80&
+               Height          =   285
+               Left            =   360
+               TabIndex        =   37
+               Text            =   "Webbot Password"
+               Top             =   1440
+               Width           =   1935
+            End
+            Begin VB.TextBox txtWebUser 
+               BackColor       =   &H00400000&
+               ForeColor       =   &H00FFFF80&
+               Height          =   285
+               Left            =   360
+               TabIndex        =   36
+               Text            =   "Webbot Username"
+               Top             =   840
+               Width           =   1935
+            End
+            Begin VB.CheckBox chkWebbotEnable 
+               BackColor       =   &H80000012&
+               Caption         =   "Enable Webbot"
+               ForeColor       =   &H8000000D&
+               Height          =   195
+               Left            =   240
+               TabIndex        =   35
+               Top             =   240
+               Visible         =   0   'False
+               Width           =   2175
+            End
+            Begin VB.Label Label9 
+               BackStyle       =   0  'Transparent
+               Caption         =   "Password:"
+               ForeColor       =   &H00FFFF00&
+               Height          =   255
+               Left            =   120
+               TabIndex        =   39
+               Top             =   1200
+               Width           =   1815
+            End
+            Begin VB.Label Label3 
+               BackStyle       =   0  'Transparent
+               Caption         =   "Username:"
+               ForeColor       =   &H00FFFF00&
+               Height          =   255
+               Left            =   120
+               TabIndex        =   38
+               Top             =   600
+               Width           =   1935
+            End
          End
          Begin VB.CheckBox chkUDP 
             Alignment       =   1  'Right Justify
             BackColor       =   &H00000000&
             Caption         =   "Plug UDP"
-            ForeColor       =   &H0000C0C0&
+            ForeColor       =   &H8000000D&
             Height          =   195
             Left            =   960
             MaskColor       =   &H00000000&
@@ -352,7 +370,7 @@ Begin VB.Form frmConfigBNET
             Alignment       =   1  'Right Justify
             BackColor       =   &H00000000&
             Caption         =   " 0ms"
-            ForeColor       =   &H0000C0C0&
+            ForeColor       =   &H8000000D&
             Height          =   195
             Left            =   960
             MaskColor       =   &H00000000&
@@ -361,59 +379,59 @@ Begin VB.Form frmConfigBNET
             Width           =   1095
          End
          Begin VB.TextBox txtBNLS 
-            BackColor       =   &H00000040&
-            ForeColor       =   &H000080FF&
+            BackColor       =   &H00400000&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             Left            =   240
-            TabIndex        =   14
+            TabIndex        =   13
             Text            =   "bnls.net"
-            Top             =   2880
+            Top             =   1920
             Width           =   1815
          End
          Begin VB.CheckBox chkJoinNotify 
             Alignment       =   1  'Right Justify
             BackColor       =   &H80000012&
             Caption         =   "Join Notifications"
-            ForeColor       =   &H0000C0C0&
+            ForeColor       =   &H8000000D&
             Height          =   375
             Left            =   240
-            TabIndex        =   12
-            Top             =   1800
+            TabIndex        =   11
+            Top             =   960
             Width           =   1815
          End
          Begin VB.CheckBox chkPing 
             Alignment       =   1  'Right Justify
             BackColor       =   &H80000012&
             Caption         =   "Lag Bars"
-            ForeColor       =   &H0000C0C0&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   960
-            TabIndex        =   13
-            Top             =   2160
+            TabIndex        =   12
+            Top             =   1320
             Width           =   1095
          End
          Begin VB.Label Label8 
             BackColor       =   &H80000007&
             Caption         =   "BNLS/JBLS"
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   120
-            TabIndex        =   36
-            Top             =   2640
+            TabIndex        =   33
+            Top             =   1680
             Width           =   1695
          End
       End
       Begin VB.Frame HomeChannel 
          BackColor       =   &H00000000&
          Caption         =   "Home Channel"
-         ForeColor       =   &H0000FFFF&
+         ForeColor       =   &H8000000D&
          Height          =   615
          Left            =   2280
-         TabIndex        =   29
+         TabIndex        =   28
          Top             =   960
          Width           =   2535
          Begin VB.TextBox txtHomeChannel 
-            BackColor       =   &H00000040&
+            BackColor       =   &H00400000&
             BeginProperty Font 
                Name            =   "Tahoma"
                Size            =   8.25
@@ -423,7 +441,7 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H000080FF&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             IMEMode         =   3  'DISABLE
             Left            =   120
@@ -448,7 +466,7 @@ Begin VB.Form frmConfigBNET
          ForeColor       =   &H0000FFFF&
          Height          =   615
          Left            =   2280
-         TabIndex        =   20
+         TabIndex        =   19
          Top             =   240
          Width           =   2535
          Begin VB.TextBox aSDASD 
@@ -466,7 +484,7 @@ Begin VB.Form frmConfigBNET
             Height          =   285
             Index           =   0
             Left            =   2520
-            TabIndex        =   21
+            TabIndex        =   20
             Top             =   1320
             Visible         =   0   'False
             Width           =   2295
@@ -483,10 +501,10 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H0000FFFF&
+            ForeColor       =   &H8000000D&
             Height          =   255
             Left            =   120
-            TabIndex        =   23
+            TabIndex        =   22
             Top             =   0
             Width           =   1335
          End
@@ -504,7 +522,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H00000000&
             Height          =   255
             Left            =   2520
-            TabIndex        =   22
+            TabIndex        =   21
             Top             =   1320
             Visible         =   0   'False
             Width           =   2295
@@ -522,14 +540,14 @@ Begin VB.Form frmConfigBNET
             Italic          =   0   'False
             Strikethrough   =   0   'False
          EndProperty
-         ForeColor       =   &H0000FFFF&
+         ForeColor       =   &H8000000D&
          Height          =   615
          Left            =   120
-         TabIndex        =   19
+         TabIndex        =   18
          Top             =   240
          Width           =   2055
          Begin VB.TextBox txtUsername 
-            BackColor       =   &H00000040&
+            BackColor       =   &H00400000&
             BeginProperty Font 
                Name            =   "Tahoma"
                Size            =   8.25
@@ -539,7 +557,7 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H000080FF&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             Left            =   120
             MaxLength       =   15
@@ -562,14 +580,14 @@ Begin VB.Form frmConfigBNET
             Italic          =   0   'False
             Strikethrough   =   0   'False
          EndProperty
-         ForeColor       =   &H0000FFFF&
+         ForeColor       =   &H8000000D&
          Height          =   615
          Left            =   120
-         TabIndex        =   18
+         TabIndex        =   17
          Top             =   960
          Width           =   2055
          Begin VB.TextBox txtPassword 
-            BackColor       =   &H00000040&
+            BackColor       =   &H00400000&
             BeginProperty Font 
                Name            =   "Tahoma"
                Size            =   8.25
@@ -579,7 +597,7 @@ Begin VB.Form frmConfigBNET
                Italic          =   0   'False
                Strikethrough   =   0   'False
             EndProperty
-            ForeColor       =   &H000080FF&
+            ForeColor       =   &H00FFFF80&
             Height          =   285
             IMEMode         =   3  'DISABLE
             Left            =   120
@@ -605,6 +623,11 @@ Private Sub chkNEGPING_Click() 'Added 9/14/2010 to avoid accidental activation o
         'Do nothing
     End If
 End Sub
+
+
+
+
+
 Private Sub chkZEROPING_Click() 'Added 9/14/2010 to avoid accidental activation of BOTH boxes... - Tagban
     If chkZEROPING.value = vbChecked Then
         chkNEGPING.value = vbUnchecked
@@ -621,6 +644,8 @@ Private Sub cmdCommit_Click()
 On Error GoTo Error
     BNET.username = txtUsername.text
     BNET.Password = txtPassword.text
+    BNET.WebUser = txtWebUser.text
+    BNET.WebPass = txtWebPass.text
     txtCDKey.text = Replace(txtCDKey.text, "-", vbNullString)
     txtCDKey2.text = Replace(txtCDKey2.text, "-", vbNullString)
     BNET.CDKey = txtCDKey.text
@@ -693,6 +718,8 @@ On Error GoTo Error
     
     txtUsername.text = BNET.username
     txtPassword.text = BNET.Password
+    txtWebUser.text = BNET.WebUser
+    txtWebPass.text = BNET.WebPass
     txtCDKey.text = BNET.CDKey
     txtCDKey2.text = BNET.CDKey2
     If BNET.Product = "RATS" Then

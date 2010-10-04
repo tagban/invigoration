@@ -26,7 +26,11 @@ Global beforetext As String
 Global postpend As String
 Global targetuser As String
 Global targetusername As String
+Global iTunesOn As Boolean
+Global nowplaying As String
+
 Public Sub ParseCommand(ByVal Message As String, username As String, Optional Inbot As Boolean = False)
+    Dim NewTitle As String, Track As iTunesLib.IITTrack
     If LCase$(Message) = "?trigger" Then Message = BNET.Trigger & "trigger"
         'if the command doesn't have a trigger, its not a command, so exit
     If Left$(Message, 1) <> BNET.Trigger And Left$(Message, 1) <> "/" Then Exit Sub
@@ -129,6 +133,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             LastCW = vbNullString
         End If
     Case "kickcount"
+    commandname = "KickCount"
         If KickCount = 0 Then
             Send LastCW & "Noone has been kicked since I entered this channel..", frmMain.wsBnet
             LastCW = vbNullString
@@ -140,6 +145,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             LastCW = vbNullString
         End If
     Case "joincount"
+    commandname = "JoinCount"
         If JoinCount = 0 Then
             Send LastCW & "Noone has entered since I got here..", frmMain.wsBnet
             LastCW = vbNullString
@@ -151,8 +157,10 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             LastCW = vbNullString
         End If
     Case "ban"
+    commandname = "Ban"
         Send "/ban " & Rest, frmMain.wsBnet
     Case "join"
+    commandname = "Join"
         With PBuffer
             .SendPacket &H10
             .InsertDWORD 2
@@ -215,10 +223,12 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
        LastCW = vbNullString
    '''''''''''''''''
     Case "quit", "unload"
+    commandname = "Quit"
         'Exits the Program, uses less ram to do so ^^
         Unload frmMain
         End
     Case "canada"
+    commandname = "Canada"
             If Canada = 0 Then
                 Canada = 1
                 Send LastCW & "Canada Mode enabled.", frmMain.wsBnet
@@ -229,6 +239,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             End If
         'CanadaMode
     Case "accept"
+    commandname = "Accept"
             If acceptinvites Then
                 acceptinvites = False
                 Send LastCW & "Invite Auto-Accept Disabled.", frmMain.wsBnet
@@ -239,6 +250,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             End If
         'Accept Invites
         Case "debug"
+        commandname = "Debug"
             If debugmode = 0 Then
                 debugmode = 1
                 AddChat D2MedBlue, "Debug Mode enabled."
@@ -249,12 +261,14 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             End If
         'CanadaMode
     Case "say"
+    commandname = "Say"
         Select Case Rest
             Case Message
                 Send Message, frmMain.wsBnet
         End Select
         'CanadaMode
     Case "leetspeak"
+    commandname = "Leet Speak"
             If leetspeak = 0 Then
                 leetspeak = 1
                 Send LastCW & "Leet Speak enabled.", frmMain.wsBnet
@@ -266,6 +280,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             End If
         'Leet Speak Mode
     Case "fudd"
+    commandname = "Fudd"
             If fudd = 0 Then
                 fudd = 1
                 Send LastCW & "Elmer Fudd mode enabled.", frmMain.wsBnet
@@ -276,92 +291,73 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
                 LastCW = vbNullString
             End If
         'Elmer Fudd Mode
-    Case "moo"
-            If moo = 0 Then
-                moo = 1
-                Send LastCW & "Moooooooooooooooo mode engaged!", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                moo = 0
-                Send LastCW & "Cows are off...", frmMain.wsBnet
-                LastCW = vbNullString
-            End If
     Case "l"
             Send LastCW & "/f m " & Rest, frmMain.wsBnet
         'Elmer Fudd Mode
-'''''''WINAMP COMMANDS''''''''''''''''''
-    Case "winamp"
-        'Just in case winamp is not installed, use the error handler to prevent the bot from dropping.
+'''''''iTunes COMMANDS''''''''''''''''''''''
+'' Winamp Control Removed as of 9/23/2010 ''
+    Case "itunes"
+    commandname = "iTunes Launcher/Closer"
         On Error Resume Next
         Select Case Rest
             Case "on", vbNullString
-                AddChat HEXPINK, "::Winamp Loaded:: [Invigoration v" & vernum & "]", frmMain.wsBnet
-                LastCW = vbNullString
-                LoadWinamp
-                WinAMP_SendCommandMessage (WA_PLAY)
-            Case "off"
-                iwinamp = WinAMP_SendCommandMessage(WA_CLOSE)
-                Send LastCW & "::Winamp Closed:: [Invigoration v" & vernum & "]", frmMain.wsBnet
-                LastCW = vbNullString
+                AddChat HEXPINK, ":: iTunes Loaded! :: [Invigoration v" & vernum & "]", frmMain.wsBnet
+                Set iTunes = New iTunesApp
+                iTunesApp.PlayPause
+            Case "off", vbNullString
+                AddChat HEXPINK, ":: iTunes OFF! ::"
+                Set iTunes = Nothing
+                iTunesApp.Quit
         End Select
     Case "mp3", "music"
-            WindowTitle = GetWindowTitle("Winamp v1.x")
-            If WindowTitle = vbNullString Then
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            Else
-            WindowTitle = Left(WindowTitle, Len(WindowTitle) - 9)
-                Send LastCW & "/me [" & WindowTitle & "] ::Invigoration v" & vernum & "::", frmMain.wsBnet
+    commandname = "iTunes MP3 Display"
+    On Error GoTo err:
+    Set Track = iTunesApp.CurrentTrack
+    If Track Is Nothing Then
+        AddChat D2Red, "Please load iTunes: /itunes on"
+    Else
+        Send LastCW & "/me [" & Track.Name & " -- " & Track.Artist & "] ::Invigoration v" & vernum & "::", frmMain.wsBnet
                 LastCW = vbNullString
-                b = True
-            End If
+    End If
+            'AddChat D2Red, "Use  g/itunes on"
    Case "play", "p"
-            iwinamp = WinAMP_SendCommandMessage(WA_PLAY)
-            If i = 0 Then
-                AddChat D2Green, ":: Playback Started ::", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
+   commandname = "iTunes Play"
+   On Error GoTo err:
+            iTunesApp.Play
+            AddChat D2Green, ":: Playback Started ::", frmMain.wsBnet
     Case "pause"
-            iwinamp = WinAMP_SendCommandMessage(WA_PAUSE)
-            If i = 0 Then
-                AddChat D2White, ":: Paused ::", frmMain.wsBnet
+    commandname = "iTunes Pause"
+    On Error GoTo err:
+            iTunesApp.Pause
+                AddChat D2White, ":: iTunes Paused ::", frmMain.wsBnet
                 LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
     Case "stop"
-            iwinamp = WinAMP_SendCommandMessage(WA_STOP)
-            If i = 0 Then
+    commandname = "iTunes Stop"
+    On Error GoTo err:
+            iTunesApp.Stop
                 AddChat D2Red, ":: Stopped ::", frmMain.wsBnet
                 LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
     Case "next", "n", "skip", ">"
-            iwinamp = WinAMP_SendCommandMessage(WA_NEXTTRACK)
-            If i = 0 Then
+    commandname = "iTunes Next"
+    On Error GoTo err:
+            iTunesApp.NextTrack
                 AddChat D2MedBlue, ":: Next > ::", frmMain.wsBnet
                 LastCW = vbNullString
-            Else
-                'Send LastCW & "Not on, use /winamp .", frmMain.wsBnet
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
     Case "prev", "<", "back", "last"
-            iwinamp = WinAMP_SendCommandMessage(WA_PREVTRACK)
-            If i = 0 Then
+    commandname = "iTunes: Back"
+    On Error GoTo err:
+            iTunesApp.BackTrack
                 AddChat D2MedBlue, ":: Back < ::", frmMain.wsBnet
                 LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
     '''''''''''''''''''''''''''''''''''''''''
     Case "home", "gohome", "homechan", "homechannel"
+    commandname = "home"
         PBuffer.SendPacket &H10
         PBuffer.InsertDWORD 2
         PBuffer.InsertNTString BNET.HomeChannel
         PBuffer.SendPacket &HC
     Case "rejoin"
+        commandname = "rejoin"
         PBuffer.SendPacket &H10
         PBuffer.InsertDWORD 2
         PBuffer.InsertNTString BNET.CurrentChan
@@ -373,5 +369,9 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
          'AddChat D2Red, "This is not a valid command, or is not currently functioning properly. If you feel this message is in error, please report it as a bug on Invigoration's website. http://invigoration.bnet.cc"
          '' The above only happens if the command is BLANK ''
     End Select
-   
+err:
+If debugmode = True Then
+   AddChat D2Red, "Error has occurred during the " & commandname & " command... Post this issue on Invigoration's website"
+Else
+End If
 End Sub

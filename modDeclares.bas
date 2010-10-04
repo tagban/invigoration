@@ -1,7 +1,6 @@
 Attribute VB_Name = "modDeclares"
-Public Const botver = "1.2.9[Stable]"
-Public Const vernum = "1.2.9"
-'webbotsite = "http://webbot.bnetweb.org/webbot.php?u=" & webbotuser & "&p=" & webbotpass
+Public Const botver = "1.3.0[Rock!]"
+Public Const vernum = "1.3.0"
 ''''''''''''''''''''''''''''''''''''''''''''''
 Public Declare Function GetTickCount& Lib "KERNEL32" ()
 'World-Accessable declares
@@ -80,6 +79,8 @@ Public Type BotData
     ZEROPING As String
     NEGPING As String
     BNCCICON As String
+    WebUser As String
+    WebPass As String
 End Type
 Public BNET As BotData
 Public Type BotNetData
@@ -88,6 +89,8 @@ Public Type BotNetData
     Database As String
     DatabasePassword As String
     Connected As Integer
+    WebUser As String
+    WebPass As String
 End Type
 Public BOTNET As BotNetData
 Public PBuffer As New PacketBuffer
