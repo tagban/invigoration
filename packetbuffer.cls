@@ -11,76 +11,76 @@ Attribute VB_GlobalNameSpace = False
 Attribute VB_Creatable = True
 Attribute VB_PredeclaredId = False
 Attribute VB_Exposed = False
-Private Buffer As String
+Private buffer As String
 
-Public Function InsertDWORDArray(Data() As Long)
+Public Function InsertDWORDArray(data() As Long)
     Dim i As Integer
-    For i = LBound(Data) To UBound(Data) Step 1
-        Buffer = Buffer & MakeDWORD(Data(i))
+    For i = LBound(data) To UBound(data) Step 1
+        buffer = buffer & MakeDWORD(data(i))
     Next i
 End Function
 
-Public Function InsertDWORD(Data As Long)
-    Buffer = Buffer & MakeDWORD(Data)
+Public Function InsertDWORD(data As Long)
+    buffer = buffer & MakeDWORD(data)
     If debugmode = 1 Then
-        AddChat HEXPINK, "InsertDWORD: " & Data
+        AddChat HEXPINK, "InsertDWORD: " & data
     End If
 End Function
 
-Public Function InsertData(Data As String)
-    Buffer = Buffer & Data
+Public Function InsertData(data As String)
+    buffer = buffer & data
     If debugmode = 1 Then
-        AddChat HEXPINK, "Data: " & Data
+        AddChat HEXPINK, "Data: " & data
     End If
 End Function
 
-Public Function InsertWORD(Data As Integer)
-    Buffer = Buffer & MakeWORD(Data)
+Public Function InsertWORD(data As Integer)
+    buffer = buffer & MakeWORD(data)
 End Function
 
-Public Function InsertByte(Data As Integer)
-    Buffer = Buffer & Chr(Data)
+Public Function InsertBYTE(data As Integer)
+    buffer = buffer & Chr(data)
     If debugmode = 1 Then
-        AddChat HEXPINK, "BYTE: " & Data
+        AddChat HEXPINK, "BYTE: " & data
     End If
 
 End Function
 
-Public Sub InsertBytes(Data As String)
+Public Sub InsertBytes(data As String)
     Dim i As Long
     Dim enqueueer As String
     
-    For i = 1 To Len(Data) Step 3
-        enqueueer = enqueueer & Chr(Val("&h0" & Mid(Data, i, 2)))
+    For i = 1 To Len(data) Step 3
+        enqueueer = enqueueer & Chr(Val("&h0" & Mid(data, i, 2)))
     If debugmode = 1 Then
-        AddChat HEXPINK, "Bytes: " & Data
+        AddChat HEXPINK, "Bytes: " & data
     End If
     Next i
-    Buffer = Buffer & enqueueer
+    buffer = buffer & enqueueer
 End Sub
 
-Public Function InsertNTString(Data As String)
-    Buffer = Buffer & Data & Chr(0)
+Public Function InsertNTString(data As String)
+    buffer = buffer & data & Chr(0)
     If debugmode = 1 Then
-        AddChat HEXPINK, "NTString: " & Data
+        AddChat HEXPINK, "NTString: " & data
     End If
 End Function
-Public Function InsertATString(Data As String)
-    Buffer = Buffer & Data & Chr(&HA)
+Public Function InsertATString(data As String)
+    buffer = buffer & data & Chr(&HA)
     If debugmode = 1 Then
-        AddChat HEXPINK, "ATString: " & Data
+        AddChat HEXPINK, "ATString: " & data
     End If
 End Function
-Public Function InsertNonNTString(Data As String)
-    Buffer = Buffer & Data
+Public Function InsertNonNTString(data As String)
+    buffer = buffer & data
     If debugmode = 1 Then
-        AddChat HEXPINK, "NonNTString: " & Data
+        AddChat HEXPINK, "NonNTString: " & data
     End If
 End Function
-Public Function InsertNonNTStringArray(Data() As String)
+Public Function InsertNonNTStringArray(data() As String)
 Dim i As Integer
-For i = LBound(Data) To UBound(Data) Step 1
-    Buffer = Buffer & Data(i)
+For i = LBound(data) To UBound(data) Step 1
+    buffer = buffer & data(i)
     If debugmode = 1 Then
         'AddChat HEXPINK, "NonNTStringARRAY: " & data
     End If
@@ -99,16 +99,16 @@ Function MakeWORD(value As Integer) As String
 End Function
 
 Public Function Clear()
-    Buffer = vbNullString
+    buffer = vbNullString
 End Function
 
-Public Function SendPacket(PacketID As Byte)
+Public Function SendPacket(PacketId As Byte)
     On Error GoTo Err:
 If frmMain.wsBnet.State <> sckConnected Then: Exit Function
 '' Runtime Error 6 ??
-    frmMain.wsBnet.SendData Chr(&HFF) & Chr(PacketID) & MakeWORD(Len(Buffer) + 4) & Buffer
+    frmMain.wsBnet.SendData Chr(&HFF) & Chr(PacketId) & MakeWORD(Len(buffer) + 4) & buffer
     If debugmode = 1 Then
-        AddChat HEXPINK, "Sent Packet: 0x" & Hex(PacketID)
+        AddChat HEXPINK, "Sent Packet: 0x" & Hex(PacketId)
     End If
     Clear
 Err:
@@ -117,13 +117,22 @@ Err:
     'info = "<font color=red>ERROR: </font> <font color=pink>Packet send error: 0x" & Hex(PacketId) & "</font><br>"
     'frmMain.txtTesting.text = info
 End Function
-
-Public Function SendBNLSPacket(PacketID As Byte)
+Public Function SendRPacket(PacketId As Byte)
+On Error GoTo Err3:
+If frmMain.wsRealm.State <> sckConnected Then: Exit Function
+    frmMain.wsRealm.SendData MakeWORD(Len(buffer) + 3) & Chr(PacketId) & buffer
+    If debugmode = 1 Then
+        AddChat HEXPINK, "Sent Realm Packet: 0x" & Hex(PacketId)
+    End If
+    Clear
+Err3:
+End Function
+Public Function SendBNLSPacket(PacketId As Byte)
 On Error GoTo Err2:
 If frmMain.wsBnls.State <> sckConnected Then: Exit Function
-    frmMain.wsBnls.SendData MakeWORD(Len(Buffer) + 3) & Chr(PacketID) & Buffer
+    frmMain.wsBnls.SendData MakeWORD(Len(buffer) + 3) & Chr(PacketId) & buffer
     If debugmode = 1 Then
-        AddChat HEXPINK, "Sent BNLS Packet: 0x" & Hex(PacketID)
+        AddChat HEXPINK, "Sent BNLS Packet: 0x" & Hex(PacketId)
     End If
     Clear
 Err2:
