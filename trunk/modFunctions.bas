@@ -42,9 +42,9 @@ Dim FullText As String
     BNET.ShowPing = GetStuff("BNET", "ShowPing")
     BNET.JoinNotify = GetStuff("BNET", "JoinNotify")
     BNET.Trigger = GetStuff("BNET", "Trigger")
-    BNET.WebUser = GetStuff("BNET", "WebUser")
-    BNET.WebPass = GetStuff("BNET", "WebPass")
     BNET.BNLSServer = GetStuff("BNLS", "Server")
+    BNET.Realm = GetStuff("BNET", "Realm")
+    BNET.BNCCICON = GetStuff("BNET", "BNCCICON")
 End Function
 
 Public Function SaveConfig()
@@ -64,9 +64,9 @@ Dim FullText As String
     WriteStuff "BNET", "ShowPing", BNET.ShowPing
     WriteStuff "BNET", "JoinNotify", BNET.JoinNotify
     WriteStuff "BNET", "Trigger", BNET.Trigger
-    WriteStuff "BNET", "WebUser", BNET.WebUser
-    WriteStuff "BNET", "WebPass", BNET.WebPass
     WriteStuff "BNLS", "Server", BNET.BNLSServer
+    WriteStuff "BNET", "Realm", BNET.BattlenetServer
+    WriteStuff "BNET", "BNCCICON", BNET.BNCCICON
     
 End Function
 

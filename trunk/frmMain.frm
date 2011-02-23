@@ -1,6 +1,6 @@
 VERSION 5.00
-Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "mscomctl.ocx"
-Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCN.OCX"
+Object = "{831FDD16-0C5C-11D2-A9FC-0000F8754DA1}#2.0#0"; "MSCOMCTL.OCX"
+Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Object = "{3B7C8863-D78F-101B-B9B5-04021C009402}#1.2#0"; "RICHTX32.OCX"
 Object = "{48E59290-9880-11CF-9754-00AA00C00908}#1.0#0"; "MSINET.OCX"
 Begin VB.Form frmMain 
@@ -124,7 +124,7 @@ Begin VB.Form frmMain
       Top             =   4560
       Width           =   7935
    End
-   Begin MSWinsockLib.Winsock wsWebbot 
+   Begin MSWinsockLib.Winsock wsRealm 
       Left            =   1920
       Top             =   240
       _ExtentX        =   741
@@ -461,7 +461,6 @@ Begin VB.Form frmMain
       _ExtentY        =   7646
       _Version        =   393217
       BackColor       =   2368548
-      Enabled         =   -1  'True
       ReadOnly        =   -1  'True
       ScrollBars      =   2
       DisableNoScroll =   -1  'True
@@ -693,14 +692,10 @@ Public invignet As Integer
 Public privatever As Boolean
 Public intRandom As Integer
 Public hexchat As Integer
-Public webbotsite As String
-Public WebSend As String
 Private Const WM_USER = &H400&
 Private Const EM_AUTOURLDETECT = (WM_USER + 91)
 Public WithEvents ChatBot As BnetBot
 Attribute ChatBot.VB_VarHelpID = -1
-Public WithEvents iTunes As iTunesApp
-Attribute iTunes.VB_VarHelpID = -1
 
 Public Sub PrepareCheck(ByRef tocheck As String)
     tocheck = Replace(tocheck, "[", "a")
@@ -730,7 +725,6 @@ Private Sub Form_Load()
     LoadConfig
     InvigNews = devNEWS.OpenURL("http://www.bnet.cc/invigoration/news.txt")
     InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
-    webbotsite = "http://webbot.bnetweb.org/webbot.php?u=" & BNET.WebUser & "&p=" & BNET.WebPass
     'InvigNight = devNEWS.OpenURL("http://www.bnet.cc/invigoration/nversion.txt")
     InvigRel = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
     AddChat D2MedBlue, "Version Check: "
@@ -754,7 +748,7 @@ Private Sub Form_Load()
         AddChat D2Orange, "Your version: " & vernum, D2White, "  Latest version: " & InvigVer
         AddChat D2Orange, "Last Update: ", D2White, X, D2Orange, " on ", D2White, R
         AddChat HEXPINK, "---------------------------------------------------------------------"
-        msg = MsgBox("You need to update Invigoration. Please try using CTRL+U, if that doesn't work, close your bot and visit: http://code.google.com/p/invigoration/", vbOKOnly, "New Version Released!")
+        msg = MsgBox("You need to update Invigoration. Please try using CTRL+U, if that doesn't work, close your bot and visit: http://www.clanbnu.ws/upgrade.html", vbOKOnly, "New Version Released!")
     End If
     AddChat D2Purple, "---------------------------------------------------"
     AddChat D2MedBlue, "()()"
@@ -765,8 +759,6 @@ Private Sub Form_Load()
     AddChat D2MedBlue, "---------------------------------------------------"
     frmConfigBNET.txtCDKey.text = GetStuff("BNET", "CDKey")
     frmConfigBNET.txtCDKey2.text = GetStuff("BNET", "CDKey2")
-    'AddChat D2MedBlue, "BNET.cc Webbot Activated" & GoWinInet(webbotsite & "&f=15 v=Invigoration")
-    'GoWinInet (webbotsite & "&f=11&c=clr+all")
     random = "180"
     uptimesec = 0
     uptimemin = 0
@@ -798,9 +790,80 @@ Private Sub IdleTimer_Timer()
             End If
 End Sub
 
+Private Sub Image1_Click()
+    Dim i As Integer
+    Dim iwinamp As Integer
+    Dim b As Boolean
+On Error Resume Next
+                AddChat D2MedBlue, ":: Winamp Loaded ::"
+                LastCW = vbNullString
+                LoadWinamp
+                WinAMP_SendCommandMessage (WA_PLAY)
+End Sub
+
+Private Sub Image2_Click()
+    Dim i As Integer
+    Dim iwinamp As Integer
+    Dim b As Boolean
+On Error Resume Next
+            iwinamp = WinAMP_SendCommandMessage(WA_PLAY)
+            If i = 0 Then
+            AddChat D2Orange, ":: Starting playback... ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
+
+Private Sub Image3_Click()
+    Dim i As Integer
+    Dim iwinamp As Integer
+    Dim b As Boolean
+On Error Resume Next
+            iwinamp = WinAMP_SendCommandMessage(WA_STOP)
+            If i = 0 Then
+            AddChat D2Orange, ":: Stopped ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
+
+Private Sub Image4_Click()
+    Dim i As Integer
+    Dim iwinamp As Integer
+    Dim b As Boolean
+On Error Resume Next
+            iwinamp = WinAMP_SendCommandMessage(WA_PREVTRACK)
+            If i = 0 Then
+            AddChat D2Orange, ":: Playing LAST song ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
+
+Private Sub Image5_Click()
+    Dim i As Integer
+    Dim iwinamp As Integer
+    Dim b As Boolean
+On Error Resume Next
+            iwinamp = WinAMP_SendCommandMessage(WA_NEXTTRACK)
+            If i = 0 Then
+            AddChat D2Orange, ":: Playing NEXT song :: "
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
 
 Private Sub mnuAbout_Click()
     frmAbout.Show
+End Sub
+
+Private Sub mnuBack_Click()
+            iwinamp = WinAMP_SendCommandMessage(WA_PREVTRACK)
+            If i = 0 Then
+                AddChat D2Orange, ":: Playing LAST song. ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
 End Sub
 
 Private Sub mnuBan_Click()
@@ -818,6 +881,31 @@ Private Sub mnuCanada_Click()
     End If
 End Sub
 
+Private Sub mnuDispMP32me_Click()
+    Dim WindowTitle As String
+    WindowTitle = GetWindowTitle("Winamp v1.x")
+    If WindowTitle = vbNullString Then
+        AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
+        winampnow = "Not loaded."
+    Else
+    WindowTitle = Left(WindowTitle, Len(WindowTitle) - 9)
+        AddChat D2White, "Now Playing [" & WindowTitle & "] "
+        winampnow = WindowTitle
+        b = True
+    End If
+End Sub
+
+Private Sub mnuDispMP3Chan_Click()
+    Dim WindowTitle As String
+    WindowTitle = GetWindowTitle("Winamp v1.x")
+    If WindowTitle = vbNullString Then
+        AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
+    Else
+    WindowTitle = Left(WindowTitle, Len(WindowTitle) - 9)
+        Send "/me [" & WindowTitle & "] ::Invigoration v" & vernum & "::", frmMain.wsBnet
+        b = True
+    End If
+End Sub
 
 Private Sub mnuFAdd_Click()
     Send "/f a " & lstChannel.SelectedItem, wsBnet
@@ -918,7 +1006,6 @@ connectstatus = True
     txtChannelInfo.ForeColor = D2Green
     antiidlesecond = 0
     frmMain.tmrAntiIdle.Enabled = True
-    frmMain.wsWebbot.Connect
 Error:
 
 End Sub
@@ -971,6 +1058,11 @@ ElseIf leetspeak = 1 Then
 End If
 End Sub
 
+Private Sub mnuLoadWA_Click()
+                AddChat D2White, "::Winamp Loaded:: [Invigoration v" & vernum & "]"
+                LoadWinamp
+                WinAMP_SendCommandMessage (WA_PLAY)
+End Sub
 
 Private Sub mnuMoooo_Click()
     If moo = 0 Then
@@ -981,6 +1073,25 @@ Private Sub mnuMoooo_Click()
         AddChat D2White, "I lost my milk... :("
     End If
 End Sub
+
+Private Sub mnuNext_Click()
+            iwinamp = WinAMP_SendCommandMessage(WA_NEXTTRACK)
+            If i = 0 Then
+                AddChat D2Orange, ":: Skipping to NEXT song. ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
+
+Private Sub mnuPlay_Click()
+            iwinamp = WinAMP_SendCommandMessage(WA_PLAY)
+            If i = 0 Then
+                AddChat D2Orange, ":: Winamp playback started ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
+
 Private Sub mnuSetupOption_Click()
     frmConfigBNET.Show
 End Sub
@@ -990,6 +1101,20 @@ Private Sub mnuSquelch_Click()
     Send "/squelch " & lstChannel.SelectedItem & Space(1), wsBnet
     txtsendbnet.SelStart = Len(txtsendbnet.text)
     txtsendbnet.SetFocus
+End Sub
+
+Private Sub mnuStop_Click()
+            iwinamp = WinAMP_SendCommandMessage(WA_STOP)
+            If i = 0 Then
+                AddChat D2Orange, ":: Winamp Stopped ::"
+            Else
+                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
+            End If
+End Sub
+
+Private Sub mnuUnloadWA_Click()
+                iwinamp = WinAMP_SendCommandMessage(WA_CLOSE)
+                AddChat D2Orange, "::Winamp Closed:: [Invigoration v" & vernum & "]"
 End Sub
 
 Private Sub mnuUnSquelch_Click()
@@ -1294,7 +1419,7 @@ Private Sub txtSendBNET_KeyPress(keyascii As Integer)
             End If
             End If
             If Message = "/" Then
-            On Error GoTo err:
+            On Error GoTo Err:
                 AddChat D2Red, "Cannot send just /. Please specify the command."
             ElseIf invigchat = 1 Then
                 If wsBnet.State <> Connected Then
@@ -1315,7 +1440,7 @@ Private Sub txtSendBNET_KeyPress(keyascii As Integer)
                     AddChat D2Red, "Battle.net is not connected."
                 End If
             End If
-err:
+Err:
             
         End If
     End If
@@ -1392,7 +1517,11 @@ Dim ParsedString As String, thing As New BnetBot
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
     Else
-   
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
     End If
     'End of Special Flags Code
     ''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -1402,22 +1531,18 @@ Dim ParsedString As String, thing As New BnetBot
             .ListItems.Add 1, , username, , thing.GetIconCode(Message, Flags)
             .ListItems(1).ListSubItems.Add , , GetPingCode(Ping)
             .ListItems(1).ToolTipText = "[" & ParsedString & "](" & Ping & "ms) MODERATOR"
-            'GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=" & StrReverse(Mid(Message, 1, 4)) & "&pi=" & Ping & "&fl=1")
         ElseIf Flags = "1" Then
             .ListItems.Add 1, , username, , thing.GetIconCode(Message, Flags)
             .ListItems(1).ListSubItems.Add , , GetPingCode(Ping)
             .ListItems(1).ToolTipText = "Blizzard Representative"
-            'GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=blizz&pi=" & Ping & "&fl=0")
         ElseIf Flags = "&H80000" Then
             .ListItems.Add , , username, , thing.GetIconCode(Message, Flags)
             .ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add , , GetPingCode(Ping)
             .ListItems(frmMain.lstChannel.ListItems.Count).ToolTipText = "[Invigoration Development Team]"
-            'GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=CHAT&pi=" & Ping & "&fl=0")
         Else
             .ListItems.Add , , username, , thing.GetIconCode(Message, Flags)
             .ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add , , GetPingCode(Ping)
             .ListItems(frmMain.lstChannel.ListItems.Count).ToolTipText = "[" & ParsedString & "](" & Ping & "ms)"
-            'GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=" & StrReverse(Mid(Message, 1, 4)) & "&pi=" & Ping & "&fl=" & Flags)
         End If
         GetPingColor username, Flags, Ping
         If Flags = &H1 Then
@@ -1448,13 +1573,11 @@ Private Sub ChatBot_OnChannel(ByVal ChannelName As String, ByVal Flags As Long)
         Refresh
     End With
     BNET.CurrentChan = ChannelName
-    AddChat D2Orange, "Joining (" & GetChannelType(Flags) & ") " & ChannelName & "."
-    'GoWinInet (webbotsite & "&f=2&d=" & Format(Time, "HH:MM") & "&ch=" & ChannelName)
+    AddChat D2Orange, "Joining (" & GetChannelType(Flags) & ") " & ChannelName & " w/Flags: " & Flags & "."
 End Sub
 
 Private Sub ChatBot_OnEmote(ByVal username As String, ByVal Flags As Long, ByVal Message As String)
     AddChat D2Beige1, "* " & username & Space(1) & Message & " *"
-    'GoWinInet (webbotsite & "&f=9&d=" & Format(Time, "HH:MM") & "&n=" & username & "&t=" & Message)
 End Sub
 Private Sub ChatBot_OnError(ByVal Message As String)
 
@@ -1496,6 +1619,12 @@ Dim thing As New BnetBot
         Flags = &H80000
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
+    Else
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
     End If
     'End of Special Flags Code
     ''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -1511,7 +1640,6 @@ Dim thing As New BnetBot
                     End If
             End With
         End If
-        'GoWinInet (webbotsite & "&f=12&n=" & username)
     Next X
 End Sub
 
@@ -1531,7 +1659,11 @@ Dim ParsedString As String, thing As New BnetBot
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
     Else
-
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
     End If
     'End of Special Flags Code
     ''''''''''''''''''''''''''''''''''''''''''''''''''
@@ -1543,19 +1675,11 @@ Dim ParsedString As String, thing As New BnetBot
         .ListItems(1).ListSubItems.Add , , GetPingCode(Ping)
         .ListItems(1).ToolTipText = "[" & ParsedString & "](" & Ping & "ms) moderator"
         JoinCount = JoinCount + 1
-       ' GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=" & StrReverse(Mid(Message, 1, 4)) & "&pi=" & Ping & "&fl=1")
-    ElseIf Flags = &H80000 Then
-        .ListItems.Add , , username, , thing.GetIconCode(Message, Flags)
-        .ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add , , GetPingCode(Ping)
-        .ListItems(frmMain.lstChannel.ListItems.Count).ToolTipText = "[" & ParsedString & "](" & Ping & "ms)"
-        JoinCount = JoinCount + 1
-        'GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=bnet&pi=" & Ping & "&fl=2")
     Else
         .ListItems.Add , , username, , thing.GetIconCode(Message, Flags)
         .ListItems(frmMain.lstChannel.ListItems.Count).ListSubItems.Add , , GetPingCode(Ping)
         .ListItems(frmMain.lstChannel.ListItems.Count).ToolTipText = "[" & ParsedString & "](" & Ping & "ms)"
         JoinCount = JoinCount + 1
-        'GoWinInet (webbotsite & "&f=4&d=" & Format(Time, "HH:MM") & "&n=" & username & "&cl=" & StrReverse(Mid(Message, 1, 4)) & "&pi=" & Ping & "&fl=" & Flags)
     End If
         GetPingColor username, Flags, Ping
         If BNET.JoinNotify = "1" Then
@@ -1592,7 +1716,7 @@ On Error Resume Next
     With frmMain.txtChannelInfo
         .Caption = BNET.CurrentChan & " (" & frmMain.lstChannel.ListItems.Count & ")"
     End With
-    'GoWinInet (webbotsite & "&f=16&d=" & Format(Time, "HH:MM") & "&n=" & username)
+    
     If BNET.JoinNotify = "1" Then
         AddChat D2Green, username & " has left the channel."
     Else
@@ -1628,13 +1752,10 @@ Private Sub ChatBot_OnTalk(ByVal username As String, ByVal Flags As Long, ByVal 
     Select Case Mid$(Message, 1, 1)
         Case Chr(163)
             AddChat D2Beige1, ":: " & username & " :: ", HEXPINK, "[HEX] " & HexToStr(Mid$(Message, 2, Len(Message)))
-            'GoWinInet (webbotsite & "&f=8&d=" & Format(Time, "HH:MM") & "&n=" & username & "&t= [HexEncrypt]" & HexToStr(Mid$(Message, 2, Len(Message))))
         Case Chr(149)
             AddChat D2Beige1, ":: " & username & " :: ", HEXPINK, "[INVIG] " & InvigDecrypt(Mid$(Message, 2, Len(Message)))
-            'GoWinInet (webbotsite & "&f=8&d=" & Format(Time, "HH:MM") & "&n=" & username & "&t= [InvigEncrypt] " & InvigDecrypt(Mid$(Message, 2, Len(Message))))
         Case Else
              AddChat D2Beige1, ":: " & username & " :: ", D2White, Message
-             'GoWinInet (webbotsite & "&f=8&d=" & Format(Time, "HH:MM") & "&n=" & username & "&t=" & Message)
         End Select
 ParseCommand Message, username 'send commands to parser
 Call fBotColors
@@ -1677,4 +1798,8 @@ On Error GoTo Err3:
     frmMain.tmrDC.Enabled = True
 Err3:
     
+End Sub
+
+Private Sub wsRealm_Error(ByVal Number As Integer, Description As String, ByVal Scode As Long, ByVal Source As String, ByVal HelpFile As String, ByVal HelpContext As Long, CancelDisplay As Boolean)
+    AddChat D2Red, "Realm Connection Failed..."
 End Sub
