@@ -1,0 +1,8 @@
+# Configuration Assistance #
+
+The bot can be configured either using config.ini inside of the program folder, or by loading the bot and clicking 'Configure' menu and then 'Edit Configuration'.
+
+<img src='http://www.bnet.cc/invigoration/config.jpg'>
+
+
+Do you really need help? lolz The only thing to note, is that the Email address currently doesn't save, as I haven't gotten registrations to work yet. Stay Tuned!
