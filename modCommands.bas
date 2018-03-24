@@ -287,73 +287,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
                 LastCW = vbNullString
             End If
         'Elmer Fudd Mode
-'''''''WINAMP COMMANDS''''''''''''''''''
-    Case "winamp"
-        'Just in case winamp is not installed, use the error handler to prevent the bot from dropping.
-        On Error Resume Next
-        Select Case Rest
-            Case "on", vbNullString
-                AddChat HEXPINK, "::Winamp Loaded:: [Invigoration v" & vernum & "]", frmMain.wsBnet
-                LastCW = vbNullString
-                LoadWinamp
-                WinAMP_SendCommandMessage (WA_PLAY)
-            Case "off"
-                iwinamp = WinAMP_SendCommandMessage(WA_CLOSE)
-                Send LastCW & "::Winamp Closed:: [Invigoration v" & vernum & "]", frmMain.wsBnet
-                LastCW = vbNullString
-        End Select
-    Case "mp3", "music"
-            WindowTitle = GetWindowTitle("Winamp v1.x")
-            If WindowTitle = vbNullString Then
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            Else
-            WindowTitle = Left(WindowTitle, Len(WindowTitle) - 9)
-                Send LastCW & "/me [" & WindowTitle & "] ::Invigoration v" & vernum & "::", frmMain.wsBnet
-                LastCW = vbNullString
-                b = True
-            End If
-   Case "play", "p"
-            iwinamp = WinAMP_SendCommandMessage(WA_PLAY)
-            If i = 0 Then
-                AddChat D2Green, ":: Playback Started ::", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-    Case "pause"
-            iwinamp = WinAMP_SendCommandMessage(WA_PAUSE)
-            If i = 0 Then
-                AddChat D2White, ":: Paused ::", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-    Case "stop"
-            iwinamp = WinAMP_SendCommandMessage(WA_STOP)
-            If i = 0 Then
-                AddChat D2Red, ":: Stopped ::", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-    Case "next", "n", "skip", ">"
-            iwinamp = WinAMP_SendCommandMessage(WA_NEXTTRACK)
-            If i = 0 Then
-                AddChat D2MedBlue, ":: Next > ::", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                'Send LastCW & "Not on, use /winamp .", frmMain.wsBnet
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-    Case "prev", "<", "back", "last"
-            iwinamp = WinAMP_SendCommandMessage(WA_PREVTRACK)
-            If i = 0 Then
-                AddChat D2MedBlue, ":: Back < ::", frmMain.wsBnet
-                LastCW = vbNullString
-            Else
-                AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-    '''''''''''''''''''''''''''''''''''''''''
+
     Case "home", "gohome", "homechan", "homechannel"
         PBuffer.SendPacket &H10
         PBuffer.InsertDWORD 2

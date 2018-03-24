@@ -225,7 +225,7 @@ Begin VB.Form frmConfigBNET
             Height          =   315
             ItemData        =   "frmConfigBNET.frx":09B3
             Left            =   840
-            List            =   "frmConfigBNET.frx":09CC
+            List            =   "frmConfigBNET.frx":09C6
             TabIndex        =   4
             Text            =   "PXES"
             ToolTipText     =   "Product ID (Backwards)"
@@ -755,11 +755,7 @@ End Sub
 
 
 Private Sub txtProduct_Change()
-    If BNET.Product = "RATS" Then
-        txtProduct.text = "Starcraft"
-    ElseIf BNET.Product = "PXES" Then
-        txtProduct.text = "Brood War"
-    ElseIf BNET.Product = "NB2W" Then
+    If BNET.Product = "NB2W" Then
         txtProduct.text = "Warcraft 2"
     ElseIf BNET.Product = "3RAW" Then
         chkUDP.value = vbUnchecked
