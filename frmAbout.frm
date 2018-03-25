@@ -39,23 +39,13 @@ Begin VB.Form frmAbout
    End
    Begin VB.Label Label6 
       BackColor       =   &H80000012&
-      Caption         =   "Project Page@GoogleCode"
+      Caption         =   "Github Source"
       ForeColor       =   &H8000000A&
       Height          =   255
-      Left            =   1680
-      TabIndex        =   11
-      Top             =   3960
+      Left            =   1560
+      TabIndex        =   9
+      Top             =   3720
       Width           =   2295
-   End
-   Begin VB.Label Label5 
-      BackColor       =   &H80000012&
-      Caption         =   "DarkBlizz.org"
-      ForeColor       =   &H8000000A&
-      Height          =   255
-      Left            =   120
-      TabIndex        =   10
-      Top             =   3960
-      Width           =   1455
    End
    Begin VB.Label Label2 
       BackColor       =   &H80000007&
@@ -63,20 +53,9 @@ Begin VB.Form frmAbout
       ForeColor       =   &H8000000E&
       Height          =   495
       Left            =   120
-      TabIndex        =   8
+      TabIndex        =   7
       Top             =   1200
       Width           =   5655
-   End
-   Begin VB.Label Label10 
-      BackColor       =   &H00000000&
-      Caption         =   "Clan BNU's Website"
-      ForeColor       =   &H00C0C0C0&
-      Height          =   255
-      Index           =   0
-      Left            =   1680
-      TabIndex        =   7
-      Top             =   3720
-      Width           =   1935
    End
    Begin VB.Label lblVersion 
       BackColor       =   &H80000007&
@@ -204,7 +183,7 @@ Begin VB.Form frmAbout
       ForeColor       =   &H8000000A&
       Height          =   255
       Left            =   120
-      TabIndex        =   9
+      TabIndex        =   8
       Top             =   3720
       Width           =   1095
    End
@@ -340,19 +319,17 @@ Private Sub Form_Load()
     lblVersion.Caption = botver
 End Sub
 
-Private Sub Label10_Click(Index As Integer)
-    ShellExecute Me.hWnd, "Open", "http://www.clanbnu.net", 0&, 0&, 0&
-End Sub
 
 
 Private Sub Label3_Click()
     ShellExecute Me.hWnd, "Open", "http://www.bnet.cc", 0&, 0&, 0&
 End Sub
 
-Private Sub Label5_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.darkblizz.org", 0&, 0&, 0&
-End Sub
 
 Private Sub Label6_Click()
-    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "https://github.com/tagban/invigoration", 0&, 0&, 0&
+End Sub
+
+Private Sub lblDescription_Click()
+
 End Sub

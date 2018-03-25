@@ -461,6 +461,7 @@ Begin VB.Form frmMain
       _ExtentY        =   7646
       _Version        =   393217
       BackColor       =   2368548
+      Enabled         =   -1  'True
       ReadOnly        =   -1  'True
       ScrollBars      =   2
       DisableNoScroll =   -1  'True
@@ -962,8 +963,8 @@ Private Sub mnuKick_Click()
 End Sub
 
 Private Sub mnuBug_Click()
-    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/issues/entry", 0&, 0&, 0&
-    AddChat D2White, "Thank you for contributing, we appreciate all of your testing! If a window didn't open, go here:  ohttp://code.google.com/p/invigoration/issues/entry "
+    ShellExecute Me.hWnd, "Open", "https://github.com/tagban/invigoration/issues", 0&, 0&, 0&
+    AddChat D2White, "Thank you for contributing, we appreciate all of your testing! If a window didn't open, go here:  ohttps://github.com/tagban/invigoration/issues "
 End Sub
 
 Private Sub mnuClearBufs_Click()
