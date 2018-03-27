@@ -46,7 +46,6 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
 '''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''''
     
     Dim i As Integer
-    Dim iwinamp As Integer
     Dim b As Boolean
     Dim SayMessage As String
     Dim Extra As String
@@ -298,7 +297,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
         PBuffer.InsertDWORD 2
         PBuffer.InsertNTString BNET.CurrentChan
         PBuffer.SendPacket &HC
-    Case "w", "m", "whisper", "unignore", "unsquelch", "Message", "help", "clan", "where", "c", "Message", "squelch", "ign,e", "f", "friend", "friends", "?", "help", "dnd", "options", "o", "emote", "me", "channel", "who", "whoami", "whois", "whereis", "beep", "designate", "mail", "time", "unban", "users", "stats", "nobeep"
+    Case "w", "m", "whisper", "unignore", "unsquelch", "Message", "help", "clan", "where", "c", "Message", "squelch", "ign,e", "f", "friend", "friends", "?", "help", "dnd", "options", "o", "emote", "me", "channel", "who", "whoami", "whois", "whereis", "beep", "designate", "mail", "time", "unban", "users", "stats", "set-email", "nobeep"
         If Inbot Then Send LastCW & "/" & Message, frmMain.wsBnet
         'Empty Command NOTHING NULL'
     Case Else
