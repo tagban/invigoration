@@ -1,6 +1,6 @@
 Attribute VB_Name = "modDeclares"
-Public Const botver = "1.3.1[BETA]"
-Public Const vernum = "1.3.1"
+Public Const botver = "1.4.1[BETA]"
+Public Const vernum = "1.4.0"
 ''''''''''''''''''''''''''''''''''''''''''''''
 Public Declare Function GetTickCount& Lib "KERNEL32" ()
 'World-Accessable declares

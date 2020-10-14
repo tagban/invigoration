@@ -11,7 +11,14 @@ Public Type NOTIFYICONDATA
     hIcon As Long
     szTip As String * 64
 End Type
-      
+Private Declare Function LoadLibraryA Lib "kernel32.dll" (ByVal lpLibFileName As String) As Long
+Private Declare Function FreeLibrary Lib "kernel32.dll" (ByVal hLibModule As Long) As Long
+Private Declare Function InitCommonControlsEx Lib "comctl32.dll" (iccex As InitCommonControlsExStruct) As Boolean
+Private Declare Sub InitCommonControls Lib "comctl32.dll" ()
+Private Type InitCommonControlsExStruct
+    lngSize As Long
+    lngICC As Long
+End Type
 Public Const NIM_ADD = &H0
 Public Const NIM_MODIFY = &H1
 Public Const NIM_DELETE = &H2

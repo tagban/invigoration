@@ -340,17 +340,12 @@ Dim Product As String
             AddChat D2Red, "Friend has been removed from flist: &H68"
     Case &H53
             If Asc(Mid$(Data, 5, 4)) = &H1 Then
-            'Account Doesn't Exist
-                If BNET.Product = "3RAW" Then
-                    AddChat D2Red, "Account doesn't exist, unable to create using Warcraft III."
-                Else
                     AddChat D2Red, "Account doesn't exist, attempting creation."
                         With PBuffer
                             .InsertNTString BNET.username
                             .InsertNTString BNET.Password
                             .SendBNLSPacket &H4
                         End With
-                End If
             Else
                 With PBuffer
                     .InsertNonNTString Mid(Data, 9, 64)

@@ -19,6 +19,7 @@ Form=frmConfigBNET.frm
 Module=modCommands; modCommands.bas
 Module=modColors; modColors.bas
 Class=Buffer; Buffer.cls
+Module=modView; modView.bas
 IconForm="frmMain"
 Startup="frmMain"
 HelpFile=""

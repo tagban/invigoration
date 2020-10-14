@@ -461,7 +461,6 @@ Begin VB.Form frmMain
       _ExtentY        =   7646
       _Version        =   393217
       BackColor       =   2368548
-      Enabled         =   -1  'True
       ReadOnly        =   -1  'True
       ScrollBars      =   2
       DisableNoScroll =   -1  'True
@@ -712,8 +711,8 @@ End Sub
 
 Private Sub bnu_Click()
 On Error Resume Next
-Send "/join Clan BNU", frmMain.wsBnet
-AddChat vbYellow, "Joining Channel Clan BNU...."
+Send "/join Town Square", frmMain.wsBnet
+AddChat vbYellow, "Joining Channel Town Square...."
 
 End Sub
 
@@ -724,10 +723,10 @@ Private Sub Form_Load()
     frmMain.Caption = "Invigoration - http://www.BNET.cc"
     LogChat = 0
     LoadConfig
-    InvigNews = devNEWS.OpenURL("http://www.bnet.cc/invigoration/news.txt")
-    InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
+    'InvigNews = devNEWS.OpenURL("http://www.bnet.cc/invigoration/news.txt")
+    'InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
     'InvigNight = devNEWS.OpenURL("http://www.bnet.cc/invigoration/nversion.txt")
-    InvigRel = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
+    'InvigRel = devNEWS.OpenURL("http://www.bnet.cc/invigoration/verrelease.txt")
     AddChat D2MedBlue, "Version Check: "
     connectstatus = False
     If InvigVer = vernum Then
@@ -790,83 +789,9 @@ Private Sub IdleTimer_Timer()
                 IdleTime = 0
             End If
 End Sub
-
-Private Sub Image1_Click()
-    Dim i As Integer
-    Dim iwinamp As Integer
-    Dim b As Boolean
-On Error Resume Next
-                AddChat D2MedBlue, ":: Winamp Loaded ::"
-                LastCW = vbNullString
-                LoadWinamp
-                WinAMP_SendCommandMessage (WA_PLAY)
-End Sub
-
-Private Sub Image2_Click()
-    Dim i As Integer
-    Dim iwinamp As Integer
-    Dim b As Boolean
-On Error Resume Next
-            iwinamp = WinAMP_SendCommandMessage(WA_PLAY)
-            If i = 0 Then
-            AddChat D2Orange, ":: Starting playback... ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
-Private Sub Image3_Click()
-    Dim i As Integer
-    Dim iwinamp As Integer
-    Dim b As Boolean
-On Error Resume Next
-            iwinamp = WinAMP_SendCommandMessage(WA_STOP)
-            If i = 0 Then
-            AddChat D2Orange, ":: Stopped ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
-Private Sub Image4_Click()
-    Dim i As Integer
-    Dim iwinamp As Integer
-    Dim b As Boolean
-On Error Resume Next
-            iwinamp = WinAMP_SendCommandMessage(WA_PREVTRACK)
-            If i = 0 Then
-            AddChat D2Orange, ":: Playing LAST song ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
-Private Sub Image5_Click()
-    Dim i As Integer
-    Dim iwinamp As Integer
-    Dim b As Boolean
-On Error Resume Next
-            iwinamp = WinAMP_SendCommandMessage(WA_NEXTTRACK)
-            If i = 0 Then
-            AddChat D2Orange, ":: Playing NEXT song :: "
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
 Private Sub mnuAbout_Click()
     frmAbout.Show
 End Sub
-
-Private Sub mnuBack_Click()
-            iwinamp = WinAMP_SendCommandMessage(WA_PREVTRACK)
-            If i = 0 Then
-                AddChat D2Orange, ":: Playing LAST song. ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
 Private Sub mnuBan_Click()
     Send "/ban " & lstChannel.SelectedItem, wsBnet
     txtsendbnet.SetFocus
@@ -881,38 +806,10 @@ Private Sub mnuCanada_Click()
         AddChat D2White, "Canada mode disabled."
     End If
 End Sub
-
-Private Sub mnuDispMP32me_Click()
-    Dim WindowTitle As String
-    WindowTitle = GetWindowTitle("Winamp v1.x")
-    If WindowTitle = vbNullString Then
-        AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-        winampnow = "Not loaded."
-    Else
-    WindowTitle = Left(WindowTitle, Len(WindowTitle) - 9)
-        AddChat D2White, "Now Playing [" & WindowTitle & "] "
-        winampnow = WindowTitle
-        b = True
-    End If
-End Sub
-
-Private Sub mnuDispMP3Chan_Click()
-    Dim WindowTitle As String
-    WindowTitle = GetWindowTitle("Winamp v1.x")
-    If WindowTitle = vbNullString Then
-        AddChat D2White, "Winamp is not active, use '/winamp on'  to activate it."
-    Else
-    WindowTitle = Left(WindowTitle, Len(WindowTitle) - 9)
-        Send "/me [" & WindowTitle & "] ::Invigoration v" & vernum & "::", frmMain.wsBnet
-        b = True
-    End If
-End Sub
-
 Private Sub mnuFAdd_Click()
     Send "/f a " & lstChannel.SelectedItem, wsBnet
     txtsendbnet.SetFocus
 End Sub
-
 Private Sub mnuFListView_Click()
     Send "/f l ", wsBnet
     txtsendbnet.SetFocus
@@ -1019,7 +916,7 @@ End Sub
 Private Sub mnuDisconnect_Click()
     connectstatus = False
     tmrAntiIdle.Enabled = False
-    frmMain.Caption = "Invigoration - http://www.clanbnu.ws/"
+    frmMain.Caption = "Invigoration - http://www.BNET.cc/invigoration"
     frmMain.wsBnet.Close
     frmMain.wsBnls.Close
     AddChat D2White, "Battle.net Closed Connection."
@@ -1058,13 +955,6 @@ ElseIf leetspeak = 1 Then
     AddChat D2White, "Leet Speak disabled."
 End If
 End Sub
-
-Private Sub mnuLoadWA_Click()
-                AddChat D2White, "::Winamp Loaded:: [Invigoration v" & vernum & "]"
-                LoadWinamp
-                WinAMP_SendCommandMessage (WA_PLAY)
-End Sub
-
 Private Sub mnuMoooo_Click()
     If moo = 0 Then
         moo = 1
@@ -1074,25 +964,6 @@ Private Sub mnuMoooo_Click()
         AddChat D2White, "I lost my milk... :("
     End If
 End Sub
-
-Private Sub mnuNext_Click()
-            iwinamp = WinAMP_SendCommandMessage(WA_NEXTTRACK)
-            If i = 0 Then
-                AddChat D2Orange, ":: Skipping to NEXT song. ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
-Private Sub mnuPlay_Click()
-            iwinamp = WinAMP_SendCommandMessage(WA_PLAY)
-            If i = 0 Then
-                AddChat D2Orange, ":: Winamp playback started ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
 Private Sub mnuSetupOption_Click()
     frmConfigBNET.Show
 End Sub
@@ -1104,37 +975,21 @@ Private Sub mnuSquelch_Click()
     txtsendbnet.SetFocus
 End Sub
 
-Private Sub mnuStop_Click()
-            iwinamp = WinAMP_SendCommandMessage(WA_STOP)
-            If i = 0 Then
-                AddChat D2Orange, ":: Winamp Stopped ::"
-            Else
-                AddChat D2Orange, "Winamp is not active, use '/winamp on'  to activate it."
-            End If
-End Sub
-
-Private Sub mnuUnloadWA_Click()
-                iwinamp = WinAMP_SendCommandMessage(WA_CLOSE)
-                AddChat D2Orange, "::Winamp Closed:: [Invigoration v" & vernum & "]"
-End Sub
-
 Private Sub mnuUnSquelch_Click()
     Send "/unsquelch " & lstChannel.SelectedItem & Space(1), wsBnet
     txtsendbnet.SelStart = Len(txtsendbnet.text)
     txtsendbnet.SetFocus
 End Sub
-
 Private Sub mnuUpdate_Click()
-InvigVer = devNEWS.OpenURL("http://www.bnet.cc/invigoration/version.txt")
+InvigVer = devNEWS.OpenURL("https://github.com/tagban/invigoration/")
     If InvigVer = vernum Then
     ''
 Else
-    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/downloads/list", 0&, 0&, 0&
-    AddChat D2Red, "If a window didn't open, close Invig, then download the new version from: http://code.google.com/p/invigoration/"
+    ShellExecute Me.hWnd, "Open", "https://github.com/tagban/invigoration/", 0&, 0&, 0&
+    AddChat D2Red, "If a window didn't open, close Invig, then download the new version from: https://github.com/tagban/invigoration/"
 End If
 connectstatus = False
 End Sub
-
 Private Sub mnuUserFocus_Click()
     targetuser = lstChannel.SelectedItem & " : "
     targetusername = lstChannel.SelectedItem
@@ -1142,7 +997,6 @@ Private Sub mnuUserFocus_Click()
     AddChat D2MedBlue, targetusername & " is in Focus."
     txtsendbnet.SetFocus
 End Sub
-
 Private Sub mnuViewProfile_Click()
     Profile.Caption = lstChannel.SelectedItem
     Profile.Show
@@ -1150,7 +1004,7 @@ Private Sub mnuViewProfile_Click()
 End Sub
 
 Private Sub mnuWebsite_Click()
-    ShellExecute Me.hWnd, "Open", "http://code.google.com/p/invigoration/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "https://github.com/tagban/invigoration", 0&, 0&, 0&
 End Sub
 Private Sub mnuWhisper_Click()
     txtsendbnet.text = "/w " & lstChannel.SelectedItem
@@ -1449,7 +1303,7 @@ End Sub
 
 
 Private Sub Update_Click()
-    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/", 0&, 0&, 0&
+    ShellExecute Me.hWnd, "Open", "http://www.bnet.cc/invigoration", 0&, 0&, 0&
 End Sub
 Private Sub wsBnet_Close()
     mnuConnect.Visible = True
@@ -1513,10 +1367,12 @@ Dim ParsedString As String, thing As New BnetBot
     'All developers for Invigoration are recommended to add their own.
     If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
         Flags = &H80000
-    ElseIf LCase(username) = "myst" And BNET.BattlenetServer = "useast.battle.net" Then
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
         Flags = &H80000
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "us.battle.vet" Then
+        Flags = &H80000
     Else
         If BNET.BNCCICON = 1 Then
                 If LCase(username) = BNET.username Then
@@ -1616,10 +1472,12 @@ Dim thing As New BnetBot
     'All developers for Invigoration are recommended to add their own.
     If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
         Flags = &H80000
-    ElseIf LCase(username) = "myst" And BNET.BattlenetServer = "useast.battle.net" Then
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
         Flags = &H80000
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "us.battle.vet" Then
+        Flags = &H80000
     Else
         If BNET.BNCCICON = 1 Then
                 If LCase(username) = BNET.username Then
@@ -1655,10 +1513,12 @@ Dim ParsedString As String, thing As New BnetBot
     'All developers for Invigoration are recommended to add their own.
     If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
         Flags = &H80000
-    ElseIf LCase(username) = "myst" And BNET.BattlenetServer = "useast.battle.net" Then
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
         Flags = &H80000
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "us.battle.vet" Then
+        Flags = &H80000
     Else
         If BNET.BNCCICON = 1 Then
                 If LCase(username) = BNET.username Then
@@ -1699,14 +1559,18 @@ Private Sub ChatBot_OnLeave(ByVal username As String, ByVal Flags As Long)
     'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
     If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
         Flags = &H80000
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
+        Flags = &H80000
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
-        If BNET.BNCCICON = 1 Then
-             ElseIf LCase(username) = BNET.username Then
-        Flags = &H800000
-        Else
-        End If
+    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "us.battle.vet" Then
+        Flags = &H80000
     Else
+        If BNET.BNCCICON = 1 Then
+                If LCase(username) = BNET.username Then
+                    Flags = &H800000
+                End If
+        End If
     End If
     'End of Special Flags Code
     ''''''''''''''''''''''''''''''''''''''''''''''''''
