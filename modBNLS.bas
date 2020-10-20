@@ -7,9 +7,9 @@ Public cookie As Long
 
 Public versioncode As Long
 
-Private Function GetDWORD(data As String) As Long
+Private Function GetDWORD(Data As String) As Long
 Dim lReturn As Long
-    Call CopyMemory(lReturn, ByVal data, 4)
+    Call CopyMemory(lReturn, ByVal Data, 4)
     GetDWORD = lReturn
 End Function
 
@@ -33,15 +33,15 @@ Private Sub InitCRC32()
     Next
 End Sub
 
-Private Function CRC32(ByVal data As String) As Long
+Private Function CRC32(ByVal Data As String) As Long
     Dim i As Long, J As Long
     
     Call InitCRC32
     
     CRC32 = &HFFFFFFFF
     
-    For i = 1 To Len(data)
-        J = CByte(Asc(Mid(data, i, 1))) Xor (CRC32 And &HFF&)
+    For i = 1 To Len(Data)
+        J = CByte(Asc(Mid(Data, i, 1))) Xor (CRC32 And &HFF&)
         If CRC32 < 0 Then CRC32 = ((CRC32 And &H7FFFFFFF) \ &H100&) Or &H800000 Else CRC32 = CRC32 \ &H100&
         CRC32 = CRC32 Xor CRC32Table(J)
     Next
@@ -80,15 +80,15 @@ End Select
     End If
 End Function
 
-Public Sub ParseBNLS(ByVal data As String)
-Select Case Asc(Mid(data, 3, 1))
+Public Sub ParseBNLS(ByVal Data As String)
+Select Case Asc(Mid(Data, 3, 1))
 '(WORD)      Message Length, including this header
 '(BYTE)      Message ID
 '(VOID)      Message Data
     Case &H1A
             Dim pB As New Buffer
          With pB
-            .SetBuffer data
+            .SetBuffer Data
             .Skip 3
             Success = .GetBoolean
             version = .GetDWORD
@@ -125,11 +125,10 @@ Select Case Asc(Mid(data, 3, 1))
         If varproduct = "PX2D" Or varproduct = "PX3W" Then
             With PBuffer
                 .InsertDWORD &H0
-                .InsertBYTE &H2
+                .InsertByte &H2
                 .InsertDWORD &H1
                 .InsertDWORD Servers
                 .InsertNTString frmConfigBNET.txtCDKey.text
-                .InsertNTString frmConfigBNET.txtCDKey2.text
                 .SendBNLSPacket &HC
             End With
         Else
@@ -141,44 +140,31 @@ Select Case Asc(Mid(data, 3, 1))
         End If
          
     Case &H9
-        If varproduct = "PX2D" Or varproduct = "PX3W" Then
-            With PBuffer
-                .InsertDWORD &H0
-                .InsertBYTE &H2
-                .InsertDWORD &H1
-                .InsertDWORD Servers
-                .InsertNTString frmConfigBNET.txtCDKey.text
-                .InsertNTString frmConfigBNET.txtCDKey2.text
-                .SendBNLSPacket &HC
-            End With
-        Else
             With PBuffer
                .InsertDWORD Servers
                .InsertNTString frmConfigBNET.txtCDKey.text
                .SendBNLSPacket &H1
             End With
-        End If
     Case &H4
         With PBuffer
-            .InsertNonNTString Mid$(data, 4)
+            .InsertNonNTString Mid$(Data, 4)
             .InsertNTString BNET.username
             .SendPacket &H52
         End With
     Case &H2
        With PBuffer
-            .InsertNonNTString Mid(data, 4)
+            .InsertNonNTString Mid(Data, 4)
             .InsertNTString BNET.username
             .SendPacket &H53
        End With
     Case &H3
         With PBuffer
-            .InsertNonNTString Mid(data, 4)
+            .InsertNonNTString Mid(Data, 4)
             .SendPacket &H54
         End With
     Case &HC
-        CdkeyHash = Mid(data, 18, 36)
-        Cdkey2Hash = Mid(data, 58, 36)
-        GTC = Val("&H" & StrToHex(StrReverse(Mid(data, 14, 4))))
+        CdkeyHash = Mid(Data, 18, 36)
+        GTC = Val("&H" & StrToHex(StrReverse(Mid(Data, 14, 4))))
         GTC = CLng(GTC)
         Send0x51
     Case &H1
@@ -186,7 +172,7 @@ Select Case Asc(Mid(data, 3, 1))
             AddChat HEXPINK, "BNLS PACKET 0x1"
         End If
             With pB
-                .SetBuffer data
+                .SetBuffer Data
                 .Skip 3
                 
                 If Not .GetBoolean Then
@@ -216,9 +202,6 @@ Select Case Asc(Mid(data, 3, 1))
                 End If
                 .InsertDWORD &H0
                 .InsertNonNTString CdkeyHash
-                If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-                   .InsertNonNTString Cdkey2Hash
-                End If
                 If debugmode = 1 Then
                     AddChat D2Orange, "CD Key Hash: " & CdkeyHash
                     AddChat D2Orange, "CD Key Hash length :" & Len(CdkeyHash)
@@ -231,7 +214,7 @@ Select Case Asc(Mid(data, 3, 1))
            ' Send0x51
         Case &HE
             Dim key As Long, key2 As Long
-            key2 = GetDWORD(Mid(data, 4, 4))
+            key2 = GetDWORD(Mid(Data, 4, 4))
             key = BNLSChecksum("Invigoration", key2)
             With PBuffer
                 .InsertDWORD key
@@ -255,7 +238,7 @@ Select Case Asc(Mid(data, 3, 1))
                 End If
                 hash(0) = PBuffer.MakeDWORD(GTC)
                 hash(1) = PBuffer.MakeDWORD(Servers)
-                hash(2) = Mid(data, 4, Len(data) - 3)
+                hash(2) = Mid(Data, 4, Len(Data) - 3)
                 With PBuffer
                     .InsertDWORD &H1C
                     .InsertDWORD &H1
@@ -270,14 +253,14 @@ Select Case Asc(Mid(data, 3, 1))
                     If SPass = True Then
                         .InsertDWORD GTC
                         .InsertDWORD Servers
-                        .InsertNonNTString Mid(data, 4, Len(data) - 3)
+                        .InsertNonNTString Mid(Data, 4, Len(Data) - 3)
                         .InsertNTString BNET.username
                         .SendPacket &H3A
                         SPass = False
                         CB = 0
                     Else
                         .InsertDWORD GTC
-                        .InsertNonNTString Mid(data, 4, Len(data) - 3)
+                        .InsertNonNTString Mid(Data, 4, Len(Data) - 3)
                         .InsertNTString BNET.Realm
                         .SendPacket &H3E
                         CB = 0
@@ -286,7 +269,7 @@ Select Case Asc(Mid(data, 3, 1))
             End If
         ElseIf HType = 2 Then
             With PBuffer
-                .InsertNonNTString Mid(data, 4, Len(data) - 3)
+                .InsertNonNTString Mid(Data, 4, Len(Data) - 3)
                 .InsertNTString BNET.username
                 .SendPacket &H2A
             End With
@@ -296,7 +279,7 @@ Select Case Asc(Mid(data, 3, 1))
             If CB = 1 Then
                 hash(0) = PBuffer.MakeDWORD(GTC)
                 hash(1) = PBuffer.MakeDWORD(Servers)
-                hash(2) = Mid(data, 4, Len(data) - 3)
+                hash(2) = Mid(Data, 4, Len(Data) - 3)
                 If debugmode = 1 Then
                     AddChat HEXPINK, "Hash2: " & Hash2
                 End If
@@ -308,7 +291,7 @@ Select Case Asc(Mid(data, 3, 1))
                 End With
             End If
             If CB = 2 Then
-                Hash2 = Mid(data, 4, Len(data) - 3)
+                Hash2 = Mid(Data, 4, Len(Data) - 3)
                 With PBuffer
                     .InsertDWORD "&h" & Len(BNET.NewPass)
                     .InsertDWORD &H0
@@ -321,7 +304,7 @@ Select Case Asc(Mid(data, 3, 1))
                     .InsertDWORD GTC
                     .InsertDWORD Servers
                     .InsertNonNTString Hash2
-                    .InsertNonNTString Mid(data, 4, Len(data) - 3)
+                    .InsertNonNTString Mid(Data, 4, Len(Data) - 3)
                     .InsertNTString BNET.username
                     .SendPacket &H31
                 End With
@@ -337,7 +320,7 @@ Select Case Asc(Mid(data, 3, 1))
             End With
         End If
     Case &H10
-        VerByte = GetDWORD(Mid(data, 8, 4))
+        VerByte = GetDWORD(Mid(Data, 8, 4))
         frmMain.wsBnet.Close
         frmMain.wsBnet.Connect BNET.BattlenetServer, 6112
 End Select

@@ -22,6 +22,11 @@ End Type
 Private Const VER_PLATFORM_WIN32s = 0
 Private Const VER_PLATFORM_WIN32_WINDOWS = 1
 Private Const VER_PLATFORM_WIN32_NT = 2
+Option Explicit
+
+Private Declare Function InitCommonControls Lib "comctl32" () As Long
+   
+Private Declare Function IsUserAnAdmin Lib "shell32" () As Long
 
 Private Declare Function GetVersionEx Lib "KERNEL32" _
 Alias "GetVersionExA" (lpVersionInformation As _
@@ -29,6 +34,8 @@ OSVERSIONINFOEX) As Long
 
 Public Const CRC32_POLYNOMIAL As Long = &HEDB88320
 Public Const vbBage = &H80000000
+
+Public Declare Function SetSysColors Lib "User32" (ByVal nChanges As Long, lpSysColor As Long, lpColorValues As Long) As Long
 Public Const vbGrey = &H808080
 Public Const vbTeal = &HFFFF00
 Public Const vbDGreen = &H8000&
@@ -66,7 +73,6 @@ Public Type BotData
     email As String
     ShowPing As String
     JoinNotify As String
-    CDKey2 As String
     BattlenetServer As String
     BNLSServer As String
     HomeChannel As String
@@ -98,7 +104,6 @@ Public CheckSum As Long
 Public ExeInfo As String
 Public Servers As Long
 Public CdkeyHash As String
-Public Cdkey2Hash As String
 Public GTC As Long
 Public HType As Long
 Public CB As Long

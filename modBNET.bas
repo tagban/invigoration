@@ -26,9 +26,6 @@ Public Sub Send0x51()
         .InsertDWORD &H0
         .InsertNonNTString CdkeyHash
         'AddChat D2Orange, StrToHex(CdkeyHash)
-        If BNET.Product = "PX2D" Or BNET.Product = "PX3W" Then
-           .InsertNonNTString Cdkey2Hash
-        End If
         .InsertNTString ExeInfo
         .InsertNTString BNET.username
         .SendPacket &H51
@@ -51,7 +48,7 @@ Public Sub Send0x50()
         .InsertDWORD &H0
         .InsertDWORD &H0
         .InsertDWORD &H480
-        .InsertDWORD &H1033
+        .InsertDWORD &H409
         .InsertDWORD &H1033
         .InsertNTString "USA"
         .InsertNTString "United States"

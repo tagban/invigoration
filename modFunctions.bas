@@ -37,7 +37,6 @@ Dim FullText As String
     BNET.username = GetStuff("BNET", "Username")
     BNET.Password = GetStuff("BNET", "Password")
     BNET.CDKey = GetStuff("BNET", "CDKey")
-    BNET.CDKey2 = GetStuff("BNET", "CDKey2")
     BNET.Product = GetStuff("BNET", "Product")
     BNET.email = GetStuff("BNET", "Email")
     BNET.BattlenetServer = GetStuff("BNET", "Server")
@@ -59,7 +58,6 @@ Dim FullText As String
     WriteStuff "BNET", "Username", BNET.username
     WriteStuff "BNET", "Password", BNET.Password
     WriteStuff "BNET", "CDKey", BNET.CDKey
-    WriteStuff "BNET", "CDKey2", BNET.CDKey2
     WriteStuff "BNET", "Product", BNET.Product
     WriteStuff "BNET", "Owner", BNET.email
     WriteStuff "BNET", "Server", BNET.BattlenetServer
@@ -208,7 +206,7 @@ End Function
 
 Public Function ClearBuffers()
     frmMain.rtbChat.text = vbNullString
-    frmMain.txtsendbnet.Clear
+    frmMain.rtbsendbnet.Clear
     AddChat D2White, "Every buffer cleared."
 End Function
 Public Function InvigDecrypt(strText As String)

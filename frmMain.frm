@@ -4,12 +4,13 @@ Object = "{248DD890-BB45-11CF-9ABC-0080C7E7B78D}#1.0#0"; "MSWINSCK.OCX"
 Object = "{3B7C8863-D78F-101B-B9B5-04021C009402}#1.2#0"; "RICHTX32.OCX"
 Object = "{48E59290-9880-11CF-9754-00AA00C00908}#1.0#0"; "MSINET.OCX"
 Begin VB.Form frmMain 
-   BackColor       =   &H001D1D1D&
+   BackColor       =   &H80000007&
+   BorderStyle     =   1  'Fixed Single
    Caption         =   "Invigoration [Nightly]"
-   ClientHeight    =   5625
-   ClientLeft      =   255
-   ClientTop       =   1005
-   ClientWidth     =   11115
+   ClientHeight    =   5730
+   ClientLeft      =   240
+   ClientTop       =   990
+   ClientWidth     =   12405
    FillColor       =   &H0080FFFF&
    FillStyle       =   3  'Vertical Line
    BeginProperty Font 
@@ -24,10 +25,34 @@ Begin VB.Form frmMain
    ForeColor       =   &H00008000&
    Icon            =   "frmMain.frx":0000
    LinkTopic       =   "None"
+   MaxButton       =   0   'False
+   MinButton       =   0   'False
    PaletteMode     =   2  'Custom
    Picture         =   "frmMain.frx":164A
-   ScaleHeight     =   5625
-   ScaleWidth      =   11115
+   ScaleHeight     =   5730
+   ScaleWidth      =   12405
+   Begin RichTextLib.RichTextBox rtbsendbnet 
+      Height          =   375
+      Left            =   120
+      TabIndex        =   3
+      Top             =   4560
+      Width           =   7935
+      _ExtentX        =   13996
+      _ExtentY        =   661
+      _Version        =   393217
+      BackColor       =   -2147483640
+      Enabled         =   -1  'True
+      TextRTF         =   $"frmMain.frx":2931
+      BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
+         Name            =   "Verdana"
+         Size            =   9
+         Charset         =   0
+         Weight          =   400
+         Underline       =   0   'False
+         Italic          =   0   'False
+         Strikethrough   =   0   'False
+      EndProperty
+   End
    Begin VB.Timer tmrConnect 
       Enabled         =   0   'False
       Interval        =   1000
@@ -59,18 +84,18 @@ Begin VB.Form frmMain
    End
    Begin VB.Timer tmrAntiIdle 
       Enabled         =   0   'False
-      Interval        =   1000
+      Interval        =   800
       Left            =   3360
       Top             =   240
    End
    Begin MSComctlLib.ListView lstChannel 
-      Height          =   4200
+      Height          =   4440
       Left            =   8520
       TabIndex        =   1
       Top             =   360
       Width           =   3255
       _ExtentX        =   5741
-      _ExtentY        =   7408
+      _ExtentY        =   7832
       View            =   3
       Arrange         =   1
       LabelEdit       =   1
@@ -83,7 +108,7 @@ Begin VB.Form frmMain
       Icons           =   "ClientIcons"
       SmallIcons      =   "ClientIcons"
       ForeColor       =   16777215
-      BackColor       =   1907997
+      BackColor       =   0
       Appearance      =   0
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          Name            =   "Verdana"
@@ -104,25 +129,6 @@ Begin VB.Form frmMain
          Text            =   "s"
          Object.Width           =   1059
       EndProperty
-   End
-   Begin VB.TextBox txtsendbnet 
-      BackColor       =   &H00404040&
-      BeginProperty Font 
-         Name            =   "Verdana"
-         Size            =   8.25
-         Charset         =   0
-         Weight          =   400
-         Underline       =   0   'False
-         Italic          =   0   'False
-         Strikethrough   =   0   'False
-      EndProperty
-      ForeColor       =   &H00E0E0E0&
-      Height          =   330
-      Left            =   120
-      MaxLength       =   225
-      TabIndex        =   2
-      Top             =   4560
-      Width           =   7935
    End
    Begin MSWinsockLib.Winsock wsRealm 
       Left            =   1920
@@ -146,8 +152,8 @@ Begin VB.Form frmMain
       _Version        =   393216
    End
    Begin MSComctlLib.ImageList ClientIcons 
-      Left            =   9960
-      Top             =   5040
+      Left            =   8040
+      Top             =   4320
       _ExtentX        =   1005
       _ExtentY        =   1005
       BackColor       =   1907997
@@ -158,287 +164,287 @@ Begin VB.Form frmMain
       BeginProperty Images {2C247F25-8591-11D1-B16A-00C0F0283628} 
          NumListImages   =   71
          BeginProperty ListImage1 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":2931
+            Picture         =   "frmMain.frx":29AD
             Key             =   ""
          EndProperty
          BeginProperty ListImage2 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":2E1D
+            Picture         =   "frmMain.frx":2E99
             Key             =   ""
          EndProperty
          BeginProperty ListImage3 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":2FD0
+            Picture         =   "frmMain.frx":304C
             Key             =   ""
          EndProperty
          BeginProperty ListImage4 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":34BC
+            Picture         =   "frmMain.frx":3538
             Key             =   ""
          EndProperty
          BeginProperty ListImage5 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":39A8
+            Picture         =   "frmMain.frx":3A24
             Key             =   ""
          EndProperty
          BeginProperty ListImage6 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":3E94
+            Picture         =   "frmMain.frx":3F10
             Key             =   ""
          EndProperty
          BeginProperty ListImage7 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":4380
+            Picture         =   "frmMain.frx":43FC
             Key             =   ""
          EndProperty
          BeginProperty ListImage8 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":486C
+            Picture         =   "frmMain.frx":48E8
             Key             =   ""
          EndProperty
          BeginProperty ListImage9 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":4D58
+            Picture         =   "frmMain.frx":4DD4
             Key             =   ""
          EndProperty
          BeginProperty ListImage10 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":5244
+            Picture         =   "frmMain.frx":52C0
             Key             =   ""
          EndProperty
          BeginProperty ListImage11 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":5730
+            Picture         =   "frmMain.frx":57AC
             Key             =   ""
          EndProperty
          BeginProperty ListImage12 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":5C1C
+            Picture         =   "frmMain.frx":5C98
             Key             =   ""
          EndProperty
          BeginProperty ListImage13 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":6A6E
+            Picture         =   "frmMain.frx":6AEA
             Key             =   ""
          EndProperty
          BeginProperty ListImage14 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":7066
+            Picture         =   "frmMain.frx":70E2
             Key             =   ""
          EndProperty
          BeginProperty ListImage15 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":7243
+            Picture         =   "frmMain.frx":72BF
             Key             =   ""
          EndProperty
          BeginProperty ListImage16 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":772F
+            Picture         =   "frmMain.frx":77AB
             Key             =   ""
          EndProperty
          BeginProperty ListImage17 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":7C1B
+            Picture         =   "frmMain.frx":7C97
             Key             =   ""
          EndProperty
          BeginProperty ListImage18 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":8107
+            Picture         =   "frmMain.frx":8183
             Key             =   ""
          EndProperty
          BeginProperty ListImage19 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":85F3
+            Picture         =   "frmMain.frx":866F
             Key             =   ""
          EndProperty
          BeginProperty ListImage20 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":8ADF
+            Picture         =   "frmMain.frx":8B5B
             Key             =   ""
          EndProperty
          BeginProperty ListImage21 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":8FCB
+            Picture         =   "frmMain.frx":9047
             Key             =   ""
          EndProperty
          BeginProperty ListImage22 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":94B7
+            Picture         =   "frmMain.frx":9533
             Key             =   ""
          EndProperty
          BeginProperty ListImage23 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":99A3
+            Picture         =   "frmMain.frx":9A1F
             Key             =   ""
          EndProperty
          BeginProperty ListImage24 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":9E8F
+            Picture         =   "frmMain.frx":9F0B
             Key             =   ""
          EndProperty
          BeginProperty ListImage25 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":A37B
+            Picture         =   "frmMain.frx":A3F7
             Key             =   ""
          EndProperty
          BeginProperty ListImage26 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":A867
+            Picture         =   "frmMain.frx":A8E3
             Key             =   ""
          EndProperty
          BeginProperty ListImage27 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":AD53
+            Picture         =   "frmMain.frx":ADCF
             Key             =   ""
          EndProperty
          BeginProperty ListImage28 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":B23F
+            Picture         =   "frmMain.frx":B2BB
             Key             =   ""
          EndProperty
          BeginProperty ListImage29 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":B72B
+            Picture         =   "frmMain.frx":B7A7
             Key             =   ""
          EndProperty
          BeginProperty ListImage30 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":BC17
+            Picture         =   "frmMain.frx":BC93
             Key             =   ""
          EndProperty
          BeginProperty ListImage31 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":C103
+            Picture         =   "frmMain.frx":C17F
             Key             =   ""
          EndProperty
          BeginProperty ListImage32 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":C5EF
+            Picture         =   "frmMain.frx":C66B
             Key             =   ""
          EndProperty
          BeginProperty ListImage33 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":CADB
+            Picture         =   "frmMain.frx":CB57
             Key             =   ""
          EndProperty
          BeginProperty ListImage34 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":CFC7
+            Picture         =   "frmMain.frx":D043
             Key             =   ""
          EndProperty
          BeginProperty ListImage35 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":D4BB
+            Picture         =   "frmMain.frx":D537
             Key             =   ""
          EndProperty
          BeginProperty ListImage36 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":D9AF
+            Picture         =   "frmMain.frx":DA2B
             Key             =   ""
          EndProperty
          BeginProperty ListImage37 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":DEA3
+            Picture         =   "frmMain.frx":DF1F
             Key             =   ""
          EndProperty
          BeginProperty ListImage38 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":E397
+            Picture         =   "frmMain.frx":E413
             Key             =   ""
          EndProperty
          BeginProperty ListImage39 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":E88B
+            Picture         =   "frmMain.frx":E907
             Key             =   ""
          EndProperty
          BeginProperty ListImage40 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":ED7F
+            Picture         =   "frmMain.frx":EDFB
             Key             =   ""
          EndProperty
          BeginProperty ListImage41 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":F273
+            Picture         =   "frmMain.frx":F2EF
             Key             =   ""
          EndProperty
          BeginProperty ListImage42 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":F767
+            Picture         =   "frmMain.frx":F7E3
             Key             =   ""
          EndProperty
          BeginProperty ListImage43 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":FC5B
+            Picture         =   "frmMain.frx":FCD7
             Key             =   ""
          EndProperty
          BeginProperty ListImage44 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1014F
+            Picture         =   "frmMain.frx":101CB
             Key             =   ""
          EndProperty
          BeginProperty ListImage45 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":10643
+            Picture         =   "frmMain.frx":106BF
             Key             =   ""
          EndProperty
          BeginProperty ListImage46 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":10B37
+            Picture         =   "frmMain.frx":10BB3
             Key             =   ""
          EndProperty
          BeginProperty ListImage47 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1102B
+            Picture         =   "frmMain.frx":110A7
             Key             =   ""
          EndProperty
          BeginProperty ListImage48 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1151F
+            Picture         =   "frmMain.frx":1159B
             Key             =   ""
          EndProperty
          BeginProperty ListImage49 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":11A0B
+            Picture         =   "frmMain.frx":11A87
             Key             =   ""
          EndProperty
          BeginProperty ListImage50 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":11EF7
+            Picture         =   "frmMain.frx":11F73
             Key             =   ""
          EndProperty
          BeginProperty ListImage51 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":123E3
+            Picture         =   "frmMain.frx":1245F
             Key             =   ""
          EndProperty
          BeginProperty ListImage52 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":128CF
+            Picture         =   "frmMain.frx":1294B
             Key             =   ""
          EndProperty
          BeginProperty ListImage53 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":12DBB
+            Picture         =   "frmMain.frx":12E37
             Key             =   ""
          EndProperty
          BeginProperty ListImage54 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":132A7
+            Picture         =   "frmMain.frx":13323
             Key             =   ""
          EndProperty
          BeginProperty ListImage55 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":13793
+            Picture         =   "frmMain.frx":1380F
             Key             =   ""
          EndProperty
          BeginProperty ListImage56 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":13C7F
+            Picture         =   "frmMain.frx":13CFB
             Key             =   ""
          EndProperty
          BeginProperty ListImage57 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1416B
+            Picture         =   "frmMain.frx":141E7
             Key             =   ""
          EndProperty
          BeginProperty ListImage58 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":14657
+            Picture         =   "frmMain.frx":146D3
             Key             =   ""
          EndProperty
          BeginProperty ListImage59 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":14B43
+            Picture         =   "frmMain.frx":14BBF
             Key             =   ""
          EndProperty
          BeginProperty ListImage60 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1502F
+            Picture         =   "frmMain.frx":150AB
             Key             =   ""
          EndProperty
          BeginProperty ListImage61 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1551B
+            Picture         =   "frmMain.frx":15597
             Key             =   ""
          EndProperty
          BeginProperty ListImage62 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":157D3
+            Picture         =   "frmMain.frx":1584F
             Key             =   ""
          EndProperty
          BeginProperty ListImage63 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":15E3B
+            Picture         =   "frmMain.frx":15EB7
             Key             =   ""
          EndProperty
          BeginProperty ListImage64 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":16455
+            Picture         =   "frmMain.frx":164D1
             Key             =   ""
          EndProperty
          BeginProperty ListImage65 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1687E
+            Picture         =   "frmMain.frx":168FA
             Key             =   ""
          EndProperty
          BeginProperty ListImage66 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":16D76
+            Picture         =   "frmMain.frx":16DF2
             Key             =   ""
          EndProperty
          BeginProperty ListImage67 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":17406
+            Picture         =   "frmMain.frx":17482
             Key             =   ""
          EndProperty
          BeginProperty ListImage68 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":1760C
+            Picture         =   "frmMain.frx":17688
             Key             =   ""
          EndProperty
          BeginProperty ListImage69 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":178B4
+            Picture         =   "frmMain.frx":17930
             Key             =   ""
          EndProperty
          BeginProperty ListImage70 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":17ABA
+            Picture         =   "frmMain.frx":17B36
             Key             =   ""
          EndProperty
          BeginProperty ListImage71 {2C247F27-8591-11D1-B16A-00C0F0283628} 
-            Picture         =   "frmMain.frx":17D62
+            Picture         =   "frmMain.frx":17DDE
             Key             =   ""
          EndProperty
       EndProperty
@@ -465,7 +471,7 @@ Begin VB.Form frmMain
       ScrollBars      =   2
       DisableNoScroll =   -1  'True
       AutoVerbMenu    =   -1  'True
-      TextRTF         =   $"frmMain.frx":1837C
+      TextRTF         =   $"frmMain.frx":183F8
       BeginProperty Font {0BE35203-8F91-11CE-9DE3-00AA004BB851} 
          Name            =   "Verdana"
          Size            =   9
@@ -493,7 +499,7 @@ Begin VB.Form frmMain
       ForeColor       =   &H00C0C000&
       Height          =   255
       Left            =   8520
-      TabIndex        =   3
+      TabIndex        =   2
       Top             =   120
       Width           =   3135
    End
@@ -672,6 +678,25 @@ Begin VB.Form frmMain
          Shortcut        =   ^H
       End
    End
+   Begin VB.Menu EditMenu 
+      Caption         =   "EditMenu"
+      Index           =   19
+      Visible         =   0   'False
+      Begin VB.Menu Copy 
+         Caption         =   "Copy"
+         Index           =   1
+         Shortcut        =   ^C
+      End
+      Begin VB.Menu Paste 
+         Caption         =   "Paste"
+         Shortcut        =   ^V
+      End
+      Begin VB.Menu SelectAll 
+         Caption         =   "SelectAll"
+         Shortcut        =   ^A
+         Visible         =   0   'False
+      End
+   End
 End
 Attribute VB_Name = "frmMain"
 Attribute VB_GlobalNameSpace = False
@@ -684,6 +709,7 @@ Public connectstatus As Boolean
 Public winampnow As String
 Public sUserName As String
 Public connectseconds As Long
+Public AntiIdleSeconds As Long
 Public random As Integer
 Public dctime As Integer
 Public IdleTime As Integer
@@ -697,6 +723,10 @@ Private Const EM_AUTOURLDETECT = (WM_USER + 91)
 Public WithEvents ChatBot As BnetBot
 Attribute ChatBot.VB_VarHelpID = -1
 
+
+Private Sub Main()
+    frmMain.Show
+End Sub
 Public Sub PrepareCheck(ByRef tocheck As String)
     tocheck = Replace(tocheck, "[", "a")
     tocheck = Replace(tocheck, "]", "x")
@@ -717,6 +747,9 @@ AddChat vbYellow, "Joining Channel Town Square...."
 End Sub
 
 Private Sub Form_Load()
+    s = SetSysColors(1, 9, &H0)
+    m = SetSysColors(1, 7, &HF)
+    Cm = SetSysColors(1, 4, &HF)
     Dim InvigNews As String
     Set ChatBot = New BnetBot
     Dim lRet As Long
@@ -758,7 +791,6 @@ Private Sub Form_Load()
     AddChat D2Orange, "Public Open Source Version: " & vernum
     AddChat D2MedBlue, "---------------------------------------------------"
     frmConfigBNET.txtCDKey.text = GetStuff("BNET", "CDKey")
-    frmConfigBNET.txtCDKey2.text = GetStuff("BNET", "CDKey2")
     random = "180"
     uptimesec = 0
     uptimemin = 0
@@ -766,6 +798,9 @@ Private Sub Form_Load()
     uptimedays = 0
     uptimeweek = 0
     uptimemonth = 0
+    rtbsendbnet.SelColor = D2White
+    ''.SelText = "this is my red text"
+''End With
 End Sub
 
 Private Sub Form_QueryUnload(Cancel As Integer, UnloadMode As Integer)
@@ -794,7 +829,7 @@ Private Sub mnuAbout_Click()
 End Sub
 Private Sub mnuBan_Click()
     Send "/ban " & lstChannel.SelectedItem, wsBnet
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 
 Private Sub mnuCanada_Click()
@@ -808,16 +843,16 @@ Private Sub mnuCanada_Click()
 End Sub
 Private Sub mnuFAdd_Click()
     Send "/f a " & lstChannel.SelectedItem, wsBnet
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 Private Sub mnuFListView_Click()
     Send "/f l ", wsBnet
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 
 Private Sub mnuFRemove_Click()
     Send "/f r " & lstChannel.SelectedItem, wsBnet
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 
 Private Sub mnuFudd_Click()
@@ -855,8 +890,8 @@ End If
 End Sub
 Private Sub mnuKick_Click()
     Send "/kick " & lstChannel.SelectedItem, wsBnet
-    txtsendbnet.SelStart = Len(txtsendbnet.text)
-    txtsendbnet.SetFocus
+    rtbsendbnet.SelStart = Len(rtbsendbnet.text)
+    rtbsendbnet.SetFocus
 End Sub
 
 Private Sub mnuBug_Click()
@@ -867,14 +902,14 @@ End Sub
 Private Sub mnuClearBufs_Click()
     rtbChat.text = vbNullString
     AddChat D2White, "Cleared Chat Buffers. Old information is lost."
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 Private Sub lstChannel_Click() '(Button As Integer, Shift As Integer, X As Single, y As Single)
 On Error Resume Next
 If frmMain.wsBnet.State = sckConnected Then
         strList = lstChannel.SelectedItem
         PopupMenu mnuUserList
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus2
 Else
 ''
 End If
@@ -884,7 +919,7 @@ On Error Resume Next
 If frmMain.wsBnet.State = sckConnected Then
         strList = lstChannel.SelectedItem
         PopupMenu mnuUserList
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 Else
 ''
 End If
@@ -906,6 +941,19 @@ connectstatus = True
     frmMain.tmrAntiIdle.Enabled = True
 Error:
 
+End Sub
+
+Private Sub rtbsendbnet_Change()
+    rtbsendbnet.SelColor = D2White
+End Sub
+
+Private Sub tmrAntiIdle_Timer()
+AntiIdleSeconds = AntiIdleSeconds + 1
+''AddChat D2Red, AntiIdleSeconds
+If AntiIdleSeconds = 110 Then
+    PBuffer.SendPacket &H0
+AntiIdleSeconds = 0
+End If
 End Sub
 
 Private Sub tmrConnect_Timer()
@@ -936,7 +984,7 @@ Private Sub mnuEndFocus_Click()
     AddChat D2White, "User focus OFF"
         targetuser = vbNullString
         targetusername = vbNullString
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 
 Private Sub mnuExit_Click()
@@ -971,14 +1019,14 @@ End Sub
 
 Private Sub mnuSquelch_Click()
     Send "/squelch " & lstChannel.SelectedItem & Space(1), wsBnet
-    txtsendbnet.SelStart = Len(txtsendbnet.text)
-    txtsendbnet.SetFocus
+    rtbsendbnet.SelStart = Len(rtbsendbnet.text)
+    rtbsendbnet.SetFocus
 End Sub
 
 Private Sub mnuUnSquelch_Click()
     Send "/unsquelch " & lstChannel.SelectedItem & Space(1), wsBnet
-    txtsendbnet.SelStart = Len(txtsendbnet.text)
-    txtsendbnet.SetFocus
+    rtbsendbnet.SelStart = Len(rtbsendbnet.text)
+    rtbsendbnet.SetFocus
 End Sub
 Private Sub mnuUpdate_Click()
 InvigVer = devNEWS.OpenURL("https://github.com/tagban/invigoration/")
@@ -995,7 +1043,7 @@ Private Sub mnuUserFocus_Click()
     targetusername = lstChannel.SelectedItem
     
     AddChat D2MedBlue, targetusername & " is in Focus."
-    txtsendbnet.SetFocus
+    rtbsendbnet.SetFocus
 End Sub
 Private Sub mnuViewProfile_Click()
     Profile.Caption = lstChannel.SelectedItem
@@ -1007,9 +1055,10 @@ Private Sub mnuWebsite_Click()
     ShellExecute Me.hWnd, "Open", "https://github.com/tagban/invigoration", 0&, 0&, 0&
 End Sub
 Private Sub mnuWhisper_Click()
-    txtsendbnet.text = "/w " & lstChannel.SelectedItem
-    txtsendbnet.SetFocus
-    txtsendbnet.SelStart = Len(txtsendbnet.text)
+    rtbsendbnet.text = "/w " & lstChannel.SelectedItem
+    rtbsendbnet.SelColor = HEXPINK
+    rtbsendbnet.SetFocus
+    rtbsendbnet.SelStart = Len(rtbsendbnet.text)
 End Sub
 
 Private Sub Reconnect_Click()
@@ -1038,8 +1087,8 @@ Private Sub Form_Resize()
 On Error GoTo Size
 rtbChat.Height = Me.Height - 1450
 rtbChat.Width = Me.Width - 3495
-txtsendbnet.Width = Me.Width - 3495
-txtsendbnet.Top = Me.ScaleHeight - 450
+rtbsendbnet.Width = Me.Width - 3495
+rtbsendbnet.Top = Me.ScaleHeight - 450
 lstChannel.Left = Me.Width - 3350
 lstChannel.Height = rtbChat.Height - 150
 txtChannelInfo.Left = Me.Width - 3350
@@ -1160,30 +1209,33 @@ Select Case Action
     End Select
 End Sub
 
-Private Sub txtSendBNET_KeyPress(keyascii As Integer)
-            If txtsendbnet.text = "/r " Then
-                txtsendbnet.text = "/w " & LastW & Space(1)
-                txtsendbnet.SelStart = Len(txtsendbnet.text)
-            ElseIf txtsendbnet.text = "/t " Then
-                txtsendbnet.text = "/w "
-                txtsendbnet.SelStart = Len(txtsendbnet.text)
-            ElseIf txtsendbnet.text = "/l " Then
-                txtsendbnet.text = "/fmsg "
-                txtsendbnet.SelStart = Len(txtsendbnet.text)
-            ElseIf txtsendbnet.text = "/em " Then
-                txtsendbnet.text = "/me "
-                txtsendbnet.SelStart = Len(txtsendbnet.text)
+Private Sub rtbSendBNET_KeyPress(keyascii As Integer)
+            rtbsendbnet.SelColor = D2White
+            If rtbsendbnet.text = "/r " Then
+                rtbsendbnet.text = "/w " & LastW & Space(1)
+                rtbsendbnet.SelStart = Len(rtbsendbnet.text)
+            ElseIf rtbsendbnet.text = "/t " Then
+                rtbsendbnet.text = "/w "
+                rtbsendbnet.SelStart = Len(rtbsendbnet.text)
+            ElseIf rtbsendbnet.text = "/l " Then
+                rtbsendbnet.text = "/fmsg "
+                rtbsendbnet.SelStart = Len(rtbsendbnet.text)
+            ElseIf rtbsendbnet.text = "/em " Then
+                rtbsendbnet.text = "/me "
+                rtbsendbnet.SelStart = Len(rtbsendbnet.text)
             End If
-    If Len(txtsendbnet.text) = 0 Then
+    If Len(rtbsendbnet.text) = 0 Then
     ''
+    rtbsendbnet.SelColor = D2White
     Else
+    rtbsendbnet.SelColor = D2White
     If keyascii = "13" Then
         keyascii = "0"
-        If Len(txtsendbnet.text) >= 1 Then
+        If Len(rtbsendbnet.text) >= 1 Then
                 Dim Message As String
-                Message = txtsendbnet.text
-                DoAddToSendList txtsendbnet.text
-                txtsendbnet.text = vbNullString
+                Message = rtbsendbnet.text
+                DoAddToSendList rtbsendbnet.text
+                rtbsendbnet.text = vbNullString
                 Dim channel As String
             If Left$(Message, 1) = "/" Then
                 ParseCommand Message, BNET.username, True
@@ -1365,14 +1417,12 @@ Dim ParsedString As String, thing As New BnetBot
     '''''''''''''''''''''''''''''''''''''''''''''''
     'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
     'All developers for Invigoration are recommended to add their own.
-    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+    If LCase(username) = "tagban" Then
         Flags = &H80000
-    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
+    ElseIf LCase(username) = "Invigoration" Then
         Flags = &H80000
     ElseIf LCase(username) = "bnu-bot" Then
         Flags = &H800000
-    ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "us.battle.vet" Then
-        Flags = &H80000
     Else
         If BNET.BNCCICON = 1 Then
                 If LCase(username) = BNET.username Then
@@ -1470,7 +1520,7 @@ Dim thing As New BnetBot
     '''''''''''''''''''''''''''''''''''''''''''''''
     'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
     'All developers for Invigoration are recommended to add their own.
-    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "connect-use.classic.blizzard.com" Then
         Flags = &H80000
     ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
         Flags = &H80000
@@ -1511,7 +1561,7 @@ Dim ParsedString As String, thing As New BnetBot
     '''''''''''''''''''''''''''''''''''''''''''''''
     'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
     'All developers for Invigoration are recommended to add their own.
-    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "connect-use.classic.blizzard.com" Then
         Flags = &H80000
     ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
         Flags = &H80000
@@ -1557,7 +1607,7 @@ End Sub
 Private Sub ChatBot_OnLeave(ByVal username As String, ByVal Flags As Long)
     '''''''''''''''''''''''''''''''''''''''''''''''
     'Special Flags Fun!? w00t Added 9/14/2010 - Tagban
-    If LCase(username) = "tagban" And BNET.BattlenetServer = "useast.battle.net" Then
+    If LCase(username) = "tagban" And BNET.BattlenetServer = "connect-use.classic.blizzard.com" Then
         Flags = &H80000
     ElseIf LCase(username) = "tagban" And BNET.BattlenetServer = "atlas.bnet.cc" Then
         Flags = &H80000

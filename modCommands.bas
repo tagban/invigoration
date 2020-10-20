@@ -160,6 +160,7 @@ Public Sub ParseCommand(ByVal Message As String, username As String, Optional In
             'AddChat D2Orange, Rest
         End With
     Case "user"
+        rtbsendbnet.SelColor = D2White
         targetuser = Rest & " : "
         targetusername = Rest
         

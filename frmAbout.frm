@@ -330,6 +330,3 @@ Private Sub Label6_Click()
     ShellExecute Me.hWnd, "Open", "https://github.com/tagban/invigoration", 0&, 0&, 0&
 End Sub
 
-Private Sub lblDescription_Click()
-
-End Sub

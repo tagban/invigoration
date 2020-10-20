@@ -32,7 +32,7 @@ Begin VB.Form frmConfigBNET
       Height          =   315
       ItemData        =   "frmConfigBNET.frx":08CA
       Left            =   2520
-      List            =   "frmConfigBNET.frx":08DA
+      List            =   "frmConfigBNET.frx":08E0
       TabIndex        =   2
       Text            =   "BNET Servers"
       Top             =   480
@@ -144,19 +144,9 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H000080FF&
             Height          =   285
             Left            =   240
-            TabIndex        =   35
+            TabIndex        =   33
             Text            =   "e-mail addr"
             Top             =   1440
-            Width           =   1335
-         End
-         Begin VB.TextBox txtCDKey2 
-            BackColor       =   &H00000040&
-            ForeColor       =   &H000080FF&
-            Height          =   285
-            Left            =   3240
-            TabIndex        =   33
-            Text            =   "CD Key 2 OFF"
-            Top             =   600
             Width           =   1335
          End
          Begin VB.TextBox txtTrigger 
@@ -185,7 +175,7 @@ Begin VB.Form frmConfigBNET
             Height          =   285
             Left            =   240
             TabIndex        =   5
-            ToolTipText     =   $"frmConfigBNET.frx":0928
+            ToolTipText     =   $"frmConfigBNET.frx":0975
             Top             =   840
             Width           =   1335
          End
@@ -223,9 +213,9 @@ Begin VB.Form frmConfigBNET
             EndProperty
             ForeColor       =   &H000080FF&
             Height          =   315
-            ItemData        =   "frmConfigBNET.frx":09B3
+            ItemData        =   "frmConfigBNET.frx":0A00
             Left            =   840
-            List            =   "frmConfigBNET.frx":09C6
+            List            =   "frmConfigBNET.frx":0A19
             TabIndex        =   4
             Text            =   "PXES"
             ToolTipText     =   "Product ID (Backwards)"
@@ -247,20 +237,9 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   34
+            TabIndex        =   32
             Top             =   1200
             Width           =   1695
-         End
-         Begin VB.Label Label7 
-            BackColor       =   &H80000007&
-            BackStyle       =   0  'Transparent
-            Caption         =   "EXP Key"
-            ForeColor       =   &H0000FFFF&
-            Height          =   255
-            Left            =   2400
-            TabIndex        =   32
-            Top             =   600
-            Width           =   855
          End
          Begin VB.Label Label2 
             BackStyle       =   0  'Transparent
@@ -398,7 +377,7 @@ Begin VB.Form frmConfigBNET
             ForeColor       =   &H0000FFFF&
             Height          =   255
             Left            =   120
-            TabIndex        =   36
+            TabIndex        =   34
             Top             =   2640
             Width           =   1695
          End
@@ -622,9 +601,7 @@ On Error GoTo Error
     BNET.username = txtUsername.text
     BNET.Password = txtPassword.text
     txtCDKey.text = Replace(txtCDKey.text, "-", vbNullString)
-    txtCDKey2.text = Replace(txtCDKey2.text, "-", vbNullString)
     BNET.CDKey = txtCDKey.text
-    BNET.CDKey2 = txtCDKey2.text
     If txtProduct.text = "Starcraft" Then
         BNET.Product = "RATS"
     ElseIf txtProduct.text = "Brood War" Then
@@ -694,7 +671,6 @@ On Error GoTo Error
     txtUsername.text = BNET.username
     txtPassword.text = BNET.Password
     txtCDKey.text = BNET.CDKey
-    txtCDKey2.text = BNET.CDKey2
     If BNET.Product = "RATS" Then
         txtProduct.text = "Starcraft"
     ElseIf BNET.Product = "PXES" Then
@@ -705,9 +681,9 @@ On Error GoTo Error
         txtProduct.text = "Warcraft 3"
     ElseIf BNET.Product = "VD2D" Then
         txtProduct.text = "Diablo 2"
-    ElseIf BNET.Product = "PX2D" Then
-        txtProduct.text = "Diablo 2: LOD"
-    ElseIf BNET.Product = "PX3W" Then
+    ElseIf BNET.Product = "CHAT" Then
+        txtProduct.text = "CHAT"
+    ElseIf BNET.Product = "LTRD" Then
         txtProduct.text = "Warcraft 3: FT"
     End If
     txtBattlenet.text = BNET.BattlenetServer

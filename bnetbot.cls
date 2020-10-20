@@ -128,7 +128,7 @@ Dim Product As String
 Product = Mid(statstring, 1, 4)
 
     If (BNFLAGS_BLIZZ And Flags) = BNFLAGS_BLIZZ Then
-        GetIconCode = 63
+        GetIconCode = 64
         Exit Function
     ElseIf (BNFLAGS_OP And Flags) = BNFLAGS_OP Then
         GetIconCode = 2
