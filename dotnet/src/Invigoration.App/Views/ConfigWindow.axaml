@@ -1,0 +1,66 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:config="using:Invigoration.Core.Config"
+        mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="700"
+        x:Class="Invigoration.App.Views.ConfigWindow"
+        x:DataType="config:BotConfig"
+        Width="480" Height="700"
+        Title="Bot Configuration">
+
+    <ScrollViewer>
+        <StackPanel Margin="16" Spacing="8">
+
+            <TextBlock Text="Bot" FontWeight="Bold" />
+            <TextBox PlaceholderText="Display name" Text="{Binding DisplayName}" />
+
+            <TextBlock Text="Battle.net Account" FontWeight="Bold" Margin="0,12,0,0" />
+            <TextBox PlaceholderText="Username" Text="{Binding Username}" />
+            <TextBox PlaceholderText="Password" Text="{Binding Password}" PasswordChar="*" />
+            <TextBox PlaceholderText="CD Key" Text="{Binding CdKey}" />
+            <TextBox PlaceholderText="Bot Master (only user who can issue commands)" Text="{Binding BotMaster}" />
+            <TextBox PlaceholderText="Command trigger, e.g. !" Text="{Binding Trigger}" MaxLength="1" />
+
+            <TextBlock Text="Servers" FontWeight="Bold" Margin="0,12,0,0" />
+            <TextBox PlaceholderText="Battle.net server" Text="{Binding BattlenetServer}" />
+            <TextBox PlaceholderText="Battle.net port" Text="{Binding BattlenetPort}" />
+            <TextBox PlaceholderText="BNLS server" Text="{Binding BnlsServer}" />
+            <TextBox PlaceholderText="BNLS port" Text="{Binding BnlsPort}" />
+            <TextBox PlaceholderText="Home channel" Text="{Binding HomeChannel}" />
+            <TextBox PlaceholderText="Realm (D2 only)" Text="{Binding Realm}" />
+
+            <TextBlock Text="Product" FontWeight="Bold" Margin="0,12,0,0" />
+            <ComboBox SelectedItem="{Binding Product}" HorizontalAlignment="Stretch">
+                <x:String>VD2D</x:String>
+                <x:String>PX2D</x:String>
+                <x:String>NB2W</x:String>
+                <x:String>LTRD</x:String>
+                <x:String>3RAW</x:String>
+                <x:String>PX3W</x:String>
+                <x:String>RATS</x:String>
+                <x:String>PXES</x:String>
+            </ComboBox>
+            <TextBlock Text="Note: WC3/WC3:TFT and classic Starcraft/Brood War are retired from official Battle.net — private servers only."
+                       TextWrapping="Wrap" Opacity="0.7" FontSize="11" />
+
+            <TextBlock Text="Ping" FontWeight="Bold" Margin="0,12,0,0" />
+            <CheckBox Content="Zero ping (fake a near-0ms ping)" IsChecked="{Binding ZeroPing}" />
+            <CheckBox Content="Negative ping (show no ping at all)" IsChecked="{Binding NegPing}" />
+
+            <TextBlock Text="Discord Bridge" FontWeight="Bold" Margin="0,12,0,0" />
+            <CheckBox Content="Enabled" IsChecked="{Binding Discord.Enabled}" />
+            <TextBox PlaceholderText="Discord bot token (secret)" Text="{Binding Discord.BotToken}" PasswordChar="*" />
+            <TextBox PlaceholderText="Discord channel ID" Text="{Binding Discord.ChannelId}" />
+            <TextBox PlaceholderText="Relay delay (seconds)" Text="{Binding Discord.RelayDelaySeconds}" />
+            <CheckBox Content="Relay Battle.net chat to Discord" IsChecked="{Binding Discord.RelayBattlenetToDiscord}" />
+            <CheckBox Content="Relay Discord messages to Battle.net" IsChecked="{Binding Discord.RelayDiscordToBattlenet}" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,16,0,0" HorizontalAlignment="Right">
+                <Button Content="Cancel" Click="OnCancelClick" />
+                <Button Content="Save" Click="OnSaveClick" IsDefault="True" />
+            </StackPanel>
+
+        </StackPanel>
+    </ScrollViewer>
+</Window>

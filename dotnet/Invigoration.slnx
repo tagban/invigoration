@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Invigoration.App/Invigoration.App.csproj" />
+    <Project Path="src/Invigoration.Core.Tests/Invigoration.Core.Tests.csproj" />
+    <Project Path="src/Invigoration.Core/Invigoration.Core.csproj" />
+  </Folder>
+</Solution>
