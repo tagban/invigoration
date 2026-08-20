@@ -28,8 +28,14 @@ public sealed partial class BotEngine
             BncsPacketId.SID_GETCHANNELLIST => HandleGetChannelList(frame),
             BncsPacketId.SID_CHATEVENT => HandleChatEvent(frame),
             BncsPacketId.SID_NEWS_INFO => HandleNewsInfo(frame),
+            BncsPacketId.SID_REQUIREDWORK => HandleRequiredWork(),
             BncsPacketId.SID_CREATEACCOUNT => HandleLegacyCreateAccountReplyAsync(),
             BncsPacketId.SID_SETEMAIL => HandleSetEmail(),
+            BncsPacketId.SID_FRIENDSLIST => HandleFriendsList(frame),
+            BncsPacketId.SID_FRIENDSUPDATE => HandleFriendsUpdate(frame),
+            BncsPacketId.SID_FRIENDSADD => HandleFriendsAdd(frame),
+            BncsPacketId.SID_FRIENDSREMOVE => HandleFriendsRemove(frame),
+            BncsPacketId.SID_FRIENDSPOSITION => HandleFriendsPosition(frame),
             _ => Task.CompletedTask,
         };
     }
@@ -241,6 +247,11 @@ public sealed partial class BotEngine
         await SendBncsAsync(new PacketWriter().WriteAscii(Config.Product), BncsPacketId.SID_GETCHANNELLIST)
             .ConfigureAwait(false);
 
+        if (BncsProduct.SupportsFriendsList(Config.Product))
+        {
+            await RequestFriendsListAsync().ConfigureAwait(false);
+        }
+
         var joinWriter = joinHomeChannelDirectly
             ? new PacketWriter().WriteDword(2).WriteNTString(Config.HomeChannel)
             : new PacketWriter().WriteDword(1).WriteNTString("L");
@@ -274,7 +285,7 @@ public sealed partial class BotEngine
         LogInfo($"Current realm server: {host}");
 
         _realm.Close();
-        await _realm.ConnectAsync(host, RealmPort).ConfigureAwait(false);
+        await _realm.ConnectAsync(host, RealmPort, proxy: BuildProxyOptions()).ConfigureAwait(false);
     }
 
     private Task HandleEnterChat(byte[] frame)
@@ -305,10 +316,65 @@ public sealed partial class BotEngine
         return Task.CompletedTask;
     }
 
+    /// <summary>Per-engine cache of each user's most recently seen 4-char product code, from ShowUser/Join/UserFlags statstrings — consulted when they later talk, so RecordSeen can stamp LastSeenProduct at the same time as LastSeenUtc.</summary>
+    private readonly Dictionary<string, string> _lastKnownProduct = new(StringComparer.OrdinalIgnoreCase);
+
     private async Task HandleChatEvent(byte[] frame)
     {
         var chatEvent = ChatEventParser.Parse(frame);
         ChatMessage?.Invoke(chatEvent);
+
+        if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join or ChatEventType.UserFlags &&
+            chatEvent.Text.Length >= 4)
+        {
+            var product = chatEvent.Text[..4];
+            _lastKnownProduct[chatEvent.Username] = product;
+            Clan.ClanRosterStore.RecordProductSeen(chatEvent.Username, product, Config.BattlenetServer);
+        }
+
+        if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join)
+        {
+            await ApplyRankBehaviorsAsync(chatEvent.Username).ConfigureAwait(false);
+        }
+
+        // Counts reset whenever the bot (re)joins a channel, then track that channel's own
+        // activity from there — matches the VB6 original (ChatBot_OnChannel/OnJoin/OnInfo).
+        if (chatEvent.Type == ChatEventType.Channel)
+        {
+            _session.BanCount = 0;
+            _session.KickCount = 0;
+            _session.JoinCount = 0;
+        }
+
+        if (chatEvent.Type == ChatEventType.Join)
+        {
+            _session.JoinCount++;
+        }
+
+        if (chatEvent.Type == ChatEventType.Info)
+        {
+            if (chatEvent.Text.Contains("was kicked out of the channel by", StringComparison.OrdinalIgnoreCase))
+            {
+                _session.KickCount++;
+            }
+            else if (chatEvent.Text.Contains("was banned by", StringComparison.OrdinalIgnoreCase))
+            {
+                _session.BanCount++;
+            }
+        }
+
+        if (chatEvent.Type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Whisper)
+        {
+            var defaultRank = Config.ClanFeatureEnabled ? Config.DefaultRank : null;
+            _lastKnownProduct.TryGetValue(chatEvent.Username, out var product);
+            Clan.ClanRosterStore.RecordSeen(chatEvent.Username, defaultRank, product, Config.BattlenetServer);
+        }
+
+        if (chatEvent.Type == ChatEventType.Talk && _trivia.IsEnabled && !IsBannedUser(chatEvent.Username) &&
+            _trivia.TryMatchAnswer(chatEvent.Text, out var matchedAnswer))
+        {
+            _trivia.PendingAnswer = (chatEvent.Username, matchedAnswer);
+        }
 
         if (chatEvent.Type is ChatEventType.Talk or ChatEventType.Whisper)
         {
@@ -318,11 +384,131 @@ public sealed partial class BotEngine
                 _session.LastWhisperFromText = chatEvent.Text;
             }
 
-            await HandleCommandAsync(chatEvent.Username, chatEvent.Text).ConfigureAwait(false);
+            await HandleCommandAsync(chatEvent.Username, chatEvent.Text, isWhisper: chatEvent.Type == ChatEventType.Whisper)
+                .ConfigureAwait(false);
+        }
+
+        if (chatEvent.Type == ChatEventType.Info && chatEvent.Text.Trim().Equals("No one hears you.", StringComparison.OrdinalIgnoreCase))
+        {
+            await RecoverFromChannelDesyncAsync().ConfigureAwait(false);
         }
     }
 
+    /// <summary>
+    /// Applies whatever automated behaviors this tracked member's current
+    /// rank carries (see ClanRank) — a welcome whisper, and/or an automatic
+    /// kick/ban for flagging troublemakers without needing to watch for them
+    /// manually. Fires on ShowUser (the bot's own initial channel roster —
+    /// so someone already in the channel when the bot connects is caught
+    /// too) and Join, not on every UserFlags update, so this can't re-fire
+    /// repeatedly for someone who's just sitting in the channel. A no-op
+    /// when clan management is off for this bot, the speaker isn't tracked,
+    /// or their rank isn't one of the predefined ClanRankStore ranks (a
+    /// legacy free-text rank has no behaviors to apply).
+    /// </summary>
+    private async Task ApplyRankBehaviorsAsync(string username)
+    {
+        if (!Config.ClanFeatureEnabled)
+        {
+            return;
+        }
+
+        var member = Clan.ClanRosterStore.FindTrusted(username, Config.BattlenetServer);
+        if (member is null || string.IsNullOrEmpty(member.Rank))
+        {
+            return;
+        }
+
+        var rank = Clan.ClanRankStore.Find(member.Rank);
+        if (rank is null)
+        {
+            return;
+        }
+
+        if (rank.AutoBan)
+        {
+            var reason = string.IsNullOrWhiteSpace(rank.AutoBanMessage) ? "" : $" {rank.AutoBanMessage}";
+            await SendChatCommandAsync($"/ban {username}{reason}").ConfigureAwait(false);
+        }
+        else if (rank.AutoKick)
+        {
+            var reason = string.IsNullOrWhiteSpace(rank.AutoKickMessage) ? "" : $" {rank.AutoKickMessage}";
+            await SendChatCommandAsync($"/kick {username}{reason}").ConfigureAwait(false);
+        }
+
+        if (rank.HasAutoWhisper && ShouldSendAutoWhisper(member, rank.AutoWhisperFrequency))
+        {
+            await SendChatCommandAsync($"/w {username} {rank.AutoWhisperMessage}").ConfigureAwait(false);
+            member.LastAutoWhisperUtc = DateTime.UtcNow;
+            Clan.ClanRosterStore.Save();
+        }
+    }
+
+    private static bool ShouldSendAutoWhisper(Clan.ClanMember member, Clan.AutoWhisperFrequency frequency)
+    {
+        if (member.LastAutoWhisperUtc is not { } last)
+        {
+            return true;
+        }
+
+        return frequency switch
+        {
+            Clan.AutoWhisperFrequency.EveryTime => true,
+            Clan.AutoWhisperFrequency.Daily => DateTime.UtcNow - last >= TimeSpan.FromHours(24),
+            Clan.AutoWhisperFrequency.Once => false,
+            _ => false,
+        };
+    }
+
+    private DateTime _lastChannelRecoveryAttemptUtc = DateTime.MinValue;
+
+    /// <summary>
+    /// "No one hears you." is PVPGN's reply to a chat send when the server
+    /// no longer considers this connection to be in any channel at all —
+    /// seen in practice when another client sharing the same channel (e.g.
+    /// its effective operator, by naming convention like a channel named
+    /// after that account) disconnects and the server silently drops
+    /// remaining members without sending a Leave/rejoin event this bot would
+    /// otherwise react to. Auto-rejoins the configured home channel to
+    /// recover, cooled down to once per 10 seconds so a channel that's
+    /// genuinely broken (not just desynced) can't turn into a rejoin-flood.
+    /// </summary>
+    private async Task RecoverFromChannelDesyncAsync()
+    {
+        var now = DateTime.UtcNow;
+        if (now - _lastChannelRecoveryAttemptUtc < TimeSpan.FromSeconds(10))
+        {
+            return;
+        }
+
+        _lastChannelRecoveryAttemptUtc = now;
+        LogInfo("Lost channel membership unexpectedly — rejoining home channel.");
+        await JoinHomeAsync().ConfigureAwait(false);
+    }
+
     private Task HandleNewsInfo(byte[] frame) => Task.CompletedTask;
+
+    /// <summary>
+    /// The server is asking for ExtraWork compliance — Blizzard's bot-
+    /// detection mechanism (see BncsPacketId.SID_REQUIREDWORK's remarks).
+    /// Deliberately not implemented: doing so means either running a
+    /// server-provided native DLL (a real security risk on its own) or
+    /// faking compliance, which is detection evasion against a real
+    /// anti-bot system on a live commercial service — not something this
+    /// project will do. Logged plainly rather than silently ignored, since
+    /// on official Battle.net this is usually followed by the server
+    /// dropping the connection some time later, and a silent, unexplained
+    /// disconnect is worse than an honest one. PVPGN servers essentially
+    /// never send this, since it's not part of core protocol compatibility.
+    /// </summary>
+    private Task HandleRequiredWork()
+    {
+        LogWarning(
+            "Server requested ExtraWork compliance (Blizzard's anti-bot check) — not implemented by design. " +
+            "This connection may be dropped by the server after a while; that's expected on official Battle.net " +
+            "and isn't something this bot will work around.");
+        return Task.CompletedTask;
+    }
 
     private async Task HandleLegacyCreateAccountReplyAsync()
     {
@@ -335,6 +521,67 @@ public sealed partial class BotEngine
     private Task HandleSetEmail()
     {
         LogInfo("Please set an email address on this account from the game client; Invigoration does not register accounts.");
+        return Task.CompletedTask;
+    }
+
+    private Task HandleFriendsList(byte[] frame)
+    {
+        _friends.Clear();
+        _friends.AddRange(FriendsListParser.ParseFriendsList(frame));
+        FriendsListUpdated?.Invoke(_friends);
+        return Task.CompletedTask;
+    }
+
+    private Task HandleFriendsUpdate(byte[] frame)
+    {
+        var (entryNumber, update) = FriendsListParser.ParseFriendsUpdate(frame);
+        if (entryNumber < _friends.Count)
+        {
+            var existing = _friends[entryNumber];
+            _friends[entryNumber] = existing with
+            {
+                Status = update.Status,
+                Location = update.Location,
+                ProductCode = update.ProductCode,
+                LocationName = update.LocationName,
+            };
+            FriendsListUpdated?.Invoke(_friends);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    private Task HandleFriendsAdd(byte[] frame)
+    {
+        _friends.Add(FriendsListParser.ParseFriendsAdd(frame));
+        FriendsListUpdated?.Invoke(_friends);
+        return Task.CompletedTask;
+    }
+
+    private Task HandleFriendsRemove(byte[] frame)
+    {
+        var entryNumber = FriendsListParser.ParseFriendsRemove(frame);
+        if (entryNumber < _friends.Count)
+        {
+            _friends.RemoveAt(entryNumber);
+            FriendsListUpdated?.Invoke(_friends);
+        }
+
+        return Task.CompletedTask;
+    }
+
+    /// <summary>Moves the friend at the old position to the new one, shifting everything between — matches bnetdocs' description of this packet's effect exactly.</summary>
+    private Task HandleFriendsPosition(byte[] frame)
+    {
+        var (oldEntry, newEntry) = FriendsListParser.ParseFriendsPosition(frame);
+        if (oldEntry < _friends.Count && newEntry < _friends.Count)
+        {
+            var entry = _friends[oldEntry];
+            _friends.RemoveAt(oldEntry);
+            _friends.Insert(newEntry, entry);
+            FriendsListUpdated?.Invoke(_friends);
+        }
+
         return Task.CompletedTask;
     }
 }

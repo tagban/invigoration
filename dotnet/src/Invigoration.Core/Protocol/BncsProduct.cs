@@ -20,7 +20,23 @@ public sealed record BncsProductInfo(
     string DisplayName,
     byte? BnlsProductByte,
     ServerCompatibility Compatibility,
-    string? Notes = null);
+    string? Notes = null,
+    string? IconKeyOverride = null,
+    bool SupportsFriendsList = true)
+{
+    /// <summary>
+    /// Icon key for a *known, exact* product — used by the game-selection
+    /// picker, where there's no ambiguity about which product this is.
+    /// Defaults to <see cref="Chat.ChatIcon.GetProductIconKey"/>'s
+    /// statstring-based mapping, which deliberately merges StarCraft/Brood
+    /// War and Warcraft III/TFT onto one icon each (the wire statstring
+    /// alone can't always tell them apart, e.g. StarCraft: Remastered
+    /// self-identifies as plain Brood War) — <see cref="IconKeyOverride"/>
+    /// exists so the picker can still show each of those a distinct icon
+    /// when the product is explicitly chosen rather than inferred.
+    /// </summary>
+    public string IconKey => IconKeyOverride ?? Chat.ChatIcon.GetProductIconKey(WireCode);
+}
 
 /// <summary>
 /// Catalog of legacy-BNCS products this engine speaks, keyed by their 4-character
@@ -56,13 +72,18 @@ public static class BncsProduct
         {
             [DiabloII] = new(DiabloII, "Diablo II", 0x4, ServerCompatibility.Both),
             [DiabloIILoD] = new(DiabloIILoD, "Diablo II: Lord of Destruction", 0x5, ServerCompatibility.Both),
-            [Warcraft2BNE] = new(Warcraft2BNE, "Warcraft II: Battle.net Edition", 0x3, ServerCompatibility.Both),
+            [Warcraft2BNE] = new(
+                Warcraft2BNE,
+                "Warcraft II: Battle.net Edition",
+                0x3,
+                ServerCompatibility.Both),
             [Diablo] = new(
                 Diablo,
                 "Diablo",
                 0x9,
                 ServerCompatibility.Both,
-                "Official Battle.net restricts Diablo (1) to Public chat channels only; PVPGN has no such restriction."),
+                "Official Battle.net restricts Diablo (1) to Public chat channels only; PVPGN has no such restriction.",
+                SupportsFriendsList: false),
             [Warcraft3] = new(
                 Warcraft3,
                 "Warcraft III: Reign of Chaos",
@@ -74,7 +95,8 @@ public static class BncsProduct
                 "Warcraft III: The Frozen Throne",
                 0x8,
                 ServerCompatibility.PrivateOnly,
-                "Retired from official Battle.net entirely; only usable against PVPGN."),
+                "Retired from official Battle.net entirely; only usable against PVPGN.",
+                IconKeyOverride: "w3tft"),
             [Starcraft] = new(
                 Starcraft,
                 "StarCraft (1998)",
@@ -88,7 +110,8 @@ public static class BncsProduct
                 "StarCraft: Brood War (1998)",
                 0x2,
                 ServerCompatibility.PrivateOnly,
-                "Original client retired from official Battle.net; only usable against PVPGN."),
+                "Original client retired from official Battle.net; only usable against PVPGN.",
+                IconKeyOverride: "scbw"),
             [StarcraftJapanese] = new(
                 StarcraftJapanese,
                 "StarCraft (Japanese release)",
@@ -96,6 +119,22 @@ public static class BncsProduct
                 ServerCompatibility.PrivateOnly,
                 "Retired from official Battle.net; only usable against PVPGN."),
         };
+
+    /// <summary>Official Battle.net regional chat servers, offered only for products where <see cref="ServerCompatibility.Both"/> applies.</summary>
+    public static readonly IReadOnlyList<string> OfficialBattlenetServers =
+    [
+        "uswest.battle.net",
+        "useast.battle.net",
+        "asia.battle.net",
+        "europe.battle.net",
+    ];
+
+    /// <summary>Well-known public PVPGN-family servers, offered as quick picks alongside a free-text custom server field.</summary>
+    public static readonly IReadOnlyList<string> SuggestedPrivateServers =
+    [
+        "atlas.bnetdocs.org",
+        "pvpgn.bnetdocs.org",
+    ];
 
     public static byte? GetBnlsProductByte(string wireCode) =>
         Catalog.TryGetValue(wireCode, out var info) ? info.BnlsProductByte : null;
@@ -109,8 +148,21 @@ public static class BncsProduct
     /// <summary>Expansion products that authenticate with a classic+expansion CD-key pair.</summary>
     public static bool RequiresExpansionCdKey(string wireCode) => wireCode is DiabloIILoD or Warcraft3TFT;
 
+    /// <summary>Whether this product needs a CD-key at all — Diablo (1) doesn't.</summary>
+    public static bool RequiresCdKey(string wireCode) => wireCode != Diablo;
+
     public static ServerCompatibility GetServerCompatibility(string wireCode) =>
         Catalog.TryGetValue(wireCode, out var info) ? info.Compatibility : ServerCompatibility.Both;
+
+    /// <summary>
+    /// Whether this product's server pushes SID_FRIENDSLIST/UPDATE/ADD/REMOVE/POSITION
+    /// at all — false only for Diablo (1), which predates the Friends
+    /// feature entirely and has no client-side "/f" command for it either.
+    /// Warcraft II: Battle.net Edition does support it (its client has a
+    /// "/f list" command) despite bnetdocs.org's "Used By" list omitting it.
+    /// </summary>
+    public static bool SupportsFriendsList(string wireCode) =>
+        Catalog.TryGetValue(wireCode, out var info) ? info.SupportsFriendsList : true;
 
     /// <summary>Heuristic check used to warn before connecting a PrivateOnly product to what looks like official Battle.net.</summary>
     public static bool LooksLikeOfficialBattlenetHost(string hostOrAddress) =>

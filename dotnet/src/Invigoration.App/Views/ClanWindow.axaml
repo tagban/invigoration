@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Invigoration.App.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="640"
+        x:Class="Invigoration.App.Views.ClanWindow"
+        x:DataType="vm:ClanViewModel"
+        Width="640" Height="640"
+        Title="Seen List">
+
+    <Design.DataContext>
+        <vm:ClanViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,Auto,Auto,*,Auto" Margin="16">
+        <TextBlock Grid.Row="0" TextWrapping="Wrap" Opacity="0.7" FontSize="11" Margin="0,0,0,10"
+                   Text="Shared across every bot you run — since each bot may connect to a different server or game, the same person here can show up seen on different servers/games depending on which bot last saw them (that's what &quot;Last game&quot;/&quot;On server&quot; below reflect). Assign a rank below (see Clan &gt; Manage Ranks to control what each rank grants) and anyone with that rank keeps it even if they switch which Battle.net account they're logged into, as long as it's listed among their accounts below — add &quot;@useast.battle.net&quot; etc. to an account to restrict it to that specific server, since the same name can be a completely different, unrelated person elsewhere. Anyone the bot has ever seen chat shows up here, not just formally added members — use the toggle below to narrow it down." />
+
+        <!-- Top bar: Add Member + search, pinned above the list so both are reachable without scrolling -->
+        <Grid Grid.Row="1" ColumnDefinitions="Auto,*" ColumnSpacing="8" Margin="0,0,0,8">
+            <Button Grid.Column="0" Content="+ Add Member" Command="{Binding AddMemberCommand}" />
+            <TextBox Grid.Column="1" PlaceholderText="Find user (name, nickname, or alias)..." Text="{Binding SearchText}" />
+        </Grid>
+
+        <CheckBox Grid.Row="2" Content="Clan members only (hide everyone else the bot has just seen chat)"
+                   IsChecked="{Binding ShowOnlyClanMembers}" Margin="0,0,0,8" />
+
+        <ScrollViewer Grid.Row="3">
+            <ItemsControl ItemsSource="{Binding FilteredMembers}">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ClanMemberViewModel">
+                        <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                            <StackPanel Spacing="6">
+
+                                <!-- Collapsed row: icon, name/nickname, rank — click to expand the full editor -->
+                                <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                        HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                                        Command="{Binding ToggleExpandedCommand}">
+                                    <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+                                        <Image Grid.Column="0" Source="{Binding LastSeenProductIconImage}" MaxWidth="32" MaxHeight="32"
+                                               Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center"
+                                               IsVisible="{Binding LastSeenProductIconImage, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                               ToolTip.Tip="{Binding LastSeenGameText}" />
+                                        <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding DisplayName}" Foreground="White" FontWeight="Bold" />
+                                            <TextBlock Text="{Binding Rank}" Foreground="White" Opacity="0.6" FontSize="11"
+                                                       IsVisible="{Binding Rank, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="Member" Foreground="White" Opacity="0.5" FontSize="10"
+                                                   VerticalAlignment="Center" Margin="0,0,8,0" IsVisible="{Binding IsClanMember}" />
+                                        <TextBlock Grid.Column="3" Text="▸" Foreground="White" Opacity="0.6" VerticalAlignment="Center"
+                                                   IsVisible="{Binding !IsExpanded}" />
+                                        <TextBlock Grid.Column="3" Text="▾" Foreground="White" Opacity="0.6" VerticalAlignment="Center"
+                                                   IsVisible="{Binding IsExpanded}" />
+                                    </Grid>
+                                </Button>
+
+                                <!-- Expanded editor -->
+                                <StackPanel Spacing="6" IsVisible="{Binding IsExpanded}">
+                                    <Grid ColumnDefinitions="*,*,Auto" ColumnSpacing="8">
+                                        <TextBox Grid.Column="0" PlaceholderText="Primary Battle.net account (e.g. tagban@useast.battle.net)" Text="{Binding Name}" />
+                                        <ComboBox Grid.Column="1" HorizontalAlignment="Stretch"
+                                                  ItemsSource="{Binding $parent[ItemsControl].((vm:ClanViewModel)DataContext).AvailableRankNames}"
+                                                  Text="{Binding Rank}" IsEditable="True" PlaceholderText="Rank" />
+                                        <Button Grid.Column="2" Content="Remove"
+                                                Command="{Binding $parent[ItemsControl].((vm:ClanViewModel)DataContext).RemoveMemberCommand}"
+                                                CommandParameter="{Binding}" />
+                                    </Grid>
+                                    <TextBox PlaceholderText="Nickname (personal label, e.g. &quot;John&quot; — not a Battle.net account, not used for matching)"
+                                             Text="{Binding NickName}" />
+                                    <TextBox PlaceholderText="Other Battle.net accounts (comma-separated) — add @useast.battle.net, @uswest.battle.net, etc. to restrict one to that server, so a same-named account elsewhere is never trusted as this person"
+                                             Text="{Binding AliasesText}" TextWrapping="Wrap" AcceptsReturn="False" />
+                                    <TextBox PlaceholderText="Platforms seen on (e.g. Classic, SC2, SC:R) — organizational only" Text="{Binding PlatformsText}" />
+                                    <TextBox PlaceholderText="Notes" Text="{Binding Notes}" />
+                                    <CheckBox Content="Formal clan member (shows under &quot;Clan members only&quot;)" IsChecked="{Binding IsClanMember}" />
+                                    <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
+                                        <TextBlock Grid.Column="0" Text="Trivia score:" VerticalAlignment="Center" Opacity="0.8" />
+                                        <NumericUpDown Grid.Column="1" Value="{Binding TriviaScore}" Width="110"
+                                                       FormatString="0" Increment="1" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding LastSeenGameText, StringFormat='Last game: {0}'}"
+                                               Opacity="0.7" FontSize="11" />
+                                    <TextBlock Text="{Binding LastSeenText, StringFormat='Last seen: {0}'}"
+                                               Opacity="0.6" FontSize="11" />
+                                    <TextBlock Text="{Binding LastSeenServerText, StringFormat='On server: {0}'}"
+                                               Opacity="0.6" FontSize="11" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+
+        <StackPanel Grid.Row="4" Orientation="Horizontal" Spacing="8" Margin="0,10,0,0" HorizontalAlignment="Right">
+            <Button Content="Close" Click="OnCloseClick" />
+            <Button Content="Save" Click="OnSaveClick" IsDefault="True" />
+        </StackPanel>
+    </Grid>
+</Window>

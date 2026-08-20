@@ -2,7 +2,9 @@ using System.Collections.Specialized;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Input;
+using Avalonia.Interactivity;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using Invigoration.App.Models;
 using Invigoration.App.ViewModels;
 
@@ -76,6 +78,15 @@ public partial class BotTabView : UserControl
         if (scroll is not null)
         {
             Dispatcher.UIThread.Post(() => scroll.ScrollToEnd(), DispatcherPriority.Background);
+        }
+    }
+
+    private async void OnManageClanClick(object? sender, RoutedEventArgs e)
+    {
+        var owner = this.FindAncestorOfType<Window>();
+        if (owner is not null)
+        {
+            await new ClanWindow().ShowDialog(owner);
         }
     }
 

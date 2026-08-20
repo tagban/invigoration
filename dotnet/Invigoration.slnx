@@ -3,5 +3,7 @@
     <Project Path="src/Invigoration.App/Invigoration.App.csproj" />
     <Project Path="src/Invigoration.Core.Tests/Invigoration.Core.Tests.csproj" />
     <Project Path="src/Invigoration.Core/Invigoration.Core.csproj" />
+    <Project Path="src/Invigoration.Sc2.Tests/Invigoration.Sc2.Tests.csproj" />
+    <Project Path="src/Invigoration.Sc2/Invigoration.Sc2.csproj" />
   </Folder>
 </Solution>

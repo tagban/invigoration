@@ -3,6 +3,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Markup.Xaml;
 using Invigoration.App.ViewModels;
 using Invigoration.App.Views;
+using Invigoration.Core.Config;
 
 namespace Invigoration.App;
 
@@ -17,6 +18,7 @@ public partial class App : Application
     {
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
+            ColorSchemeLibrary.EnsureBuiltInSchemesExist();
             desktop.MainWindow = new MainWindow
             {
                 DataContext = new MainWindowViewModel(),

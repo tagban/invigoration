@@ -9,13 +9,13 @@ namespace Invigoration.Core.Auth;
 /// </summary>
 public sealed class AuthState
 {
-    /// <summary>Client token, supplied by BNLS in its CD-key hash reply (was `GTC`).</summary>
+    /// <summary>Client token — generated locally by CdKeyDecoder-based hashing, or supplied by BNLS's CD-key hash reply when that fallback is used (was `GTC`).</summary>
     public uint ClientToken { get; set; }
 
     /// <summary>Server token, from the SID_AUTH_INFO reply (was `Servers`).</summary>
     public uint ServerToken { get; set; }
 
-    /// <summary>Hashed CD-key blob from BNLS_CDKEY / BNLS_CDKEY_EX, forwarded verbatim into SID_AUTH_CHECK.</summary>
+    /// <summary>The CD-key block(s) sent verbatim in SID_AUTH_CHECK — either built locally by CdKeyDecoder or forwarded from BNLS_CDKEY/BNLS_CDKEY_EX.</summary>
     public byte[] CdKeyHash { get; set; } = [];
 
     public uint ExeVersion { get; set; }

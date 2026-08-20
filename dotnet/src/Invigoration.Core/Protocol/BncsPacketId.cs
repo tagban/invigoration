@@ -25,12 +25,23 @@ public enum BncsPacketId : byte
     SID_LOGONRESPONSE2 = 0x3A,
     SID_LOGONREALMEX = 0x3E,
     SID_NEWS_INFO = 0x46,
+
+    /// <summary>
+    /// "Battle.net requests required work from the Client... ExtraWork has
+    /// been used by Battle.net to collect statistics on system hardware and
+    /// to prevent hacking/botting" (bnetdocs.org/document/43/extrawork).
+    /// Compliance means downloading a server-provided MPQ, extracting a
+    /// native DLL from it, and executing a function inside that DLL —
+    /// deliberately never implemented here (see HandleRequiredWork).
+    /// </summary>
+    SID_REQUIREDWORK = 0x4C,
     SID_AUTH_INFO = 0x50,
     SID_AUTH_CHECK = 0x51,
     SID_AUTH_ACCOUNTCREATE = 0x52,
     SID_AUTH_ACCOUNTLOGON = 0x53,
     SID_AUTH_ACCOUNTLOGONPROOF = 0x54,
     SID_SETEMAIL = 0x59,
+    SID_FRIENDSLIST = 0x65,
     SID_FRIENDSUPDATE = 0x66,
     SID_FRIENDSADD = 0x67,
     SID_FRIENDSREMOVE = 0x68,

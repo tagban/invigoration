@@ -21,39 +21,155 @@
         <!-- Chat log: one continuous SelectableTextBlock (built up in code-behind)
              so drag-select and Ctrl+C work across whole lines and multiple
              lines at once, not just within a single colored segment. -->
-        <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll">
+        <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll" Background="{Binding BackgroundBrush}">
             <SelectableTextBlock Name="ChatText" Margin="8" TextWrapping="Wrap" />
         </ScrollViewer>
 
-        <!-- Channel user list: black background to match the icon set's own black backgrounds -->
-        <ListBox Grid.Row="1" Grid.Column="1" ItemsSource="{Binding ChannelUsers}" Margin="0,0,8,0"
-                 Background="Black">
-            <ListBox.Styles>
-                <Style Selector="ListBoxItem">
-                    <Setter Property="Padding" Value="8,1" />
-                    <Setter Property="MinHeight" Value="0" />
+        <!-- Right-hand panel: users in the current channel, friends list, and (per-game) clan roster -->
+        <TabControl Grid.Row="1" Grid.Column="1" Margin="0,4,8,8"
+                    Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="6" Padding="0">
+            <TabControl.Styles>
+                <!-- Compact header text (this panel is otherwise all small/dense text — Fluent's default TabItem
+                     header size looks oversized next to it) and the same colored-underline-on-select pattern as
+                     the top-level bot tabs in MainWindow.axaml, so this panel's active-tab indicator is driven by
+                     the bot's own customizable Highlight color too, not just Fluent's built-in accent. -->
+                <Style Selector="TabItem">
+                    <Setter Property="FontSize" Value="12" />
+                    <Setter Property="Padding" Value="10,6" />
                 </Style>
-            </ListBox.Styles>
-            <ListBox.ItemTemplate>
-                <DataTemplate>
-                    <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                        <Image Grid.Column="0" Source="{Binding ProductIconImage}" Width="32" Height="16"
-                               Stretch="Uniform" VerticalAlignment="Center" />
-                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="6,0">
-                            <TextBlock Text="{Binding Username}" Foreground="White" VerticalAlignment="Center" />
-                            <TextBlock Text="{Binding Ping}" Foreground="White" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
-                        </StackPanel>
-                        <Image Grid.Column="2" Source="{Binding StatusIconImage}" Width="22" Height="22"
-                               Stretch="Uniform" VerticalAlignment="Center"
-                               IsVisible="{Binding StatusIconImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                    </Grid>
-                </DataTemplate>
-            </ListBox.ItemTemplate>
-        </ListBox>
+                <Style Selector="TabItem:selected Border.tabHighlight">
+                    <Setter Property="BorderThickness" Value="0,0,0,3" />
+                </Style>
+            </TabControl.Styles>
+
+            <TabItem>
+                <TabItem.Header>
+                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="0,0,0,4">
+                        <TextBlock Text="Users" />
+                    </Border>
+                </TabItem.Header>
+                <ListBox ItemsSource="{Binding ChannelUsers}" Background="Transparent" BorderThickness="0" Padding="0,4">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="8,1" />
+                            <Setter Property="MinHeight" Value="0" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate>
+                            <!-- Icons are unconstrained on Width/Height, only capped at 32x32 by MaxWidth/MaxHeight
+                                 with Stretch="Uniform": the default 28x14 set renders at its natural tiny size,
+                                 while a swapped-in larger set (e.g. the 64x64 icons classic.battle.net's WC3 pages
+                                 served) is shrunk down to fit the cap without distorting its shape. IsLargeIcon
+                                 (true once the loaded icon is taller than the classic 14px) switches the row
+                                 between a single compact line and username/ping stacked, so a 32px-tall icon isn't
+                                 left towering over one thin line of text. -->
+                            <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
+                                <Image Grid.Column="0" Source="{Binding ProductIconImage}" MaxWidth="32" MaxHeight="32"
+                                       Stretch="Uniform" VerticalAlignment="Center" />
+
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="6,0"
+                                            VerticalAlignment="Center" IsVisible="{Binding !IsLargeIcon}">
+                                    <TextBlock Text="{Binding Username}" Foreground="White" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Ping}" Foreground="White" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="1" Orientation="Vertical" Margin="6,0"
+                                            VerticalAlignment="Center" IsVisible="{Binding IsLargeIcon}">
+                                    <TextBlock Text="{Binding Username}" Foreground="White" />
+                                    <TextBlock Text="{Binding Ping}" Foreground="White" Opacity="0.6" FontSize="11" />
+                                </StackPanel>
+
+                                <Image Grid.Column="2" Source="{Binding StatusIconImage}" MaxWidth="32" MaxHeight="32"
+                                       Stretch="Uniform" VerticalAlignment="Center"
+                                       IsVisible="{Binding StatusIconImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </TabItem>
+
+            <!-- Hidden entirely for games whose server doesn't push a friends list (Diablo 1, Warcraft II: BNE) -->
+            <TabItem IsVisible="{Binding SupportsFriends}">
+                <TabItem.Header>
+                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="0,0,0,4">
+                        <TextBlock Text="Friends" />
+                    </Border>
+                </TabItem.Header>
+                <DockPanel>
+                    <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshFriendsCommand}"
+                            HorizontalAlignment="Right" Margin="4" Padding="8,2" FontSize="11" />
+                    <ListBox ItemsSource="{Binding Friends}" Background="Transparent" BorderThickness="0" Padding="0,4">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="8,2" />
+                                <Setter Property="MinHeight" Value="0" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                                    <Image Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Source="{Binding ProductIconImage}"
+                                           MaxWidth="32" MaxHeight="32" Margin="0,0,6,0" VerticalAlignment="Center"
+                                           Stretch="Uniform"
+                                           IsVisible="{Binding ProductIconImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Account}" Foreground="White" />
+                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StatusText}" Foreground="White" Opacity="0.6" FontSize="10" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </TabItem>
+
+            <!-- The bot's own clan-management system (roster/rank/alias/trivia-score), not Battle.net's native clan protocol.
+                 Only shown once this bot has ClanFeatureEnabled turned on (Config window) AND the shared roster has at
+                 least one member — see BotTabViewModel.SupportsClan. -->
+            <TabItem IsVisible="{Binding SupportsClan}">
+                <TabItem.Header>
+                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="0,0,0,4">
+                        <TextBlock Text="Clan" />
+                    </Border>
+                </TabItem.Header>
+                <DockPanel>
+                    <Button DockPanel.Dock="Top" Content="Manage Members..." Click="OnManageClanClick"
+                            HorizontalAlignment="Right" Margin="4" Padding="8,2" FontSize="11" />
+                    <ListBox ItemsSource="{Binding ClanRoster}" Background="Transparent" BorderThickness="0" Padding="0,4">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="8,2" />
+                                <Setter Property="MinHeight" Value="0" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:ClanMemberViewModel">
+                                <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto">
+                                    <TextBlock Grid.Row="0" Grid.Column="0" Text="{Binding Name}" Foreground="White" />
+                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding TriviaScore, StringFormat='{}{0} pts'}"
+                                               Foreground="White" Opacity="0.7" FontSize="10" />
+                                    <TextBlock Grid.Row="1" Grid.Column="0" Foreground="White" Opacity="0.6" FontSize="10">
+                                        <Run Text="{Binding Rank}" /><Run Text=" · " /><Run Text="{Binding LastSeenText}" />
+                                    </TextBlock>
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </DockPanel>
+            </TabItem>
+
+        </TabControl>
 
         <!-- Input -->
         <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="8">
-            <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message or /command..." />
+            <!-- Tinted with the scheme's Highlight color, thickening on focus, so it's obvious this box has focus before you type. -->
+            <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message or /command..."
+                     Classes="chatInput" BorderBrush="{Binding HighlightBrush}" BorderThickness="1">
+                <TextBox.Styles>
+                    <Style Selector="TextBox.chatInput:focus">
+                        <Setter Property="BorderThickness" Value="2" />
+                    </Style>
+                </TextBox.Styles>
+            </TextBox>
             <Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}" Margin="8,0,0,0" />
         </Grid>
 

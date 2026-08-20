@@ -4,9 +4,9 @@ namespace Invigoration.Core.Chat;
 /// Maps a user's flags/statstring to a Battle.net chat icon key, returned as
 /// a filename (without extension) the UI resolves to an image. Mostly the
 /// original classic.battle.net "chat icons" set (classic.battle.net/info/icons.shtml),
-/// except the moderator/channel-operator badge uses the WC3-ladder "General
-/// Icons" version instead (classic.battle.net/war3/ladder/icons.shtml) — it
-/// stays legible even scaled down small, unlike the original tiny gavel icon.
+/// except the moderator/channel-operator badge uses a custom flat green gavel
+/// with a transparent background (mod-gavel.png) instead — it reads cleanly
+/// against the app's dark theme, unlike the original icon's opaque white tile.
 /// Split into a product icon and an optional status/rank badge so a UI can
 /// show both at once (e.g. product icon left, moderator badge right) instead
 /// of the original bnetbot.cls behavior of picking one icon exclusively.
@@ -28,7 +28,8 @@ public static class ChatIcon
             "3RAW" or "PX3W" => "war3",
             "PX2D" => "d2exp",
             "VD2D" => "diablo2",
-            "LTRD" or "RHSD" => "diablo",
+            "LTRD" => "diablo",
+            "RHSD" => "dshr",
             "RATS" or "PXES" => "sc",
             "RHSS" => "sware",
             "RTSJ" => "jsc",
@@ -55,7 +56,7 @@ public static class ChatIcon
 
         if (uflags.HasFlag(UserFlags.Operator))
         {
-            return "bnet-channelops";
+            return "mod-gavel";
         }
 
         if (uflags.HasFlag(UserFlags.Speaker))

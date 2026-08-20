@@ -39,18 +39,40 @@ public sealed partial class BotEngine
         reader.ReadDword(); // Cookie, unused
         reader.ReadDword(); // Version code, unused
 
+        if (!BncsProduct.RequiresCdKey(Config.Product))
+        {
+            await SendAuthCheckAsync().ConfigureAwait(false);
+            return;
+        }
+
+        if (TryHashCdKeysLocally())
+        {
+            await SendAuthCheckAsync().ConfigureAwait(false);
+            return;
+        }
+
+        // Fall back to BNLS for key formats CdKeyDecoder doesn't decode
+        // locally (currently Warcraft III/TFT's 26-character key, which
+        // already depends on BNLS for its NLS/SRP login regardless) or if a
+        // key fails to decode for any other reason — BNLS/the server will
+        // reject a genuinely bad key the same way either path.
         if (BncsProduct.RequiresExpansionCdKey(Config.Product))
         {
-            // NOTE: ported as-is from the original — a real dual-key
-            // BNLS_CDKEY_EX request should carry two hashed keys, but only
-            // one CD-key field exists here (and in the VB6 config form this
-            // came from), matching a limitation already present upstream.
+            // Confirmed against bnetdocs's BNLS_CDKEY_EX request layout:
+            // Cookie(DWORD), KeyCount(BYTE), Flags(DWORD), then — since flags
+            // here is CDKEY_SAME_SESSION_KEY (0x1) with GIVEN_SESSION_KEY
+            // (0x2) unset — one shared server session key (DWORD) and no
+            // client session keys, followed by one NTString per key. The
+            // original VB6 (and this port, until now) only ever sent one
+            // key string despite declaring KeyCount=2 — the actual bug
+            // behind "there's no space for a secondary product key".
             var writer = new PacketWriter()
-                .WriteDword(0)
-                .WriteByte(2)
-                .WriteDword(1)
-                .WriteDword(_auth.ServerToken)
-                .WriteNTString(Config.CdKey);
+                .WriteDword(0) // Cookie
+                .WriteByte(2) // Number of CD-keys
+                .WriteDword(1) // Flags: CDKEY_SAME_SESSION_KEY
+                .WriteDword(_auth.ServerToken) // shared server session key
+                .WriteNTString(Config.CdKey)
+                .WriteNTString(Config.ExpansionCdKey);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CDKEY_EX).ConfigureAwait(false);
         }
         else
@@ -58,6 +80,45 @@ public sealed partial class BotEngine
             var writer = new PacketWriter().WriteDword(_auth.ServerToken).WriteNTString(Config.CdKey);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CDKEY).ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// Computes the SID_AUTH_CHECK CD-key block(s) locally via CdKeyDecoder
+    /// for the classic 13-digit and modern 16-character key formats, instead
+    /// of asking BNLS_CDKEY/BNLS_CDKEY_EX to do it (avoiding sending the
+    /// plaintext key over BNLS's unencrypted protocol). Generates a fresh
+    /// client token ourselves — normally BNLS's job — since we're no longer
+    /// asking it to. Returns false (leaving _auth untouched) if any required
+    /// key doesn't decode, so the caller can fall back to BNLS.
+    /// </summary>
+    private bool TryHashCdKeysLocally()
+    {
+        var primary = CdKeyDecoder.Decode(Config.CdKey);
+        if (primary is null)
+        {
+            return false;
+        }
+
+        DecodedCdKey? expansion = null;
+        if (BncsProduct.RequiresExpansionCdKey(Config.Product))
+        {
+            expansion = CdKeyDecoder.Decode(Config.ExpansionCdKey);
+            if (expansion is null)
+            {
+                return false;
+            }
+        }
+
+        var clientToken = (uint)Random.Shared.Next();
+        var blocks = new List<byte>(primary.Value.GetAuthCheckBlock(Config.CdKey.Trim().Length, clientToken, _auth.ServerToken));
+        if (expansion is not null)
+        {
+            blocks.AddRange(expansion.Value.GetAuthCheckBlock(Config.ExpansionCdKey.Trim().Length, clientToken, _auth.ServerToken));
+        }
+
+        _auth.ClientToken = clientToken;
+        _auth.CdKeyHash = blocks.ToArray();
+        return true;
     }
 
     private Task HandleVersionCheckAsync()
@@ -90,14 +151,36 @@ public sealed partial class BotEngine
         return SendBncsAsync(writer, BncsPacketId.SID_AUTH_ACCOUNTLOGONPROOF);
     }
 
+    /// <summary>
+    /// Confirmed against bnetdocs's BNLS_CDKEY_EX reply layout: Cookie(DWORD),
+    /// NumberRequested(BYTE), NumberSucceeded(BYTE), BitMask(DWORD), then per
+    /// successful key: ClientSessionKey(DWORD) + CdKeyData(9 DWORDs = 36
+    /// bytes). SID_AUTH_CHECK wants both keys' 36-byte blocks concatenated
+    /// back-to-back. The previous single-key version of this handler (and
+    /// its VB6-derived "big-endian token" quirk) was never exercised against
+    /// a real expansion-product account — worth confirming live.
+    /// </summary>
     private Task HandleCdKeyExReplyAsync(byte[] frame)
     {
         var reader = BnlsConnection.GetPayloadReader(frame);
-        reader.Skip(10); // matches modBNLS.bas's derivation for this reply layout
-        var clientTokenBytes = reader.ReadRaw(4);
-        Array.Reverse(clientTokenBytes); // this reply's token is big-endian, unlike the rest of the protocol
-        _auth.ClientToken = BitConverter.ToUInt32(clientTokenBytes);
-        _auth.CdKeyHash = reader.ReadRaw(36);
+        reader.Skip(4); // Cookie
+        var numberRequested = reader.ReadByte();
+        reader.Skip(1); // Number succeeded
+        reader.Skip(4); // Bit mask
+
+        var combinedHash = new List<byte>();
+        for (var i = 0; i < numberRequested; i++)
+        {
+            var clientSessionKey = reader.ReadDword();
+            if (i == 0)
+            {
+                _auth.ClientToken = clientSessionKey;
+            }
+
+            combinedHash.AddRange(reader.ReadRaw(36));
+        }
+
+        _auth.CdKeyHash = combinedHash.ToArray();
         return SendAuthCheckAsync();
     }
 
@@ -116,7 +199,8 @@ public sealed partial class BotEngine
 
     private Task SendAuthCheckAsync()
     {
-        var numKeys = BncsProduct.RequiresExpansionCdKey(Config.Product) ? 2u : 1u;
+        var numKeys = !BncsProduct.RequiresCdKey(Config.Product) ? 0u
+            : BncsProduct.RequiresExpansionCdKey(Config.Product) ? 2u : 1u;
         var writer = new PacketWriter()
             .WriteDword(_auth.ClientToken)
             .WriteDword(_auth.ExeVersion)
@@ -166,7 +250,7 @@ public sealed partial class BotEngine
 
         _bncs.Close();
         LogInfo($"Battle.net connecting to {Config.BattlenetServer}...");
-        await _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort).ConfigureAwait(false);
+        await _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, proxy: BuildProxyOptions()).ConfigureAwait(false);
     }
 
     private async Task HandleHashDataReplyAsync(byte[] frame)

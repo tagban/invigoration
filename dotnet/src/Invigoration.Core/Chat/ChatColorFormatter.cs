@@ -17,8 +17,9 @@ public static class ChatColorFormatter
 {
     private const char Marker = ' ';
 
-    public static IReadOnlyList<ChatLogSegment> Parse(string text, RgbColor defaultColor)
+    public static IReadOnlyList<ChatLogSegment> Parse(string text, RgbColor defaultColor, ChatPalette? palette = null)
     {
+        palette ??= ChatPalette.Invigoration;
         var segments = new List<ChatLogSegment>();
         var currentColor = defaultColor;
         var runStart = 0;
@@ -33,7 +34,7 @@ public static class ChatColorFormatter
                     segments.Add(new ChatLogSegment(currentColor, text[runStart..i]));
                 }
 
-                currentColor = GetColor(text[i + 1]) ?? currentColor;
+                currentColor = GetColor(text[i + 1], palette) ?? currentColor;
                 i += 2;
                 runStart = i;
                 continue;
@@ -50,20 +51,27 @@ public static class ChatColorFormatter
         return segments;
     }
 
-    private static RgbColor? GetColor(char code) => code switch
+    /// <summary>
+    /// These inline codes are a fixed, scheme-independent palette (like a
+    /// crayon box the operator can reach for in a message) rather than part
+    /// of the bnubot-derived ChatPalette roles — bnubot's color schemes only
+    /// define roles for this port's own system messages (errors, whispers,
+    /// etc.), not for an arbitrary in-chat color-code feature.
+    /// </summary>
+    private static RgbColor? GetColor(char code, ChatPalette palette) => code switch
     {
         'r' => RgbColor.FromWin32Bgr(0xFF), // vbRed
-        'w' => ChatColors.White,
+        'w' => palette.White,
         'q' => RgbColor.FromWin32Bgr(0x808080), // vbGrey
-        'g' => ChatColors.Green,
-        'y' => ChatColors.Yellow,
-        'b' => ChatColors.MedBlue,
-        'o' => ChatColors.Orange,
-        'c' => ChatColors.LtBlue,
-        'p' => ChatColors.Purple,
-        'l' => ChatColors.LtYellow,
+        'g' => new RgbColor(0x00, 0xCE, 0x00),
+        'y' => new RgbColor(0xFF, 0xFF, 0x00),
+        'b' => new RgbColor(0x44, 0x40, 0x9C),
+        'o' => new RgbColor(0xFF, 0xA5, 0x00),
+        'c' => new RgbColor(0x00, 0xD0, 0xD0),
+        'p' => new RgbColor(0x8D, 0x00, 0xCE),
+        'l' => new RgbColor(0xCE, 0xCE, 0x51),
         'e' => RgbColor.FromWin32Bgr(0x659DA8), // D2Beige2
-        'k' => ChatColors.HexPink,
+        'k' => new RgbColor(0xFF, 0x69, 0xB4),
         _ => null,
     };
 }

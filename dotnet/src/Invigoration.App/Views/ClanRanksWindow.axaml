@@ -1,0 +1,111 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Invigoration.App.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="640" d:DesignHeight="640"
+        x:Class="Invigoration.App.Views.ClanRanksWindow"
+        x:DataType="vm:ClanRanksViewModel"
+        Width="640" Height="640"
+        Title="Manage Ranks">
+
+    <Design.DataContext>
+        <vm:ClanRanksViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*">
+        <!-- Pinned so Save/Close are always reachable without scrolling through every rank below -->
+        <Border Grid.Row="0" Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="16,10">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Manage Ranks" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <Button Content="Close" Click="OnCloseClick" />
+                    <Button Content="Save" Click="OnSaveClick" IsDefault="True" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="16" Spacing="10">
+                <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                           Text="Shared across every bot you run. Each rank can grant command access, auto-whisper a member when seen, and/or automatically kick or ban them — handy for flagging troublemakers without needing to watch for them manually. The bot master always has full access regardless of any rank's grants." />
+
+                <ItemsControl ItemsSource="{Binding Ranks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="vm:ClanRankViewModel">
+                            <Border BorderBrush="Gray" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,8">
+                                <StackPanel Spacing="8">
+
+                                    <!-- Collapsed row: name + a one-line summary of what's actually turned on — click to expand the full editor -->
+                                    <Button Background="Transparent" BorderThickness="0" Padding="0"
+                                            HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
+                                            Command="{Binding ToggleExpandedCommand}">
+                                        <Grid ColumnDefinitions="*,Auto">
+                                            <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                                <TextBlock Text="{Binding Name}" Foreground="White" FontWeight="Bold" />
+                                                <TextBlock Text="{Binding SummaryText}" Foreground="White" Opacity="0.6" FontSize="11" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="1" Text="▸" Foreground="White" Opacity="0.6" VerticalAlignment="Center"
+                                                       IsVisible="{Binding !IsExpanded}" />
+                                            <TextBlock Grid.Column="1" Text="▾" Foreground="White" Opacity="0.6" VerticalAlignment="Center"
+                                                       IsVisible="{Binding IsExpanded}" />
+                                        </Grid>
+                                    </Button>
+
+                                    <!-- Expanded editor -->
+                                    <StackPanel Spacing="10" IsVisible="{Binding IsExpanded}">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <TextBox Grid.Column="0" PlaceholderText="Rank name" Text="{Binding Name}" />
+                                            <Button Grid.Column="1" Content="Remove"
+                                                    Command="{Binding $parent[ItemsControl].((vm:ClanRanksViewModel)DataContext).RemoveRankCommand}"
+                                                    CommandParameter="{Binding}" />
+                                        </Grid>
+
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Command Permissions" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                                            <ItemsControl ItemsSource="{Binding Commands}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <WrapPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="vm:RankCommandGrantViewModel">
+                                                        <CheckBox Content="{Binding DisplayName}" IsChecked="{Binding IsGranted}"
+                                                                  Margin="0,0,12,4" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Kick / Ban Actions" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                                <CheckBox Content="Auto-kick on sight" IsChecked="{Binding AutoKick}" />
+                                                <CheckBox Content="Auto-ban on sight" IsChecked="{Binding AutoBan}" />
+                                            </StackPanel>
+                                            <TextBox PlaceholderText="Kick message (optional)" Text="{Binding AutoKickMessage}"
+                                                     IsVisible="{Binding AutoKick}" />
+                                            <TextBox PlaceholderText="Ban message (optional)" Text="{Binding AutoBanMessage}"
+                                                     IsVisible="{Binding AutoBan}" />
+                                        </StackPanel>
+
+                                        <StackPanel Spacing="4">
+                                            <TextBlock Text="Auto-Whisper" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                                <TextBox Grid.Column="0" PlaceholderText="Auto-whisper message (blank = disabled)" Text="{Binding AutoWhisperMessage}" />
+                                                <ComboBox Grid.Column="1" ItemsSource="{Binding AvailableFrequencies}"
+                                                          SelectedItem="{Binding AutoWhisperFrequency}" Width="110" />
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Button Content="+ Add Rank" Command="{Binding AddRankCommand}" />
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

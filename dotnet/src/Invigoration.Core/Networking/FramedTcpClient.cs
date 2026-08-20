@@ -28,15 +28,43 @@ public abstract class FramedTcpClient : IAsyncDisposable
     /// </summary>
     protected abstract int? TryGetFrameLength(IReadOnlyList<byte> buffer);
 
-    public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default)
+    /// <summary>Connects directly to host:port, or — when <paramref name="proxy"/> is given — connects to the proxy first and tunnels to host:port through it (SOCKS5 or HTTP CONNECT), so the target server sees the proxy's IP instead of this machine's.</summary>
+    public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default, ProxyOptions? proxy = null)
     {
         Close();
 
         var client = new TcpClient();
-        await client.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
+        var connectHost = proxy?.Host ?? host;
+        var connectPort = proxy?.Port ?? port;
+        await client.ConnectAsync(connectHost, connectPort, cancellationToken).ConfigureAwait(false);
+
+        var stream = client.GetStream();
+        if (proxy is not null)
+        {
+            try
+            {
+                switch (proxy.Protocol)
+                {
+                    case ProxyProtocol.Socks5:
+                        await Socks5Connector.NegotiateAsync(stream, host, port, proxy.Username, proxy.Password, cancellationToken)
+                            .ConfigureAwait(false);
+                        break;
+
+                    case ProxyProtocol.Http:
+                        await HttpConnectProxyConnector.NegotiateAsync(stream, host, port, proxy.Username, proxy.Password, cancellationToken)
+                            .ConfigureAwait(false);
+                        break;
+                }
+            }
+            catch
+            {
+                client.Dispose();
+                throw;
+            }
+        }
 
         _client = client;
-        _stream = client.GetStream();
+        _stream = stream;
         _receiveBuffer.Clear();
 
         Connected?.Invoke();

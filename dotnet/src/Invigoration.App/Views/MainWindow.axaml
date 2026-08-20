@@ -18,9 +18,19 @@
         <Menu DockPanel.Dock="Top">
             <MenuItem Header="_File">
                 <MenuItem Header="_Add Bot..." Click="OnAddBotClick" />
+                <MenuItem Header="_Edit Selected Bot..." Click="OnEditBotClick" />
                 <MenuItem Header="_Remove Selected Bot" Click="OnRemoveBotClick" />
                 <Separator />
+                <MenuItem Header="Open Config _Folder..." Click="OnOpenConfigFolderClick" />
+                <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
+            </MenuItem>
+            <MenuItem Header="_Clan" IsVisible="{Binding AnyBotHasClanEnabled}">
+                <MenuItem Header="_Manage Members..." Click="OnClanMembersClick" />
+                <MenuItem Header="Manage _Ranks..." Click="OnClanRanksClick" />
+            </MenuItem>
+            <MenuItem Header="_Icons">
+                <MenuItem Header="_Manage Icons..." Click="OnManageIconsClick" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="OnAboutClick" />
@@ -28,9 +38,17 @@
         </Menu>
 
         <TabControl ItemsSource="{Binding Bots}" SelectedItem="{Binding SelectedBot}">
+            <TabControl.Styles>
+                <!-- Underlines the active tab in that bot's own scheme Highlight color, so which bot is open stays obvious even with several tabs open. -->
+                <Style Selector="TabItem:selected Border.tabHighlight">
+                    <Setter Property="BorderThickness" Value="0,0,0,3" />
+                </Style>
+            </TabControl.Styles>
             <TabControl.ItemTemplate>
                 <DataTemplate>
-                    <TextBlock Text="{Binding Title}" />
+                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
+                        <TextBlock Text="{Binding Title}" />
+                    </Border>
                 </DataTemplate>
             </TabControl.ItemTemplate>
         </TabControl>
