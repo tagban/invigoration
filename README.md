@@ -44,6 +44,31 @@ Swap any chat icon for your own image — game icons, status icons, all overrida
   <img src="screenshots/manage-icons.png" width="500" alt="Manage Icons window">
 </p>
 
+### Discord Bridge
+
+Relay chat between a Battle.net channel and a Discord channel, in either or both directions, per bot. The bridge connects and disconnects automatically alongside that bot's own Connect/Disconnect — there's no separate Discord button.
+
+**Setup:**
+
+1. Create a Discord application at the [Discord Developer Portal](https://discord.com/developers/applications) → **New Application**.
+2. Open the **Bot** page → **Reset Token** and copy it. Treat it as a secret — anyone with the token can control the bot.
+3. On the same **Bot** page, enable **Message Content** under *Privileged Gateway Intents*. This is required — without it, messages from other Discord users arrive with empty text and nothing relays.
+4. Open **OAuth2 → URL Generator**, check the `bot` scope and the `Send Messages` + `View Channel` permissions, then open the generated URL to invite the bot to your server.
+5. In Discord, turn on Developer Mode (**User Settings → Advanced**), then right-click the channel you want bridged and **Copy Channel ID**.
+6. In Invigoration, open that bot's **Configuration → Discord Bridge** and fill in:
+   - **Enabled**
+   - **Discord bot token** — from step 2
+   - **Discord channel ID** — from step 5
+   - **Relay delay (seconds)** — minimum gap between relayed messages in each direction, flood protection
+   - **Relay Battle.net chat to Discord** / **Relay Discord messages to Battle.net** — toggle either direction independently
+7. Save the config, then Connect the bot as normal.
+
+**Troubleshooting:**
+
+- *Discord shows a 401/Unauthorized error after connecting successfully* — the token was regenerated or auto-revoked (Discord invalidates a token the moment it's detected exposed anywhere public, e.g. a repo or paste site). Grab a fresh token from the Bot page and restart the bot.
+- *Discord → Battle.net relay is silent, but Battle.net → Discord works* — the **Message Content** intent (step 3) isn't enabled; Discord withholds message text from bots without it.
+- *Nothing relays either direction* — double-check the Channel ID is a channel the bot was actually invited into (step 4), and that both relay-direction checkboxes are on.
+
 ## Download
 
 Grab the latest build from the [Releases page](https://github.com/tagban/invigoration/releases) — Windows, macOS (arm64 and Intel), and Linux builds are all published there.
