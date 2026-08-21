@@ -4,6 +4,7 @@ dotnet/**/obj/
 dotnet/.vs/
 dotnet/publish/
 dotnet/release/
+dotnet/dist/
 *.user
 
 # Visual Studio cache (no VB6 project on this branch anymore)
