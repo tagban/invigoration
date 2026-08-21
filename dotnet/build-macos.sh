@@ -50,6 +50,22 @@ cp "$SCRIPT_DIR/packaging/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.
 sed "s/__VERSION__/$NUMERIC_VERSION/g" "$SCRIPT_DIR/packaging/Info.plist.template" > "$APP_BUNDLE/Contents/Info.plist"
 chmod +x "$APP_BUNDLE/Contents/MacOS/Invigoration.App"
 
+case "$RID" in
+  osx-arm64) LIPO_ARCH="arm64" ;;
+  osx-x64) LIPO_ARCH="x86_64" ;;
+  *) LIPO_ARCH="" ;;
+esac
+
+if [ -n "$LIPO_ARCH" ]; then
+  echo "==> Thinning universal dylibs to $LIPO_ARCH (some NuGet packages ship fat binaries, which trips macOS's legacy-Intel-software warning even on an arm64-only app)"
+  find "$APP_BUNDLE/Contents/MacOS" -name "*.dylib" | while read -r dylib; do
+    ARCHES=$(lipo -archs "$dylib" 2>/dev/null || true)
+    if [ -n "$ARCHES" ] && [ "$ARCHES" != "$LIPO_ARCH" ]; then
+      lipo -thin "$LIPO_ARCH" "$dylib" -output "$dylib.thin" && mv "$dylib.thin" "$dylib"
+    fi
+  done
+fi
+
 if [ "$SIGN" = true ]; then
   IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -1 | awk -F'"' '{print $2}' || true)
   if [ -z "$IDENTITY" ]; then
