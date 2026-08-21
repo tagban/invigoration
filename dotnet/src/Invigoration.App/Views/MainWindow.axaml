@@ -10,12 +10,52 @@
         Width="1000" Height="650"
         Title="Invigoration">
 
+    <NativeMenu.Menu>
+        <NativeMenu>
+            <NativeMenuItem Header="File">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Add Bot..." Click="OnAddBotNativeClick" />
+                        <NativeMenuItem Header="Edit Selected Bot..." Click="OnEditBotNativeClick" />
+                        <NativeMenuItem Header="Remove Selected Bot" Click="OnRemoveBotNativeClick" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Open Config Folder..." Click="OnOpenConfigFolderNativeClick" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Exit" Click="OnExitNativeClick" />
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="Clan" IsVisible="{Binding AnyBotHasClanEnabled}">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Manage Members..." Click="OnClanMembersNativeClick" />
+                        <NativeMenuItem Header="Manage Ranks..." Click="OnClanRanksNativeClick" />
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="Icons">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="Manage Icons..." Click="OnManageIconsNativeClick" />
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
+            <NativeMenuItem Header="Help">
+                <NativeMenuItem.Menu>
+                    <NativeMenu>
+                        <NativeMenuItem Header="About" Click="OnAboutNativeClick" />
+                    </NativeMenu>
+                </NativeMenuItem.Menu>
+            </NativeMenuItem>
+        </NativeMenu>
+    </NativeMenu.Menu>
+
     <Design.DataContext>
         <vm:MainWindowViewModel />
     </Design.DataContext>
 
     <DockPanel>
-        <Menu DockPanel.Dock="Top">
+        <Menu DockPanel.Dock="Top" IsVisible="{OnPlatform Default=True, macOS=False}">
             <MenuItem Header="_File">
                 <MenuItem Header="_Add Bot..." Click="OnAddBotClick" />
                 <MenuItem Header="_Edit Selected Bot..." Click="OnEditBotClick" />
