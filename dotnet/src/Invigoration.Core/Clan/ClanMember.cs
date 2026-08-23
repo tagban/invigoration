@@ -45,8 +45,8 @@ public sealed class ClanMember
     /// <summary>UTC timestamp of the last time an auto-whisper (per their rank's ClanRank.AutoWhisperFrequency) was sent to this member — used to enforce Daily/Once frequency limits. Null if never sent.</summary>
     public DateTime? LastAutoWhisperUtc { get; set; }
 
-    /// <summary>Running trivia-game score, adjustable via the "score" command; 0 until trivia is played (or scores are set manually).</summary>
-    public int TriviaScore { get; set; }
+    /// <summary>Running trivia-game score, adjustable via the "score" command; 0 until trivia is played (or scores are set manually). Fractional since correct answers award graduated points based on how many hints were shown (see BotConfig.TriviaPointsBeforeFirstHint and friends).</summary>
+    public double TriviaScore { get; set; }
 
     /// <summary>
     /// Optional free-form platform labels (e.g. "Classic", "SC2", "SC:R")

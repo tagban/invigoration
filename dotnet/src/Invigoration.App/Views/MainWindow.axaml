@@ -33,10 +33,12 @@
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>
-            <NativeMenuItem Header="Icons">
+            <NativeMenuItem Header="Customize">
                 <NativeMenuItem.Menu>
                     <NativeMenu>
                         <NativeMenuItem Header="Manage Icons..." Click="OnManageIconsNativeClick" />
+                        <NativeMenuItem Header="Manage Colors..." Click="OnManageColorsNativeClick" />
+                        <NativeMenuItem Header="Manage Battle.net Profiles..." Click="OnManageBattlenetProfilesNativeClick" />
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>
@@ -69,15 +71,17 @@
                 <MenuItem Header="_Manage Members..." Click="OnClanMembersClick" />
                 <MenuItem Header="Manage _Ranks..." Click="OnClanRanksClick" />
             </MenuItem>
-            <MenuItem Header="_Icons">
-                <MenuItem Header="_Manage Icons..." Click="OnManageIconsClick" />
+            <MenuItem Header="_Customize">
+                <MenuItem Header="Manage _Icons..." Click="OnManageIconsClick" />
+                <MenuItem Header="Manage _Colors..." Click="OnManageColorsClick" />
+                <MenuItem Header="Manage _Battle.net Profiles..." Click="OnManageBattlenetProfilesClick" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="OnAboutClick" />
             </MenuItem>
         </Menu>
 
-        <TabControl ItemsSource="{Binding Bots}" SelectedItem="{Binding SelectedBot}">
+        <TabControl Name="TopLevelTabControl" ItemsSource="{Binding TopLevelTabs}" SelectionChanged="OnTopLevelTabSelectionChanged">
             <TabControl.Styles>
                 <!-- Underlines the active tab in that bot's own scheme Highlight color, so which bot is open stays obvious even with several tabs open. -->
                 <Style Selector="TabItem:selected Border.tabHighlight">
@@ -85,9 +89,20 @@
                 </Style>
             </TabControl.Styles>
             <TabControl.ItemTemplate>
-                <DataTemplate>
+                <!-- x:CompileBindings=False: TopLevelTabs is `object` (mixing BotTabViewModel,
+                     BotGroupTabViewModel, and GlobalWhispersTabViewModel) specifically so this
+                     template resolves Title/HighlightBrush/HeaderFontSize/HeaderForeground/
+                     HasUnread by reflection against whichever type is actually bound, rather
+                     than requiring one shared base type to declare all five. -->
+                <DataTemplate x:CompileBindings="False">
                     <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
-                        <TextBlock Text="{Binding Title}" />
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
+                            <!-- Subtle "something happened while you weren't looking" dot — see
+                                 BotTabViewModel/BotGroupTabViewModel/GlobalWhispersTabViewModel's
+                                 HasUnread. -->
+                            <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                        </StackPanel>
                     </Border>
                 </DataTemplate>
             </TabControl.ItemTemplate>

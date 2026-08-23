@@ -15,8 +15,9 @@ public sealed record SunkenSession(RecordStream Stream, ResumeResult.Success Det
 /// including its exact record sequence and the "skip one optional
 /// RegulatorUpdate before the real ResumeResponse" behavior.
 ///
-/// Like <see cref="Front.FrontClient"/>, this has NOT been exercised against
-/// a live Battle.net server.
+/// Live-verified end-to-end against a real Battle.net account on 2026-08-22
+/// (see <see cref="Front.FrontClient"/>'s remarks) — the resume handshake
+/// completes and RC4 transport encryption enables successfully.
 /// </summary>
 public static class SunkenClient
 {

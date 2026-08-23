@@ -23,9 +23,13 @@ public sealed class TriviaSession
     /// the same engine, but not necessarily: when several bots share this
     /// session via BotConfig.TriviaGroup (e.g. one on Warcraft II, one on
     /// StarCraft II, same person's clan), the answer can arrive on any of
-    /// their channels while only one of them owns the round loop.
+    /// their channels while only one of them owns the round loop. Source
+    /// describes where the answer came from (server + chat room, or
+    /// "Discord") — see BotEngine.Bncs.cs's DescribeChatSource — so a
+    /// TriviaGroup round spanning several bots/channels can say which one a
+    /// winner actually answered from.
     /// </summary>
-    public (string Username, string MatchedAnswer)? PendingAnswer { get; set; }
+    public (string Username, string MatchedAnswer, string Source)? PendingAnswer { get; set; }
 
     /// <summary>Consecutive questions nobody answered — trivia auto-disables at 10, matching BNU`Bot.</summary>
     public int UnansweredStreak { get; private set; }

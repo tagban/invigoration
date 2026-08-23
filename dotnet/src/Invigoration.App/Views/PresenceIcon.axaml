@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d"
+             x:Class="Invigoration.App.Views.PresenceIcon"
+             Width="10" Height="10" VerticalAlignment="Center">
+
+    <!-- Small color-coded status badge, evoking classic Battle.net's per-status
+         icons without reproducing any of Blizzard's actual artwork — one shape
+         per PresenceState, toggled in code-behind (an enum doesn't bind
+         cleanly to IsVisible without a converter per state, and this is only
+         5 fixed shapes). -->
+    <Grid>
+        <Ellipse Name="AvailableShape" Fill="#3CB371" IsVisible="False" ToolTip.Tip="Available" />
+
+        <Grid Name="AwayShape" IsVisible="False">
+            <Ellipse Fill="#DAA520" ToolTip.Tip="Away" />
+            <Path Data="M 5,2.2 L 5,5 L 7,6.2" Stroke="White" StrokeThickness="1" StrokeLineCap="Round" IsHitTestVisible="False" />
+        </Grid>
+
+        <Grid Name="BusyShape" IsVisible="False">
+            <Ellipse Fill="#DC143C" ToolTip.Tip="Do Not Disturb" />
+            <Rectangle Fill="White" Width="5.5" Height="1.4" IsHitTestVisible="False" />
+        </Grid>
+
+        <Grid Name="InGameShape" IsVisible="False">
+            <Ellipse Fill="#6A5ACD" ToolTip.Tip="In a Game" />
+            <Path Fill="White" Data="M 3.2,2.6 L 3.2,7.4 L 7.2,5 Z" IsHitTestVisible="False" />
+        </Grid>
+
+        <Ellipse Name="OfflineShape" Fill="#696969" Opacity="0.6" IsVisible="False" ToolTip.Tip="Offline" />
+    </Grid>
+</UserControl>

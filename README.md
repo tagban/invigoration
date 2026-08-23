@@ -84,6 +84,10 @@ dotnet build Invigoration.slnx
 
 macOS releases are built, signed with a Developer ID certificate, and notarized via `dotnet/build-macos.sh`. Linux releases are packaged via `dotnet/build-linux.sh`. See those scripts for the full pipeline.
 
+## Acknowledgments
+
+StarCraft II, StarCraft: Remastered, and Warcraft III: Reforged connectivity is built on protocol research from [Superiority](https://github.com/ncarrillo/superiority) — its Rust implementation was the reference for Invigoration's own native client.
+
 ## Status
 
 Actively developed, still labeled beta — expect rough edges. Feedback and bug reports welcome via [Issues](https://github.com/tagban/invigoration/issues).

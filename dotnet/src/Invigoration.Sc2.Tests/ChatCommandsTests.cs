@@ -90,4 +90,24 @@ public class ChatCommandsTests
 
         Assert.Equal("53050add6816012e", Convert.ToHexString(record).ToLowerInvariant());
     }
+
+    // Golden vectors generated directly from ncarrillo/superiority's own
+    // Protocol::cache_get_stream_items(token, channel, item_name, locale) via
+    // a one-off example against the extracted retail schema, matching the
+    // same tokens/FourCCs BotEngine.Sc2.cs sends during ChatBootstrap.
+    [Fact]
+    public void CacheGetStreamItems_ErrorCatalog_MatchesGoldenVector()
+    {
+        var record = ChatCommands.CacheGetStreamItems(1, "BNET", "ERRS", "enUS");
+
+        Assert.Equal("c90300000001028000432722aa44a9292965b72aa9ffffffff01", Convert.ToHexString(record).ToLowerInvariant());
+    }
+
+    [Fact]
+    public void CacheGetStreamItems_PublicChannelCatalog_MatchesGoldenVector()
+    {
+        var record = ChatCommands.CacheGetStreamItems(2, "BNET", "CONF", "enUS");
+
+        Assert.Equal("c90300000002028000432722aa42a7a72364b72aa9ffffffff01", Convert.ToHexString(record).ToLowerInvariant());
+    }
 }

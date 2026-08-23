@@ -123,7 +123,7 @@ public partial class ClanMemberViewModel : ObservableObject
     public partial string Notes { get; set; }
 
     [ObservableProperty]
-    public partial int TriviaScore { get; set; }
+    public partial decimal TriviaScore { get; set; }
 
     [ObservableProperty]
     public partial bool IsClanMember { get; set; }
@@ -165,7 +165,7 @@ public partial class ClanMemberViewModel : ObservableObject
         Rank = member.Rank;
         AliasesText = string.Join(", ", member.Aliases);
         Notes = member.Notes;
-        TriviaScore = member.TriviaScore;
+        TriviaScore = (decimal)member.TriviaScore;
         IsClanMember = member.IsClanMember;
         PlatformsText = string.Join(", ", member.Platforms);
     }
@@ -181,7 +181,7 @@ public partial class ClanMemberViewModel : ObservableObject
 
     partial void OnNotesChanged(string value) => Member.Notes = value;
 
-    partial void OnTriviaScoreChanged(int value) => Member.TriviaScore = value;
+    partial void OnTriviaScoreChanged(decimal value) => Member.TriviaScore = (double)value;
 
     partial void OnIsClanMemberChanged(bool value) => Member.IsClanMember = value;
 

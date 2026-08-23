@@ -29,6 +29,9 @@ public sealed class BotSessionState
     public int KickCount { get; set; }
     public int JoinCount { get; set; }
 
+    /// <summary>Classic BNCS/Chat-Telnet only (single-channel by protocol) — the channel name from the most recent ChatEventType.Channel event, e.g. for describing where a trivia answer came from. SC2/SC:R/WC3:R tracks this per-channel instead (see BotEngine.Sc2.cs), not here.</summary>
+    public string CurrentChannelName { get; set; } = "";
+
     public string LastWhisperFromUser { get; set; } = "";
     public string LastWhisperFromText { get; set; } = "";
     public string LastWhisperSentUser { get; set; } = "";

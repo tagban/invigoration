@@ -1,6 +1,5 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
 using Invigoration.App.ViewModels;
 using Invigoration.Core.Config;
 
@@ -11,7 +10,9 @@ namespace Invigoration.App.Views;
 /// ShowDialog on Save (null on Cancel) — the original is never mutated, so
 /// this is safe for both adding a new bot and editing an already-added one;
 /// the caller decides what to do with the result (use it as the new bot's
-/// config, or assign it back onto an existing BotEngine.Config).
+/// config, or assign it back onto an existing BotEngine.Config). Color
+/// scheme and icon set editing both moved to their own windows under the
+/// top-level Customize menu — this window only picks which saved one to use.
 /// </summary>
 public partial class ConfigWindow : Window
 {
@@ -31,29 +32,4 @@ public partial class ConfigWindow : Window
     private void OnSaveClick(object? sender, RoutedEventArgs e) => Close(_viewModel.Config);
 
     private void OnCancelClick(object? sender, RoutedEventArgs e) => Close(null);
-
-    private async void OnImportSchemeClick(object? sender, RoutedEventArgs e)
-    {
-        var files = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = "Import Color Scheme",
-            AllowMultiple = false,
-            FileTypeFilter = [new FilePickerFileType("Invigoration Color Scheme") { Patterns = ["*.json"] }],
-        });
-
-        var path = files.Count > 0 ? files[0].TryGetLocalPath() : null;
-        if (path is null)
-        {
-            return;
-        }
-
-        try
-        {
-            _viewModel.ImportSchemeFile(path);
-        }
-        catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException)
-        {
-            // No dialog infrastructure exists yet to surface this; a bad file just silently doesn't import.
-        }
-    }
 }

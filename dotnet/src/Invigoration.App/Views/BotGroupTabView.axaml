@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="Invigoration.App.Views.BotGroupTabView"
+             x:DataType="vm:BotGroupTabViewModel">
+
+    <!-- One sub-tab per bot in this group — same nested-TabControl-of-bots idea as a
+         Stimpak-backed bot's own per-channel sub-tabs (BotTabView.axaml), just one level up:
+         a group collapses several whole bots into one top-level tab instead of several
+         channels into one bot tab. Each sub-tab's content resolves to BotTabView the normal
+         way (compiled bindings work fine here — Bots is homogeneously BotTabViewModel, no
+         duck-typing needed at this level). -->
+    <TabControl ItemsSource="{Binding Bots}" SelectedItem="{Binding SelectedBot}">
+        <TabControl.Styles>
+            <Style Selector="TabItem:selected Border.tabHighlight">
+                <Setter Property="BorderThickness" Value="0,0,0,3" />
+            </Style>
+        </TabControl.Styles>
+        <TabControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:BotTabViewModel">
+                <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="{Binding Title}" />
+                        <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+        </TabControl.ItemTemplate>
+    </TabControl>
+</UserControl>

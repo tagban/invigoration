@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Collections.Specialized;
 using System.Diagnostics;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Config;
 using Invigoration.Core.Trivia;
@@ -17,6 +20,51 @@ public partial class MainWindowViewModel : ViewModelBase
     public partial BotTabViewModel? SelectedBot { get; set; }
 
     /// <summary>
+    /// What MainWindow's top-level TabControl actually binds ItemsSource to — the Whispers
+    /// pseudo-tab first, then one entry per real bot. Deliberately typed as plain `object`, not
+    /// `ViewModelBase`: Avalonia's XAML compiler infers a compiled-binding type from an
+    /// ObservableCollection's generic parameter, and a strongly-typed ViewModelBase would make
+    /// the header ItemTemplate's Title/HighlightBrush bindings fail to compile (ViewModelBase
+    /// itself has neither) — `object` forces reflection-based binding instead, which is exactly
+    /// what lets GlobalWhispersTabViewModel duck-type those same two property names and render
+    /// in the same header template as a real BotTabViewModel. Kept in sync with Bots wherever it
+    /// changes (constructor, AddBot, RemoveBot) — no separate CollectionChanged bridging needed
+    /// since Bots itself is never reordered after add.
+    /// </summary>
+    public ObservableCollection<object> TopLevelTabs { get; } = [];
+
+    /// <summary>
+    /// Every bot's WhisperThreads merged into one most-recently-active-first list, for the
+    /// top-level Whispers tab that spans all connected bots — see WireGlobalWhispers. Each
+    /// thread is the exact same instance its own bot's per-bot Whispers tab shows (via
+    /// WhisperThreadViewModel.Owner), so replying/marking read from either place stays in sync.
+    /// </summary>
+    public ObservableCollection<WhisperThreadViewModel> GlobalWhisperThreads { get; } = [];
+
+    [ObservableProperty]
+    public partial WhisperThreadViewModel? SelectedGlobalWhisperThread { get; set; }
+
+    partial void OnSelectedGlobalWhisperThreadChanged(WhisperThreadViewModel? value) => value?.MarkRead();
+
+    /// <summary>
+    /// Icon lookup has no per-bot concept — IconOverrideStore is one shared
+    /// folder, and IconSetStore.ApplySet swaps its contents wholesale. Since
+    /// each bot can now name its own preferred set (BotConfig.IconSetName),
+    /// the closest approximation to "per-bot" without threading a set name
+    /// through every icon lookup call site is re-applying the newly-selected
+    /// bot's set whenever the tab selection changes — icons are then correct
+    /// for whichever bot you're actually looking at, even though two tabs
+    /// can't render different sets *simultaneously*.
+    /// </summary>
+    partial void OnSelectedBotChanged(BotTabViewModel? value)
+    {
+        if (!string.IsNullOrEmpty(value?.Config.IconSetName))
+        {
+            IconSetStore.ApplySet(value.Config.IconSetName);
+        }
+    }
+
+    /// <summary>
     /// True once at least one configured bot has ClanFeatureEnabled on — the
     /// top-level "Clan" menu binds its IsVisible to this so it disappears
     /// entirely rather than offering clan management nobody's turned on.
@@ -26,13 +74,20 @@ public partial class MainWindowViewModel : ViewModelBase
     [ObservableProperty]
     public partial bool AnyBotHasClanEnabled { get; set; }
 
+    private readonly GlobalWhispersTabViewModel _whispersTab;
+
     public MainWindowViewModel()
     {
+        _whispersTab = new GlobalWhispersTabViewModel(this);
+
         foreach (var config in _store.Load())
         {
-            Bots.Add(new BotTabViewModel(new BotEngine(config)));
+            var tab = CreateBotTab(config);
+            Bots.Add(tab);
+            WireGlobalWhispers(tab);
         }
 
+        RefreshTopLevelTabs();
         SelectedBot = Bots.Count > 0 ? Bots[0] : null;
         RefreshAnyBotHasClanEnabled();
         _ = AutoConnectStartupBotsAsync();
@@ -43,6 +98,78 @@ public partial class MainWindowViewModel : ViewModelBase
     }
 
     private void RefreshAnyBotHasClanEnabled() => AnyBotHasClanEnabled = Bots.Any(b => b.Config.ClanFeatureEnabled);
+
+    /// <summary>
+    /// Rebuilds TopLevelTabs from Bots' current BotConfig.TabGroup values — the Whispers
+    /// pseudo-tab first, then every ungrouped bot as its own tab, then one BotGroupTabViewModel
+    /// per distinct non-empty TabGroup. Deliberately NOT tied to every SaveAll() (that fires
+    /// routinely from unrelated background activity, e.g. an SC2 channel join persisting
+    /// Sc2LastChannelNames — rebuilding the tab strip that often would reset selection/scroll
+    /// state for no reason); called explicitly instead from the few places TabGroup can actually
+    /// change: startup, AddBot, RemoveBot, and after the Config window closes with changes.
+    /// </summary>
+    public void RefreshTopLevelTabs()
+    {
+        TopLevelTabs.Clear();
+        TopLevelTabs.Add(_whispersTab);
+
+        foreach (var bot in Bots.Where(b => string.IsNullOrEmpty(b.Config.TabGroup)))
+        {
+            TopLevelTabs.Add(bot);
+        }
+
+        foreach (var group in Bots.Where(b => !string.IsNullOrEmpty(b.Config.TabGroup))
+                     .GroupBy(b => b.Config.TabGroup)
+                     .OrderBy(g => g.Key, StringComparer.OrdinalIgnoreCase))
+        {
+            var groupTab = new BotGroupTabViewModel(group.Key, group);
+            // A click on one of this group's own nested sub-tabs changes SelectedBot here
+            // without the outer TabControl's SelectionChanged ever firing — recompute so that
+            // bot's IsActive/HasUnread reflect it too, but only when this group is actually the
+            // visible top-level tab right now (RecomputeActiveBot itself checks that).
+            groupTab.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(BotGroupTabViewModel.SelectedBot))
+                {
+                    RecomputeActiveBot();
+                }
+            };
+            TopLevelTabs.Add(groupTab);
+        }
+
+        RecomputeActiveBot();
+    }
+
+    private object? _selectedTopLevelItem;
+
+    /// <summary>Called by MainWindow.axaml.cs whenever the top-level TabControl's selection changes — records which item is showing and recomputes which bot (if any) is actually visible.</summary>
+    public void SetActiveTopLevelItem(object? item)
+    {
+        _selectedTopLevelItem = item;
+        RecomputeActiveBot();
+    }
+
+    /// <summary>
+    /// "Active" (IsActive/HasUnread-clearing) means genuinely visible right now — for a plain
+    /// bot tab that's just itself; for a group tab, it's whichever bot the group's own nested
+    /// TabControl currently has selected, not the group as a whole. Re-run whenever either
+    /// selection level changes (see SetActiveTopLevelItem and the groupTab.PropertyChanged
+    /// subscription above) so both stay in sync with what's actually on screen.
+    /// </summary>
+    private void RecomputeActiveBot()
+    {
+        var active = _selectedTopLevelItem switch
+        {
+            BotTabViewModel bot => bot,
+            BotGroupTabViewModel group => group.SelectedBot,
+            _ => null,
+        };
+
+        foreach (var bot in Bots)
+        {
+            bot.IsActive = bot == active;
+        }
+    }
 
     /// <summary>
     /// Connects every bot with AutoConnectOnStartup, staggered a couple
@@ -59,10 +186,20 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Wires BotEngine.ConfigPersistNeeded (see its own remarks) to SaveAll, so a config mutation the engine makes on its own — currently just auto-assigning a Battle.net credential profile on first SC2 connect — reaches bots.json rather than only living in memory.</summary>
+    private BotTabViewModel CreateBotTab(BotConfig config)
+    {
+        var engine = new BotEngine(config);
+        engine.ConfigPersistNeeded += SaveAll;
+        return new BotTabViewModel(engine);
+    }
+
     public void AddBot(BotConfig config)
     {
-        var tab = new BotTabViewModel(new BotEngine(config));
+        var tab = CreateBotTab(config);
         Bots.Add(tab);
+        WireGlobalWhispers(tab);
+        RefreshTopLevelTabs();
         SelectedBot = tab;
         SaveAll();
     }
@@ -70,14 +207,80 @@ public partial class MainWindowViewModel : ViewModelBase
     public async void RemoveBot(BotTabViewModel tab)
     {
         Bots.Remove(tab);
+        // A straight TopLevelTabs.Remove(tab) wouldn't reach a grouped bot at all — it isn't a
+        // direct member of TopLevelTabs, it's nested inside its BotGroupTabViewModel.Bots — so
+        // this rebuilds instead, correctly dropping it whether it was grouped or not.
+        RefreshTopLevelTabs();
         if (SelectedBot == tab)
         {
             SelectedBot = Bots.Count > 0 ? Bots[0] : null;
         }
 
+        UnwireGlobalWhispers(tab);
+        tab.Engine.ConfigPersistNeeded -= SaveAll;
         await tab.DisposeAsync();
         SaveAll();
     }
+
+    /// <summary>
+    /// Mirrors one bot's WhisperThreads into GlobalWhisperThreads: a new thread is inserted at
+    /// the top (matches per-bot ordering, most-recently-active-first), and a Move — fired by
+    /// UpsertWhisper bumping an existing thread back to the top on new activity — mirrors the
+    /// same reordering here, so the global tab's ordering stays "most recently active across
+    /// every bot" too, not just within each bot's own list.
+    /// </summary>
+    private void WireGlobalWhispers(BotTabViewModel bot)
+    {
+        foreach (var thread in bot.WhisperThreads)
+        {
+            GlobalWhisperThreads.Insert(0, thread);
+        }
+
+        bot.WhisperThreads.CollectionChanged += OnBotWhisperThreadsChanged;
+    }
+
+    private void UnwireGlobalWhispers(BotTabViewModel bot)
+    {
+        bot.WhisperThreads.CollectionChanged -= OnBotWhisperThreadsChanged;
+        foreach (var thread in bot.WhisperThreads)
+        {
+            GlobalWhisperThreads.Remove(thread);
+        }
+    }
+
+    private void OnBotWhisperThreadsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        switch (e.Action)
+        {
+            case NotifyCollectionChangedAction.Add when e.NewItems is not null:
+                foreach (WhisperThreadViewModel thread in e.NewItems)
+                {
+                    GlobalWhisperThreads.Insert(0, thread);
+                }
+
+                break;
+
+            case NotifyCollectionChangedAction.Move when e.NewItems is not null:
+                foreach (WhisperThreadViewModel thread in e.NewItems)
+                {
+                    var index = GlobalWhisperThreads.IndexOf(thread);
+                    if (index > 0)
+                    {
+                        GlobalWhisperThreads.Move(index, 0);
+                    }
+                }
+
+                break;
+
+            case NotifyCollectionChangedAction.Remove when e.OldItems is not null:
+                foreach (WhisperThreadViewModel thread in e.OldItems)
+                {
+                    GlobalWhisperThreads.Remove(thread);
+                }
+
+                break;
+        }
+    });
 
     public void SaveAll()
     {

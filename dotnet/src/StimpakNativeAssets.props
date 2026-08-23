@@ -1,0 +1,43 @@
+<Project>
+  <!--
+    Stimpak.csproj's own native-library copy target flattens everything to the
+    output root, which on a case-insensitive filesystem (Windows) collides
+    with its own managed Stimpak.dll assembly — only one survives the copy,
+    silently dropping the native library. Placed in the standard
+    runtimes/<rid>/native/ layout instead, which .NET's native-library
+    resolver also probes, and which can't collide with the managed assembly
+    sitting in the output root. Globs (not literal paths) so a platform
+    that hasn't had `native/build.sh` run for it yet simply contributes
+    nothing rather than breaking the build.
+
+    Import this from any project whose own output directory needs to
+    successfully P/Invoke into Stimpak at runtime — not just Invigoration.App,
+    but also e.g. Invigoration.Core.Tests, since some of its tests construct a
+    real StimpakClient (see BotEngineSc2ChannelStateTests.cs).
+  -->
+  <PropertyGroup>
+    <StimpakNativeReleaseDir>$(MSBuildThisFileDirectory)..\..\native\superiority\target\release\</StimpakNativeReleaseDir>
+  </PropertyGroup>
+  <ItemGroup>
+    <None Include="$(StimpakNativeReleaseDir)stimpak.dll" Condition="Exists('$(StimpakNativeReleaseDir)stimpak.dll')">
+      <Link>runtimes\win-x64\native\stimpak.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(StimpakNativeReleaseDir)libstimpak.dylib" Condition="Exists('$(StimpakNativeReleaseDir)libstimpak.dylib') And '$(RuntimeIdentifier)' == 'osx-arm64'">
+      <Link>runtimes\osx-arm64\native\libstimpak.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(StimpakNativeReleaseDir)libstimpak.dylib" Condition="Exists('$(StimpakNativeReleaseDir)libstimpak.dylib') And '$(RuntimeIdentifier)' == 'osx-x64'">
+      <Link>runtimes\osx-x64\native\libstimpak.dylib</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+    <None Include="$(StimpakNativeReleaseDir)libstimpak.so" Condition="Exists('$(StimpakNativeReleaseDir)libstimpak.so')">
+      <Link>runtimes\linux-x64\native\libstimpak.so</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <Visible>false</Visible>
+    </None>
+  </ItemGroup>
+</Project>

@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -28,7 +29,8 @@ public partial class ConfigViewModel : ObservableObject
             .OrderBy(p => p.DisplayName)
             .Concat(
             [
-                new ProductOption("SC2", "StarCraft II (coming soon)", null, IsSelectable: false),
+                new ProductOption(BncsProduct.Chat, "Chat / Telnet (no game, PVPGN only)", GameIconLoader.Get("chat")),
+                new ProductOption(BncsProduct.Sc2, "StarCraft II", GameIconLoader.Get("sc2")),
                 new ProductOption("SCRM", "StarCraft: Remastered (coming soon)", null, IsSelectable: false),
             ])
             .ToList();
@@ -39,36 +41,69 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(AllowsOfficialServers))]
     [NotifyPropertyChangedFor(nameof(ServerCompatibilityNote))]
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
+    [NotifyPropertyChangedFor(nameof(IsChatProtocol))]
+    [NotifyPropertyChangedFor(nameof(IsSc2Product))]
     public partial string Product { get; set; }
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(AllowsOfficialServers))]
-    [NotifyPropertyChangedFor(nameof(IsBncsBinary))]
-    [NotifyPropertyChangedFor(nameof(IsTelnetGateway))]
-    public partial ConnectionMode ConnectionMode { get; set; }
+    /// <summary>True when "Chat / Telnet" is the selected Game entry — hides the BNLS section (unused in that mode: no BNLS/CD-key/version-check at all, just a username/password prompt) and shows an explanatory note. Selecting this Product is the only way to turn on Config.ConnectionMode.Chat; see OnProductChanged.</summary>
+    public bool IsChatProtocol => Product == BncsProduct.Chat;
 
-    public bool IsBncsBinary
+    public bool IsSc2Product => Product == BncsProduct.Sc2;
+
+    // --- StarCraft II login: which saved Battle.net login (see "Manage Battle.net
+    // Profiles..." under the Customize menu) this bot uses. The actual sign-in itself
+    // happens through Stimpak's own native window on first real connect (or from the
+    // Manage Battle.net Profiles window's "Sign In..." action) — picking a profile here
+    // just says which cached session to use, sharing one across bots is exactly the point. ---
+
+    /// <summary>Sentinel row appended to AvailableProfiles — picking it reveals the inline "name, then Create" mini-form rather than immediately assigning a profile.</summary>
+    private static readonly BattlenetCredentialProfile NewProfileSentinel = new() { Id = "", Name = "+ New Profile..." };
+
+    public ObservableCollection<BattlenetCredentialProfile> AvailableProfiles { get; } = [];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsCreatingNewProfile))]
+    public partial BattlenetCredentialProfile? SelectedProfile { get; set; }
+
+    public bool IsCreatingNewProfile => ReferenceEquals(SelectedProfile, NewProfileSentinel);
+
+    [ObservableProperty]
+    public partial string NewProfileName { get; set; } = "";
+
+    partial void OnSelectedProfileChanged(BattlenetCredentialProfile? value)
     {
-        get => ConnectionMode == ConnectionMode.BncsBinary;
-        set
+        if (value is null || ReferenceEquals(value, NewProfileSentinel))
         {
-            if (value)
-            {
-                ConnectionMode = ConnectionMode.BncsBinary;
-            }
+            return;
         }
+
+        Config.BattlenetCredentialProfileId = value.Id;
     }
 
-    public bool IsTelnetGateway
+    [RelayCommand]
+    private void CreateProfile()
     {
-        get => ConnectionMode == ConnectionMode.TelnetGateway;
-        set
+        if (string.IsNullOrWhiteSpace(NewProfileName))
         {
-            if (value)
-            {
-                ConnectionMode = ConnectionMode.TelnetGateway;
-            }
+            return;
         }
+
+        var profile = BattlenetCredentialProfileStore.CreateAndSave(NewProfileName);
+        NewProfileName = "";
+        RefreshAvailableProfiles(profile.Id);
+    }
+
+    private void RefreshAvailableProfiles(string? preferredId = null)
+    {
+        var selectedId = preferredId ?? SelectedProfile?.Id;
+        AvailableProfiles.Clear();
+        foreach (var profile in BattlenetCredentialProfileStore.Profiles)
+        {
+            AvailableProfiles.Add(profile);
+        }
+
+        AvailableProfiles.Add(NewProfileSentinel);
+        SelectedProfile = AvailableProfiles.FirstOrDefault(p => p.Id == selectedId);
     }
 
     // --- Proxy ---
@@ -115,18 +150,17 @@ public partial class ConfigViewModel : ObservableObject
 
     public ObservableCollection<string> ServerSuggestions { get; } = [];
 
-    public bool RequiresExpansionKey => BncsProduct.RequiresExpansionCdKey(Product);
+    public bool RequiresExpansionKey => !IsSc2Product && BncsProduct.RequiresExpansionCdKey(Product);
 
-    public bool RequiresCdKey => BncsProduct.RequiresCdKey(Product);
+    public bool RequiresCdKey => !IsSc2Product && BncsProduct.RequiresCdKey(Product);
 
-    public bool AllowsOfficialServers =>
-        ConnectionMode == ConnectionMode.BncsBinary &&
-        BncsProduct.GetServerCompatibility(Product) == ServerCompatibility.Both;
+    public bool AllowsOfficialServers => BncsProduct.GetServerCompatibility(Product) == ServerCompatibility.Both;
 
     public string? ServerCompatibilityNote =>
         BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.Notes : null;
 
     public Bitmap? ProductIconImage => GameIconLoader.Get(
+        IsSc2Product ? "sc2" :
         BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.IconKey : ChatIcon.GetProductIconKey(Product));
 
     // --- Official server picker (4 fixed choices + "Other...") ---
@@ -139,6 +173,20 @@ public partial class ConfigViewModel : ObservableObject
     public partial string SelectedOfficialServer { get; set; }
 
     public bool IsOtherServerSelected => SelectedOfficialServer == OtherServerOption;
+
+    /// <summary>
+    /// Mirrors Config.BattlenetServer as its own observable VM property (same
+    /// reason as ProxyEnabled below) — both custom-server AutoCompleteBoxes
+    /// bind here instead of straight to Config.BattlenetServer, so setting a
+    /// server from code (see OnBattlenetServerChanged's default-home-channel
+    /// lookup) can also push HomeChannel out to its own bound TextBox.
+    /// </summary>
+    [ObservableProperty]
+    public partial string BattlenetServer { get; set; }
+
+    /// <summary>Mirrors Config.HomeChannel — needs to be observable so setting it from code (a per-server default, see OnBattlenetServerChanged) actually updates the bound TextBox, not just the underlying Config.</summary>
+    [ObservableProperty]
+    public partial string HomeChannel { get; set; }
 
     // --- Chat color scheme ---
 
@@ -157,15 +205,22 @@ public partial class ConfigViewModel : ObservableObject
 
     public bool IsCustomScheme => ColorScheme == ChatColorScheme.Custom;
 
-    public ObservableCollection<CustomColorSlotViewModel> CustomColorSlots { get; }
-
     [ObservableProperty]
     public partial string CustomSchemeName { get; set; }
 
+    /// <summary>Which named schemes from the shared library ("Manage Colors" under the Customize menu) this bot can pick from when ColorScheme is Custom — editing them happens there now, not here.</summary>
     public ObservableCollection<LibrarySchemeOption> LibrarySchemes { get; } = [];
 
     [ObservableProperty]
     public partial LibrarySchemeOption? SelectedLibraryScheme { get; set; }
+
+    private const string DefaultIconSetLabel = "Default (bundled icons)";
+
+    /// <summary>Which saved IconSetStore set this bot uses — DefaultIconSetLabel (maps to Config.IconSetName = "") plus every set editable/creatable from "Manage Icons..." under the Customize menu.</summary>
+    public ObservableCollection<string> AvailableIconSets { get; } = [];
+
+    [ObservableProperty]
+    public partial string IconSetName { get; set; }
 
     public IReadOnlyList<PaletteSwatch> PaletteSwatches
     {
@@ -196,37 +251,20 @@ public partial class ConfigViewModel : ObservableObject
     {
         Config = config;
         Product = config.Product;
-        ConnectionMode = config.ConnectionMode;
         ProxyEnabled = config.ProxyEnabled;
         ProxyProtocol = config.ProxyProtocol;
         SelectedOfficialServer = BncsProduct.OfficialBattlenetServers.Contains(config.BattlenetServer)
             ? config.BattlenetServer
             : OtherServerOption;
+        BattlenetServer = config.BattlenetServer;
+        HomeChannel = config.HomeChannel;
         ColorScheme = config.ChatColorScheme;
-        var c = config.CustomColors;
-        CustomColorSlots = new ObservableCollection<CustomColorSlotViewModel>
-        {
-            new("Background", () => c.Background, v => c.Background = v, RefreshPaletteSwatches),
-            new("Talk (default text)", () => c.White, v => c.White = v, RefreshPaletteSwatches),
-            new("Channel joined", () => c.Channel, v => c.Channel = v, RefreshPaletteSwatches),
-            new("Info / status", () => c.Info, v => c.Info = v, RefreshPaletteSwatches),
-            new("Error / warning", () => c.Error, v => c.Error = v, RefreshPaletteSwatches),
-            new("Debug", () => c.Debug, v => c.Debug = v, RefreshPaletteSwatches),
-            new("Join / leave", () => c.Gray, v => c.Gray = v, RefreshPaletteSwatches),
-            new("Your own name", () => c.SelfUserName, v => c.SelfUserName = v, RefreshPaletteSwatches),
-            new("Whisper / ignored", () => c.Whisper, v => c.Whisper = v, RefreshPaletteSwatches),
-            new("Highlight (active tab)", () => c.Highlight, v => c.Highlight = v, RefreshPaletteSwatches),
-            new("Ignored user's name", () => c.Red, v => c.Red = v, RefreshPaletteSwatches),
-            new("Bnet-rep name/chat", () => c.Green, v => c.Green = v, RefreshPaletteSwatches),
-            new("Blizzard-rep name/chat", () => c.Cyan, v => c.Cyan = v, RefreshPaletteSwatches),
-            new("Speaker name/chat", () => c.Speaker, v => c.Speaker = v, RefreshPaletteSwatches),
-            new("Guest name/chat", () => c.Guest, v => c.Guest = v, RefreshPaletteSwatches),
-            new("Default username", () => c.UserNameDefault, v => c.UserNameDefault = v, RefreshPaletteSwatches),
-            new("Default emote", () => c.EmoteDefault, v => c.EmoteDefault = v, RefreshPaletteSwatches),
-        };
         CustomSchemeName = config.CustomColorSchemeName;
+        IconSetName = string.IsNullOrEmpty(config.IconSetName) ? DefaultIconSetLabel : config.IconSetName;
         RefreshServerSuggestions();
         RefreshLibrarySchemes();
+        RefreshAvailableIconSets();
+        RefreshAvailableProfiles(config.BattlenetCredentialProfileId);
     }
 
     private void RefreshPaletteSwatches() => OnPropertyChanged(nameof(PaletteSwatches));
@@ -267,11 +305,6 @@ public partial class ConfigViewModel : ObservableObject
         dst.EmoteDefault = src.EmoteDefault;
 
         ColorScheme = ChatColorScheme.Custom;
-        foreach (var slot in CustomColorSlots)
-        {
-            slot.Refresh();
-        }
-
         RefreshPaletteSwatches();
     }
 
@@ -286,31 +319,29 @@ public partial class ConfigViewModel : ObservableObject
         ApplyNamedPalette(ColorSchemeLibrary.Load(selected.FilePath));
     }
 
-    [RelayCommand]
-    private void SaveSchemeToLibrary()
+    private void RefreshAvailableIconSets()
     {
-        ColorSchemeLibrary.Save(new NamedCustomPalette { Name = CustomSchemeName, Colors = Config.CustomColors });
-        RefreshLibrarySchemes();
+        var selected = IconSetName;
+        AvailableIconSets.Clear();
+        AvailableIconSets.Add(DefaultIconSetLabel);
+        foreach (var name in IconSetStore.ListSets())
+        {
+            AvailableIconSets.Add(name);
+        }
+
+        IconSetName = AvailableIconSets.Contains(selected) ? selected : DefaultIconSetLabel;
     }
 
-    /// <summary>Loads a scheme file picked from outside the library (e.g. a friend's email attachment), and adds it to the library so it's available going forward too.</summary>
-    public void ImportSchemeFile(string filePath)
-    {
-        var imported = ColorSchemeLibrary.Load(filePath);
-        ColorSchemeLibrary.Save(imported);
-        RefreshLibrarySchemes();
-        ApplyNamedPalette(imported);
-    }
+    partial void OnIconSetNameChanged(string value) =>
+        Config.IconSetName = value == DefaultIconSetLabel ? "" : value;
 
     partial void OnProductChanged(string value)
     {
         Config.Product = value;
-        RefreshServerSuggestions();
-    }
-
-    partial void OnConnectionModeChanged(ConnectionMode value)
-    {
-        Config.ConnectionMode = value;
+        // Selecting "Chat / Telnet" is the only way to turn on Config.ConnectionMode.Chat — there's
+        // no separate connection-protocol picker, since Chat mode isn't tied to any game at all and
+        // just replaces the product choice instead of sitting alongside it.
+        Config.ConnectionMode = value == BncsProduct.Chat ? ConnectionMode.Chat : ConnectionMode.BncsBinary;
         RefreshServerSuggestions();
     }
 
@@ -322,9 +353,21 @@ public partial class ConfigViewModel : ObservableObject
     {
         if (value != OtherServerOption)
         {
-            Config.BattlenetServer = value;
+            BattlenetServer = value;
         }
     }
+
+    /// <summary>Applies a known-good default HomeChannel for specific public servers (currently just atlas.bnetdocs.org → "Town Square") the first time that server's picked — never overwrites a channel the user already typed.</summary>
+    partial void OnBattlenetServerChanged(string value)
+    {
+        Config.BattlenetServer = value;
+        if (string.IsNullOrWhiteSpace(HomeChannel) && BncsProduct.GetDefaultHomeChannel(value) is { } suggested)
+        {
+            HomeChannel = suggested;
+        }
+    }
+
+    partial void OnHomeChannelChanged(string value) => Config.HomeChannel = value;
 
     partial void OnColorSchemeChanged(ChatColorScheme value) => Config.ChatColorScheme = value;
 

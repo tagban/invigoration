@@ -64,7 +64,7 @@ public class SunkenClientIntegrationTests
         var writer = new BitWriter();
         writer.Write(0, 1); // Logon (0 bits) + m_result selector: success
         writer.Write(0, 3); // m_finalRequest: 0 modules
-        writer.Write((uint)30, 32); // m_pingTimeout
+        writer.Write(30u ^ 0x8000_0000u, 32); // m_pingTimeout -- Battlenet::s32 is biased (sign bit flipped), see LogonResponse3Decoder
         writer.Write(0, 1); // m_regulatorRules: absent
         writer.Write(0, 6); // m_givenName: 0 bytes
         writer.WriteBytes([], aligned: true);

@@ -108,4 +108,26 @@ public class BotEngineTriviaToggleTests
         // Stop immediately so the background round loop this started doesn't keep running past the test.
         await InvokeHandleTriviaCommandAsync(engine, "off", "SomeUser", Reply);
     }
+
+    [Fact]
+    public async Task HandleTriviaCommandAsync_All_StartsUnfilteredRound()
+    {
+        var config = new BotConfig { TriviaFeatureEnabled = true };
+        await using var engine = new BotEngine(config);
+        var replies = new List<string>();
+        Task Reply(string text)
+        {
+            replies.Add(text);
+            return Task.CompletedTask;
+        }
+
+        await InvokeHandleTriviaCommandAsync(engine, "all", "SomeUser", Reply);
+
+        Assert.Single(replies);
+        Assert.Contains("started", replies[0], StringComparison.OrdinalIgnoreCase);
+        // Unfiltered, like plain "on" — no "(category)" note in the started message.
+        Assert.DoesNotContain("(", replies[0]);
+
+        await InvokeHandleTriviaCommandAsync(engine, "off", "SomeUser", Reply);
+    }
 }

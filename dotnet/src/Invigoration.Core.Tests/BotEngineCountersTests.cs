@@ -31,7 +31,7 @@ public class BotEngineCountersTests
 
     private static Task InvokeHandleChatEvent(BotEngine engine, byte[] frame)
     {
-        var method = typeof(BotEngine).GetMethod("HandleChatEvent", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var method = typeof(BotEngine).GetMethod("HandleBncsChatEventFrame", BindingFlags.NonPublic | BindingFlags.Instance)!;
         return (Task)method.Invoke(engine, [frame])!;
     }
 

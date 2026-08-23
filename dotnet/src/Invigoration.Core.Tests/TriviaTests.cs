@@ -61,6 +61,46 @@ public class TriviaQuestionParseTests
     {
         Assert.Throws<FormatException>(() => TriviaQuestion.Parse("", "Trivia"));
     }
+
+    [Fact]
+    public void Parse_MultipleChoice_FourChoices()
+    {
+        var q = TriviaQuestion.Parse("MC*Blizzard*Which game has the Secret Cow Level?*Diablo II*StarCraft*Warcraft III*Hearthstone", "ignored");
+
+        Assert.True(q.IsMultipleChoice);
+        Assert.Equal("Blizzard", q.Category);
+        Assert.Equal("Which game has the Secret Cow Level?", q.QuestionText);
+        Assert.Equal(4, q.Choices.Count);
+        Assert.Contains(q.Choices, c => c.Text == "Diablo II");
+        Assert.Contains(q.Choices, c => c.Text == "StarCraft");
+        Assert.Contains(q.Choices, c => c.Text == "Warcraft III");
+        Assert.Contains(q.Choices, c => c.Text == "Hearthstone");
+        // Letters are exactly A/B/C/D for a 4-choice question, assigned by shuffled position.
+        Assert.Equal(['A', 'B', 'C', 'D'], q.Choices.Select(c => c.Letter).OrderBy(l => l));
+    }
+
+    [Fact]
+    public void Parse_MultipleChoice_MinimumTwoChoices()
+    {
+        var q = TriviaQuestion.Parse("MC*Diablo*What class of enemy is Diablo?*Demon*Undead", "ignored");
+
+        Assert.True(q.IsMultipleChoice);
+        Assert.Equal(2, q.Choices.Count);
+        Assert.Equal(['A', 'B'], q.Choices.Select(c => c.Letter).OrderBy(l => l));
+    }
+
+    [Fact]
+    public void Parse_MultipleChoice_TooFewFields_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() => TriviaQuestion.Parse("MC*Category*Question*OnlyCorrectAnswer", "ignored"));
+    }
+
+    [Fact]
+    public void Parse_MultipleChoice_TooManyChoices_ThrowsFormatException()
+    {
+        Assert.Throws<FormatException>(() =>
+            TriviaQuestion.Parse("MC*Category*Question*Correct*Wrong1*Wrong2*Wrong3*Wrong4", "ignored"));
+    }
 }
 
 public class TriviaQuestionMatchTests
@@ -110,6 +150,42 @@ public class TriviaQuestionMatchTests
         Assert.True(hidden1 >= hidden2);
         Assert.Equal(q.Hint0.Length, q.Hint1.Length);
         Assert.Equal(q.Hint1.Length, q.Hint2.Length);
+    }
+
+    [Fact]
+    public void TryMatchAnswer_MultipleChoice_AcceptsEitherLetterOrFullText()
+    {
+        var q = TriviaQuestion.Parse("MC*Diablo*What class of enemy is Diablo?*Demon*Undead", "ignored");
+        var correctLetter = q.Choices.First(c => c.Text == "Demon").Letter;
+
+        Assert.True(q.TryMatchAnswer("Demon", out var byText));
+        Assert.Equal("Demon", byText);
+
+        Assert.True(q.TryMatchAnswer(correctLetter.ToString(), out var byLetter));
+        Assert.Equal(correctLetter.ToString(), byLetter);
+
+        Assert.False(q.TryMatchAnswer("Undead", out _)); // the wrong option's own text should never match
+    }
+
+    [Fact]
+    public void CreateMultipleChoice_CorrectAnswerIsNotAlwaysTheFirstLetter()
+    {
+        // Shuffling is random, so run it enough times that landing on "A"
+        // every single time would be implausible (1-in-4^N) if the shuffle
+        // were actually broken/no-op.
+        var everAssignedNonA = false;
+        for (var i = 0; i < 30; i++)
+        {
+            var q = TriviaQuestion.CreateMultipleChoice("cat", "q", "Correct", ["Wrong1", "Wrong2", "Wrong3"]);
+            var correctLetter = q.Choices.First(c => c.Text == "Correct").Letter;
+            if (correctLetter != 'A')
+            {
+                everAssignedNonA = true;
+                break;
+            }
+        }
+
+        Assert.True(everAssignedNonA, "Correct answer landed on 'A' in all 30 attempts — shuffle looks broken.");
     }
 }
 

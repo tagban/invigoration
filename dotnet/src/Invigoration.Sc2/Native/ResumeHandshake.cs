@@ -20,6 +20,22 @@ namespace Invigoration.Sc2.Native;
 /// reflective schema codec rather than a hand-rolled bit writer, so there is
 /// no golden hex vector to test against here — these are schema-derived,
 /// cross-referenced between two sources, not independently vector-verified.
+///
+/// Two fields' length/value prefixes are *biased*, not raw: BSN's generic
+/// integer codec (core/src/bsn/codec.rs's read_range/write_range) always
+/// stores `wire = value - range.minimum` in `range.bit_width` bits, not
+/// `value` itself. For most fields here `minimum` is 0 so this is invisible,
+/// but core/src/native/schema/wire.rs's static type table gives
+/// Battlenet::Account::Mail (m_account) `IntegerRange { bit_width: 9,
+/// minimum: 3, maximum: 320 }` and Battlenet::GameAccount::Name
+/// (m_gameAccountName) `IntegerRange { bit_width: 5, minimum: 1, maximum: 32
+/// }` — both non-zero. Writing the raw byte count instead of `count -
+/// minimum` (as this file did until the Boom(6)-rejection bug was root-
+/// caused against that reference) desyncs every bit after it in the record,
+/// which upstream's server answers by tearing down the connection with a
+/// Connection/Boom record. <see cref="LogonResponse3Decoder"/> already knew
+/// about the GameAccount::Name bias on the decode side (see its "biased +1"
+/// comment) — this file's own encoder just never matched it.
 /// </summary>
 public static class ResumeHandshake
 {
@@ -73,9 +89,11 @@ public static class ResumeHandshake
         var writer = new BitWriter();
         RoutingHeader.Encode(writer, AuthResumeCommand, AuthenticationSlot);
         WriteRequestCommon(writer);
-        WriteBlob(writer, accountBytes, lengthBits: 9);
+        // Account::Mail: IntegerRange { bit_width: 9, minimum: 3, maximum: 320 } -- biased -3.
+        WriteBlob(writer, accountBytes, lengthBits: 9, minimum: 3);
         writer.Write(gameAccountRegion, 8);
-        WriteBlob(writer, gameAccountNameBytes, lengthBits: 5);
+        // GameAccount::Name: IntegerRange { bit_width: 5, minimum: 1, maximum: 32 } -- biased -1.
+        WriteBlob(writer, gameAccountNameBytes, lengthBits: 5, minimum: 1);
         writer.Align();
         return writer.ToBytes();
     }
@@ -222,7 +240,7 @@ public static class ResumeHandshake
             finalRequests.Add(DecodeModuleInput(reader));
         }
 
-        var pingTimeoutSeconds = unchecked((int)reader.Read(32));
+        var pingTimeoutSeconds = ReadS32(reader);
 
         var regulatorRules = reader.Read(1) != 0 ? DecodeRegulatorInfo(reader) : null;
 
@@ -249,7 +267,7 @@ public static class ResumeHandshake
         ResumeFailureReason reason = reasonSelector switch
         {
             0 => new ResumeFailureReason.Update(),
-            1 => new ResumeFailureReason.Failed((ushort)reader.Read(16), unchecked((int)reader.Read(32))),
+            1 => new ResumeFailureReason.Failed((ushort)reader.Read(16), ReadS32(reader)),
             2 => new ResumeFailureReason.VersionCheckDisconnect(),
             _ => throw new InvalidOperationException("Resume failure reason has an unknown choice."),
         };
@@ -266,6 +284,17 @@ public static class ResumeHandshake
         return new ModuleInput(new ModuleId(usage, identity), data);
     }
 
+    /// <summary>
+    /// Decodes a Battlenet::s32 (core/src/native/schema/wire.rs type 37:
+    /// <c>IntegerRange { bit_width: 32, minimum: -2147483648, maximum:
+    /// 2147483647 }</c>). BSN's codec always computes <c>value = raw +
+    /// minimum</c>; for this type that is NOT the same as reinterpreting the
+    /// raw 32 bits as a two's-complement int (a naive <c>unchecked((int)raw)</c>)
+    /// — since minimum is exactly -2^31, `raw + minimum` mod 2^32 is equal to
+    /// flipping the sign bit before that reinterpretation.
+    /// </summary>
+    private static int ReadS32(BitReader reader) => unchecked((int)(reader.Read(32) ^ 0x8000_0000UL));
+
     private static void WriteRequestCommon(BitWriter writer)
     {
         writer.Write(FourCc.Encode("S2"), 32);
@@ -280,9 +309,10 @@ public static class ResumeHandshake
         }
     }
 
-    private static void WriteBlob(BitWriter writer, byte[] bytes, int lengthBits)
+    /// <summary>Writes a length-prefixed blob whose length field is BSN-biased by <paramref name="minimum"/> (i.e. the wire stores <c>bytes.Length - minimum</c>, per the field's schema range) — see the class remarks for why this matters.</summary>
+    private static void WriteBlob(BitWriter writer, byte[] bytes, int lengthBits, int minimum = 0)
     {
-        writer.Write((ulong)bytes.Length, lengthBits);
+        writer.Write((ulong)(bytes.Length - minimum), lengthBits);
         writer.WriteBytes(bytes, aligned: true);
     }
 }
