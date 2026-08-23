@@ -9,6 +9,7 @@ A complete rewrite of the classic Battle.net bot, brought to the .NET era — 15
 ## Features
 
 - Multi-bot, multi-server: run several bots side-by-side in tabs, each on its own server, game, and account
+- **StarCraft II connectivity** (limited but working) over Blizzard's real modern protocol — login, multi-channel chat, whispers, and friends, plus SC:Remastered/WC3:Reforged support built on the same connection
 - Shared clan roster with configurable ranks — per-rank command access, auto-whisper/auto-kick/auto-ban
 - Trivia across 6 categories (Diablo, Warcraft, StarCraft, Blizzard, Pop Culture, Music), with editable question packs
 - Per-bot custom chat color schemes, plus a full icon manager for game/status icons
@@ -44,6 +45,24 @@ Swap any chat icon for your own image — game icons, status icons, all overrida
   <img src="screenshots/manage-icons.png" width="500" alt="Manage Icons window">
 </p>
 
+### StarCraft II / SC:Remastered / WC3:Reforged
+
+Set a bot's **Product** to StarCraft II (or SC:R/WC3:R, once available) in its Configuration window and Connect — these products log in through Blizzard's modern Battle.net service instead of the classic protocol the rest of this app uses, so a few things work differently:
+
+- **Battle.net credential profiles**: instead of each bot having its own implicit login, a bot picks a named **Battle.net Profile** from a dropdown in its Configuration window. Point two bots at the same profile to share one signed-in login (handy for running an SC2 and a WC3:R bot on the same account); give a bot its own profile for a separate login. Manage profiles — rename, sign in, remove — from **Customize → Manage Battle.net Profiles...**.
+- **Multi-channel chat**: unlike classic Battle.net's single-channel chat, these products can be joined to several channels at once (up to 6). Each joined channel gets its own sub-tab with its own chat log and user list; use the **+** button above the sub-tabs to join another public or private channel, and the **×** on a sub-tab to leave it. The bot remembers which channels it had open and rejoins them on reconnect.
+- Trivia, when running in one of these channels, only accepts answers from that same channel — not from a different one the bot also happens to be in.
+
+### Whisper tabs
+
+Every bot has its own **Whispers** tab, and there's a compact **`/w`** tab at the very top of the window that aggregates whisper conversations across *every* connected bot — click a name in either to read the conversation and reply. You can also right-click a name in a bot's Friends list to pop up a small "Whisper" compose box without leaving the list.
+
+### Bot tab groups
+
+Give two or more bots the same **Tab group** name in their Configuration window (e.g. all the bots on one server) and they collapse into a single top-level tab with their own sub-tabs inside — handy for decluttering the tab strip when you're running a lot of bots at once. Leave it blank to keep a bot as its own individual tab.
+
+A small dot appears on any tab (bot, group, channel, or whisper) that has new activity you haven't looked at yet.
+
 ### Discord Bridge
 
 Relay chat between a Battle.net channel and a Discord channel, in either or both directions, per bot. The bridge connects and disconnects automatically alongside that bot's own Connect/Disconnect — there's no separate Discord button.
@@ -75,12 +94,20 @@ Grab the latest build from the [Releases page](https://github.com/tagban/invigor
 
 ## Building from source
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download).
+Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and, for StarCraft II/SC:R/WC3:R connectivity, a [Rust toolchain](https://rustup.rs) (this repo vendors [ncarrillo/superiority](https://github.com/ncarrillo/superiority) as a git submodule for that).
 
 ```bash
-cd dotnet
-dotnet build Invigoration.slnx
+git clone --recurse-submodules https://github.com/tagban/invigoration.git
+# already cloned without submodules? git submodule update --init --recursive
+
+cd invigoration/native
+./build.sh              # builds the SC2 native library once — needed before the first App build
+
+cd ../dotnet
+dotnet build src/Invigoration.App/Invigoration.App.csproj
 ```
+
+Build `Invigoration.App.csproj` directly, not the `.slnx` — a solution-level build uses a different project-graph traversal that doesn't reliably apply the `AssemblyName` override the native SC2 library needs to avoid colliding with its own managed assembly on a case-insensitive filesystem (Windows).
 
 macOS releases are built, signed with a Developer ID certificate, and notarized via `dotnet/build-macos.sh`. Linux releases are packaged via `dotnet/build-linux.sh`. See those scripts for the full pipeline.
 
