@@ -20,6 +20,15 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Invigoration.Core\Invigoration.Core.csproj" />
+    <!-- Same AssemblyName override Invigoration.Core/App use, and for the same reason: without
+         it, MSBuild treats this project's transitive view of Stimpak.csproj as a separate
+         instance from Core's own (different global properties), rebuilding it with the default
+         (colliding-on-Windows) name — see Invigoration.Core.csproj's comment for the full story. -->
+    <ProjectReference Include="..\..\..\native\superiority\stimpak\csharp\Stimpak\Stimpak.csproj">
+      <AdditionalProperties>StimpakBuildNative=false;AssemblyName=Stimpak.Managed</AdditionalProperties>
+    </ProjectReference>
   </ItemGroup>
+
+  <Import Project="..\StimpakNativeAssets.props" />
 
 </Project>

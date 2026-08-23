@@ -153,23 +153,36 @@ public sealed partial class BotEngine
 
     /// <summary>
     /// Confirmed against bnetdocs's BNLS_CDKEY_EX reply layout: Cookie(DWORD),
-    /// NumberRequested(BYTE), NumberSucceeded(BYTE), BitMask(DWORD), then per
-    /// successful key: ClientSessionKey(DWORD) + CdKeyData(9 DWORDs = 36
-    /// bytes). SID_AUTH_CHECK wants both keys' 36-byte blocks concatenated
-    /// back-to-back. The previous single-key version of this handler (and
-    /// its VB6-derived "big-endian token" quirk) was never exercised against
-    /// a real expansion-product account — worth confirming live.
+    /// NumberRequested(BYTE), NumberSucceeded(BYTE), BitMask(DWORD), then one
+    /// per-key block — ClientSessionKey(DWORD) + CdKeyData(9 DWORDs = 36
+    /// bytes) — for each SUCCESSFULLY encrypted key, i.e. bounded by
+    /// NumberSucceeded, not NumberRequested (an earlier version of this
+    /// handler used NumberRequested as the loop bound, which threw an
+    /// out-of-range read against a real server reply where one of two
+    /// requested keys failed encryption). If fewer keys succeeded than were
+    /// requested, SID_AUTH_CHECK would be sent an incomplete hash and just
+    /// fail confusingly server-side, so bail out here instead with a message
+    /// naming which key(s) BNLS rejected.
     /// </summary>
     private Task HandleCdKeyExReplyAsync(byte[] frame)
     {
         var reader = BnlsConnection.GetPayloadReader(frame);
         reader.Skip(4); // Cookie
         var numberRequested = reader.ReadByte();
-        reader.Skip(1); // Number succeeded
-        reader.Skip(4); // Bit mask
+        var numberSucceeded = reader.ReadByte();
+        var bitMask = reader.ReadDword();
+
+        if (numberSucceeded < numberRequested)
+        {
+            var failedKeys = new List<string>();
+            if ((bitMask & 0x1) == 0) failedKeys.Add("CD key");
+            if (numberRequested > 1 && (bitMask & 0x2) == 0) failedKeys.Add("expansion CD key");
+            LogInfo($"BNLS rejected the {string.Join(" and ", failedKeys)} ({numberSucceeded}/{numberRequested} succeeded) — aborting login. Double-check the key(s) in the bot's config.");
+            return Task.CompletedTask;
+        }
 
         var combinedHash = new List<byte>();
-        for (var i = 0; i < numberRequested; i++)
+        for (var i = 0; i < numberSucceeded; i++)
         {
             var clientSessionKey = reader.ReadDword();
             if (i == 0)
@@ -246,11 +259,36 @@ public sealed partial class BotEngine
         // a minimal 4-byte payload) — not representative of the real format.
         var reader = BnlsConnection.GetPayloadReader(frame);
         reader.Skip(4); // echoed product byte
-        _auth.VersionByte = reader.ReadDword();
+        var bnlsVersionByte = reader.ReadDword();
+
+        if (TryParseVersionByteOverride(Config.VersionByteOverride, out var overrideByte))
+        {
+            LogInfo($"Version byte: overriding BNLS's {bnlsVersionByte} (0x{bnlsVersionByte:X}) with the configured {overrideByte} (0x{overrideByte:X}).");
+            _auth.VersionByte = overrideByte;
+        }
+        else
+        {
+            _auth.VersionByte = bnlsVersionByte;
+        }
 
         _bncs.Close();
         LogInfo($"Battle.net connecting to {Config.BattlenetServer}...");
         await _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, proxy: BuildProxyOptions()).ConfigureAwait(false);
+    }
+
+    /// <summary>"0x"-prefixed hex (e.g. "0x1A") or plain decimal; blank/unparsable is treated as "no override".</summary>
+    private static bool TryParseVersionByteOverride(string text, out uint value)
+    {
+        text = text.Trim();
+        if (text.Length == 0)
+        {
+            value = 0;
+            return false;
+        }
+
+        return text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
+            ? uint.TryParse(text[2..], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out value)
+            : uint.TryParse(text, out value);
     }
 
     private async Task HandleHashDataReplyAsync(byte[] frame)

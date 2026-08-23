@@ -26,7 +26,7 @@ public sealed partial class BotEngine
             BncsPacketId.SID_LOGONREALMEX => HandleLogonRealmExAsync(frame),
             BncsPacketId.SID_ENTERCHAT => HandleEnterChat(frame),
             BncsPacketId.SID_GETCHANNELLIST => HandleGetChannelList(frame),
-            BncsPacketId.SID_CHATEVENT => HandleChatEvent(frame),
+            BncsPacketId.SID_CHATEVENT => HandleBncsChatEventFrame(frame),
             BncsPacketId.SID_NEWS_INFO => HandleNewsInfo(frame),
             BncsPacketId.SID_REQUIREDWORK => HandleRequiredWork(),
             BncsPacketId.SID_CREATEACCOUNT => HandleLegacyCreateAccountReplyAsync(),
@@ -319,13 +319,50 @@ public sealed partial class BotEngine
     /// <summary>Per-engine cache of each user's most recently seen 4-char product code, from ShowUser/Join/UserFlags statstrings — consulted when they later talk, so RecordSeen can stamp LastSeenProduct at the same time as LastSeenUtc.</summary>
     private readonly Dictionary<string, string> _lastKnownProduct = new(StringComparer.OrdinalIgnoreCase);
 
-    private async Task HandleChatEvent(byte[] frame)
-    {
-        var chatEvent = ChatEventParser.Parse(frame);
-        ChatMessage?.Invoke(chatEvent);
+    /// <summary>Per-user rolling window of recent Join/Leave timestamps, for Config.HideJoinLeaveSpamEnabled — see IsJoinLeaveNoisy.</summary>
+    private readonly Dictionary<string, List<DateTime>> _recentJoinLeaveTimestamps = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Parses a raw binary SID_CHATEVENT frame, then hands off to the shared (transport-agnostic) HandleChatEvent below — the Chat-protocol connection feeds the same method from its own line parser (see BotEngine.Chat.cs).</summary>
+    private Task HandleBncsChatEventFrame(byte[] frame) => HandleChatEvent(ChatEventParser.Parse(frame));
+
+    /// <summary>
+    /// A human-readable "where this came from" for a trivia winner announcement — the
+    /// motivating case is a TriviaGroup round spanning several bots/products at once, where
+    /// it's genuinely ambiguous which linked channel (or Discord) a given answer arrived from.
+    /// </summary>
+    private string DescribeChatSource(ChatEvent chatEvent)
+    {
+        if (chatEvent.Origin == ChatEventOrigin.Discord)
+        {
+            return "Discord";
+        }
+
+        if (chatEvent.ChannelIndex is { } idx && _sc2Channels.TryGetValue(idx, out var session))
+        {
+            return $"StarCraft II - {session.Channel.Name}";
+        }
+
+        var channel = string.IsNullOrEmpty(_session.CurrentChannelName) ? "its channel" : _session.CurrentChannelName;
+        return $"{Config.BattlenetServer} - {channel}";
+    }
+
+    private async Task HandleChatEvent(ChatEvent chatEvent)
+    {
+        // Display-only filter: everything below (roster, rank behaviors, counts, trivia,
+        // commands) still runs exactly as normal regardless of this — only whether the
+        // event also gets written to the visible chat log depends on it.
+        var isHiddenJoinLeaveSpam = chatEvent.Type is ChatEventType.Join or ChatEventType.Leave &&
+                                     (Config.SuppressJoinLeaveNotifications ||
+                                      (Config.HideJoinLeaveSpamEnabled && IsJoinLeaveNoisy(chatEvent.Username)));
+        if (!isHiddenJoinLeaveSpam)
+        {
+            ChatMessage?.Invoke(chatEvent);
+        }
+
+        // "[CHAT]" (and similar bracketed tags) is what Chat-protocol-only participants report
+        // instead of a real 4-char BNCS product code — not a product, so don't track it as one.
         if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join or ChatEventType.UserFlags &&
-            chatEvent.Text.Length >= 4)
+            chatEvent.Text.Length >= 4 && chatEvent.Text[0] != '[')
         {
             var product = chatEvent.Text[..4];
             _lastKnownProduct[chatEvent.Username] = product;
@@ -344,6 +381,7 @@ public sealed partial class BotEngine
             _session.BanCount = 0;
             _session.KickCount = 0;
             _session.JoinCount = 0;
+            _session.CurrentChannelName = chatEvent.Text;
         }
 
         if (chatEvent.Type == ChatEventType.Join)
@@ -370,10 +408,15 @@ public sealed partial class BotEngine
             Clan.ClanRosterStore.RecordSeen(chatEvent.Username, defaultRank, product, Config.BattlenetServer);
         }
 
+        // ChannelIndex is null for BNCS/Chat-Telnet (single-channel by protocol, so always a
+        // match) and for a whisper on any product (not channel-scoped). For a Stimpak-backed
+        // (SC2/SC:R/WC3:R) bot, this keeps an answer typed in one joined channel from
+        // resolving a trivia question the bot posed in a different one.
         if (chatEvent.Type == ChatEventType.Talk && _trivia.IsEnabled && !IsBannedUser(chatEvent.Username) &&
+            (chatEvent.ChannelIndex is null || chatEvent.ChannelIndex == _sc2TriviaChannelIndex) &&
             _trivia.TryMatchAnswer(chatEvent.Text, out var matchedAnswer))
         {
-            _trivia.PendingAnswer = (chatEvent.Username, matchedAnswer);
+            _trivia.PendingAnswer = (chatEvent.Username, matchedAnswer, DescribeChatSource(chatEvent));
         }
 
         if (chatEvent.Type is ChatEventType.Talk or ChatEventType.Whisper)
@@ -384,7 +427,8 @@ public sealed partial class BotEngine
                 _session.LastWhisperFromText = chatEvent.Text;
             }
 
-            await HandleCommandAsync(chatEvent.Username, chatEvent.Text, isWhisper: chatEvent.Type == ChatEventType.Whisper)
+            await HandleCommandAsync(
+                chatEvent.Username, chatEvent.Text, isWhisper: chatEvent.Type == ChatEventType.Whisper, chatEvent.ChannelIndex)
                 .ConfigureAwait(false);
         }
 
@@ -392,6 +436,31 @@ public sealed partial class BotEngine
         {
             await RecoverFromChannelDesyncAsync().ConfigureAwait(false);
         }
+    }
+
+    /// <summary>
+    /// True once this user has racked up more than Config.HideJoinLeaveSpamThreshold
+    /// Join/Leave events within the last Config.HideJoinLeaveSpamWindowSeconds —
+    /// records the current event as part of the same check, so this is only
+    /// ever called once per event (not a separate peek-then-record step).
+    /// Self-correcting: once a noisy user's rate drops (their older
+    /// timestamps age out of the window), a later join/leave stops counting
+    /// as noisy again without needing anything to explicitly reset it.
+    /// </summary>
+    private bool IsJoinLeaveNoisy(string username)
+    {
+        var now = DateTime.UtcNow;
+        var window = TimeSpan.FromSeconds(Math.Max(1, Config.HideJoinLeaveSpamWindowSeconds));
+
+        if (!_recentJoinLeaveTimestamps.TryGetValue(username, out var timestamps))
+        {
+            timestamps = [];
+            _recentJoinLeaveTimestamps[username] = timestamps;
+        }
+
+        timestamps.RemoveAll(t => now - t > window);
+        timestamps.Add(now);
+        return timestamps.Count > Math.Max(0, Config.HideJoinLeaveSpamThreshold);
     }
 
     /// <summary>

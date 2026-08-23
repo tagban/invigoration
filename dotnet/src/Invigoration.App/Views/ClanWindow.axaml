@@ -77,7 +77,7 @@
                                     <Grid ColumnDefinitions="Auto,Auto,*" ColumnSpacing="8">
                                         <TextBlock Grid.Column="0" Text="Trivia score:" VerticalAlignment="Center" Opacity="0.8" />
                                         <NumericUpDown Grid.Column="1" Value="{Binding TriviaScore}" Width="110"
-                                                       FormatString="0" Increment="1" />
+                                                       FormatString="0.##" Increment="0.25" />
                                     </Grid>
                                     <TextBlock Text="{Binding LastSeenGameText, StringFormat='Last game: {0}'}"
                                                Opacity="0.7" FontSize="11" />

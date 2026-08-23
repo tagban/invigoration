@@ -33,6 +33,37 @@ public sealed class BotConfig
     [JsonConverter(typeof(ObfuscatedPasswordJsonConverter))]
     public string Password { get; set; } = "";
 
+    // --- StarCraft II (modern Battle.net login, separate from the classic BNCS fields above) ---
+
+    /// <summary>
+    /// Which BattlenetCredentialProfileStore profile this bot's Battle.net
+    /// login comes from — "" means none assigned yet (a bot config predating
+    /// this feature, or one whose assigned profile was since deleted);
+    /// BotEngine.Sc2.cs auto-creates and stamps one in on first connect.
+    /// Sharing the same Id across two bots (e.g. an SC2 bot and a future
+    /// WC3:Reforged bot on the same account) makes them share one signed-in
+    /// session instead of prompting for a separate login each.
+    /// </summary>
+    public string BattlenetCredentialProfileId { get; set; } = "";
+
+    /// <summary>
+    /// Names of the channels joined last time this bot was connected (SC2/SC:R/WC3:R only —
+    /// classic BNCS/Chat-Telnet are single-channel and have nothing to remember here). Replayed
+    /// after connecting so the bot's set of open channels survives a reconnect or app restart;
+    /// the always-auto-joined default channel doesn't need special-casing since replay skips
+    /// any name already joined. Kept in sync automatically as channels are joined/left — not
+    /// meant to be hand-edited.
+    /// </summary>
+    public List<string> Sc2LastChannelNames { get; set; } = new();
+
+    /// <summary>
+    /// Which named group this bot's top-level tab belongs to in MainWindow — "" means
+    /// ungrouped, shown as its own individual tab like before. Purely a display grouping (e.g.
+    /// several bots on the same server), set from the Config window; has no effect on
+    /// connection behavior.
+    /// </summary>
+    public string TabGroup { get; set; } = "";
+
     public string CdKey { get; set; } = "";
 
     /// <summary>
@@ -45,13 +76,24 @@ public sealed class BotConfig
     public string BotMaster { get; set; } = "";
     public string Trigger { get; set; } = "!";
     public bool UseUdp { get; set; }
-    public string Email { get; set; } = "";
-    public PingDisplayMode ShowPing { get; set; } = PingDisplayMode.Bars;
-    public bool JoinNotify { get; set; }
     public string BattlenetServer { get; set; } = "useast.battle.net";
     public int BattlenetPort { get; set; } = 6112;
     public string BnlsServer { get; set; } = "bnls.bnetdocs.org";
     public int BnlsPort { get; set; } = 9367;
+
+    /// <summary>
+    /// Manual override for the version byte BNLS_REQUESTVERSIONBYTE normally
+    /// supplies (see Auth.AuthState.VersionByte) — empty means use whatever
+    /// BNLS returns, which is the normal/default behavior. Since this bot has
+    /// no local hashing to fall back on, BNLS is otherwise the only source
+    /// for this value — some private/PVPGN servers are pinned to an older
+    /// game-client version than BNLS's own database assumes for a product,
+    /// so their SID_AUTH_CHECK rejects the byte BNLS hands back even though
+    /// the CD-key/hash portions are fine. Accepts a "0x"-prefixed hex value
+    /// (e.g. "0x1A") or plain decimal; anything else is treated as unset.
+    /// </summary>
+    public string VersionByteOverride { get; set; } = "";
+
     public string HomeChannel { get; set; } = "";
 
     /// <summary>When true, this bot connects automatically when the app starts, instead of waiting for a manual Connect click.</summary>
@@ -129,6 +171,15 @@ public sealed class BotConfig
     /// </summary>
     public string TriviaGroup { get; set; } = "";
 
+    /// <summary>Points awarded for answering correctly before the first hint is shown (i.e. within the first ~10 seconds). The richest of the three tiers, since no hint was needed.</summary>
+    public double TriviaPointsBeforeFirstHint { get; set; } = 1.25;
+
+    /// <summary>Points awarded for answering correctly after the first hint but before the second (~10-20 seconds in).</summary>
+    public double TriviaPointsAfterFirstHint { get; set; } = 1.0;
+
+    /// <summary>Points awarded for answering correctly after the second hint (~20-30 seconds in, right before time runs out).</summary>
+    public double TriviaPointsAfterSecondHint { get; set; } = 0.75;
+
     /// <summary>
     /// Minimum delay between outgoing chat messages, in milliseconds — shared
     /// process-wide across every bot the user runs, not just this one, since
@@ -141,21 +192,61 @@ public sealed class BotConfig
     /// </summary>
     public int FloodProtectionDelayMs { get; set; } = 2000;
 
+    /// <summary>
+    /// When on, Join/Leave lines never show in this bot's chat log at all — unconditional,
+    /// unlike HideJoinLeaveSpamEnabled below which only hides them once a user's rate crosses a
+    /// threshold. Same "display filter only" guarantee: roster tracking, rank behaviors, and
+    /// JoinCount all still happen exactly as normal underneath.
+    /// </summary>
+    public bool SuppressJoinLeaveNotifications { get; set; }
+
+    /// <summary>
+    /// When on, a user who racks up more than HideJoinLeaveSpamThreshold
+    /// Join/Leave events within a rolling HideJoinLeaveSpamWindowSeconds
+    /// window stops having further Join/Leave lines shown in the chat log
+    /// until they quiet back down (the window ages out) — a flaky connection
+    /// bouncing in and out doesn't spam the log. Purely a display filter:
+    /// roster tracking, rank behaviors (auto-whisper/kick/ban), and
+    /// JoinCount all still happen exactly as normal underneath, nothing
+    /// about the actual event handling changes, only whether that one line
+    /// gets written to the visible chat log. On by default — there's no
+    /// functional downside to filtering pure log noise, so this should just
+    /// work without needing to be found and turned on first.
+    /// </summary>
+    public bool HideJoinLeaveSpamEnabled { get; set; } = true;
+
+    public int HideJoinLeaveSpamThreshold { get; set; } = 3;
+
+    public int HideJoinLeaveSpamWindowSeconds { get; set; } = 60;
+
     /// <summary>4-character BNCS product code, e.g. "VD2D" = Diablo II, "PX2D" = Diablo II: LoD.</summary>
     public string Product { get; set; } = "VD2D";
 
     public string Realm { get; set; } = "";
     public bool ZeroPing { get; set; }
     public bool NegPing { get; set; }
-    public bool ShowBnccIcon { get; set; }
 
     /// <summary>
-    /// Full BNCS binary protocol (needs BNLS for hashing) vs. the plain-text
-    /// chat-gateway/telnet protocol (username + plaintext password only, no
-    /// BNLS/CD-key/version-check at all). Official Battle.net disabled the
-    /// gateway protocol in 2005, so TelnetGateway only works against PVPGN.
+    /// BncsBinary (default): the normal binary game protocol every other
+    /// part of this app assumes. Chat: Battle.net/PVPGN's older plain-text,
+    /// line-based "Chat" connection type (selected by sending byte 0x03
+    /// instead of 0x01 right after connecting) — no BNLS, CD-key, or
+    /// version-check involved at all, just a username/password prompt. Some
+    /// PVPGN networks (e.g. eurobattle.net) still run this alongside the
+    /// binary protocol; official Battle.net does not.
     /// </summary>
     public ConnectionMode ConnectionMode { get; set; } = ConnectionMode.BncsBinary;
+
+    /// <summary>
+    /// Which saved <see cref="Config.IconSetStore"/> set this bot's icons come
+    /// from — "" means the bundled defaults (plus any global overrides set
+    /// via the old single-active-set model). Applied by swapping in that
+    /// set's files as the active <see cref="IconOverrideStore"/> overrides
+    /// whenever this bot's tab becomes selected (see MainWindowViewModel);
+    /// icon lookup itself has no per-bot concept, it's whichever set was
+    /// last swapped in.
+    /// </summary>
+    public string IconSetName { get; set; } = "";
 
     /// <summary>Which named color set this bot's chat log and color codes render with.</summary>
     public ChatColorScheme ChatColorScheme { get; set; } = ChatColorScheme.Invigoration;
@@ -212,7 +303,8 @@ public sealed class DiscordBridgeConfig
 {
     public bool Enabled { get; set; }
 
-    /// <summary>Discord bot token. Secret — stored locally like the BNCS password; never logged or echoed back in chat.</summary>
+    /// <summary>Discord bot token. Obfuscated at rest like Password — see ObfuscatedPasswordJsonConverter. Never logged or echoed back in chat.</summary>
+    [JsonConverter(typeof(ObfuscatedPasswordJsonConverter))]
     public string BotToken { get; set; } = "";
 
     public ulong ChannelId { get; set; }
@@ -225,15 +317,9 @@ public sealed class DiscordBridgeConfig
     public bool RelayDiscordToBattlenet { get; set; } = true;
 }
 
-public enum PingDisplayMode
-{
-    Numeric,
-    Bars,
-    BarsCompact,
-}
-
 public enum ConnectionMode
 {
     BncsBinary,
-    TelnetGateway,
+    Chat,
 }
+

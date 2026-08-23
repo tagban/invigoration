@@ -14,15 +14,16 @@ namespace Invigoration.Sc2.Front;
 /// protocol docs, since the docs describe the sequence narratively rather
 /// than as exact dispatch logic.
 ///
-/// This orchestration layer has NOT been exercised against a live
-/// Battle.net server. Everything it calls into (wire formats, crypto, the
-/// native chat protocol) was independently verified against golden test
-/// vectors; this class could not be, since that requires a live account and
-/// network access this environment doesn't have. Treat it as a first pass
-/// that will likely need iteration once it's actually run.
+/// Live-verified end-to-end against a real Battle.net account on
+/// 2026-08-22: connect → authenticate (including a real browser-driven web
+/// challenge) → GameUtilities.ProcessClientRequest → SunkenClient resume
+/// handshake all completed successfully in one continuous session.
 /// </summary>
 public sealed class FrontClient : IAsyncDisposable
 {
+    /// <summary>Front WebSocket endpoint for the US region — the only region exercised so far. A real client picks this per-account from <see cref="LogonResult.AvailableRegions"/>/<see cref="LogonResult.ConnectedRegion"/>; not implemented yet.</summary>
+    public const string DefaultUsUri = "wss://us.actual.battle.net:1119/";
+
     private const uint ResponseServiceId = 0xfe;
     private const string SubProtocol = "v1.rpc.battle.net";
 

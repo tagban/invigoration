@@ -7,6 +7,8 @@ using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
+using Invigoration.Core.Protocol;
+using Stimpak;
 
 namespace Invigoration.App.ViewModels;
 
@@ -27,11 +29,55 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     public IBrush BackgroundBrush => new SolidColorBrush(
         Color.FromRgb(Engine.Palette.Background.R, Engine.Palette.Background.G, Engine.Palette.Background.B));
 
+    /// <summary>The normal top-level tab header look — see GlobalWhispersTabViewModel's matching properties for why the Whispers pseudo-tab overrides both to stand out as a distinct, fixed utility tab.</summary>
+    public double HeaderFontSize => 13;
+
+    public IBrush HeaderForeground => Brushes.White;
+
+    /// <summary>Whether this bot is the one actually visible right now — set by MainWindowViewModel.RecomputeActiveBot, which accounts for both being the selected top-level tab directly and being the selected member of a selected BotGroupTabViewModel. Setting this true clears HasUnread.</summary>
+    [ObservableProperty]
+    public partial bool IsActive { get; set; }
+
+    partial void OnIsActiveChanged(bool value)
+    {
+        if (value)
+        {
+            HasUnread = false;
+        }
+    }
+
+    /// <summary>A subtle "something happened while you weren't looking" flag for this bot's top-level tab — set on a new Talk/Emote/Broadcast line while !IsActive (see HandleChatEvent and OnChatMessage's multi-channel branch), cleared on becoming active.</summary>
+    [ObservableProperty]
+    public partial bool HasUnread { get; set; }
+
     public ObservableCollection<ChatLineViewModel> ChatLines { get; } = [];
 
     public ObservableCollection<ChannelUserViewModel> ChannelUsers { get; } = [];
 
+    /// <summary>Whether this bot can be joined to several channels at once (SC2/SC:R/WC3:R) — gates the sub-tab UI. Classic BNCS/Chat-Telnet stay on the single flat ChatLines/ChannelUsers above.</summary>
+    public bool SupportsMultiChannel => BncsProduct.IsStimpakBacked(Config.Product);
+
+    /// <summary>One sub-tab per joined SC2/SC:R/WC3:R channel — see SupportsMultiChannel.</summary>
+    public ObservableCollection<ChannelTabViewModel> Channels { get; } = [];
+
+    [ObservableProperty]
+    public partial ChannelTabViewModel? SelectedChannel { get; set; }
+
+    /// <summary>The account's public-channel catalog (for the "join another channel" picker), sent once per SC2 session.</summary>
+    public ObservableCollection<PublicChannel> AvailablePublicChannels { get; } = [];
+
+    [ObservableProperty]
+    public partial string JoinChannelName { get; set; } = "";
+
     public ObservableCollection<FriendEntryViewModel> Friends { get; } = [];
+
+    /// <summary>One entry per peer this bot has whispered with, most-recently-active first — see UpsertWhisper. The only place a whisper's text is shown; it no longer also appears in the normal chat log (see HandleChatEvent's Whisper/WhisperSent cases).</summary>
+    public ObservableCollection<WhisperThreadViewModel> WhisperThreads { get; } = [];
+
+    [ObservableProperty]
+    public partial WhisperThreadViewModel? SelectedWhisperThread { get; set; }
+
+    partial void OnSelectedWhisperThreadChanged(WhisperThreadViewModel? value) => value?.MarkRead();
 
     /// <summary>Read-only snapshot of the shared roster for the Clan tab, filtered to formal members (IsClanMember) only — everyone else the bot has auto-tracked from chatting stays out of this tab, and only shows in the full Seen List window. Edits happen in the dedicated Clan Members window, opened via the "Manage Members..." button there.</summary>
     public ObservableCollection<ClanMemberViewModel> ClanRoster { get; } = [];
@@ -98,6 +144,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             ChannelUsers.Clear();
             Friends.Clear();
         });
+        Engine.Sc2ChannelJoined += OnSc2ChannelJoined;
+        Engine.Sc2ChannelLeft += OnSc2ChannelLeft;
+        Engine.Sc2ChannelJoinRejected += OnSc2ChannelJoinRejected;
+        Engine.Sc2ChannelActionFailed += OnSc2ChannelActionFailed;
+        Engine.Sc2PublicChannelsReceived += OnSc2PublicChannelsReceived;
         IconOverrideStore.OverridesChanged += OnIconOverrideChanged;
         Invigoration.Core.Clan.ClanRosterStore.RosterChanged += OnClanRosterChanged;
         RefreshClanRoster();
@@ -142,10 +193,10 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
 
     /// <summary>
     /// Restores the VB6 original's Form_Load ASCII-art banner - a bunny made
-    /// of parentheses plus "Invigoration Nightly Bunny" in red/green - shown
+    /// of parentheses plus "Invigoration Beta bunny" in red/green - shown
     /// once when a bot tab opens, as a nod to this project's long-running
     /// beta status. Ported from frmMain.frm's AddChat calls; the colored
-    /// "Nightly"/"Bunny" words reuse the same inline color-code marker
+    /// "Beta"/"bunny" words reuse the same inline color-code marker
     /// (U+00A0 + letter) ChatColorFormatter already parses everywhere else.
     /// </summary>
     private void ShowStartupBanner()
@@ -153,7 +204,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         var p = Engine.Palette;
         const string separator = "---------------------------------------------------";
         const char marker = ' ';
-        var bunnyLine = $"Invigoration {marker}rNightly {marker}gBunny";
+        var bunnyLine = $"Invigoration {marker}rBeta {marker}gbunny";
 
         ChatLines.Add(new ChatLineViewModel(separator, p.Highlight));
         ChatLines.Add(new ChatLineViewModel("()()", p.Info));
@@ -197,22 +248,22 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
 
         InputText = "";
 
-        var triggerChar = Config.Trigger.FirstOrDefault();
-        var isTriggered = text.Length > 0 && (text[0] == triggerChar || text[0] == '/');
-
-        if (isTriggered && text.Length > 1 && text[0] == text[1])
+        // Only "/" runs a local command now — the configured Trigger character no longer does
+        // (see BotEngine.Commands.cs), so anything typed locally that starts with it is just
+        // sent as ordinary chat text below, same as any other message. "//" still escapes a
+        // leading slash: sends the rest verbatim as a real chat message instead of intercepting
+        // it as a local command — lets you test another bot's slash command (e.g. "//join foo")
+        // from this bot's own tab as if you were just another channel member.
+        if (text.Length > 0 && text[0] == '/')
         {
-            // Doubling the leading trigger/slash escapes it: sends the rest
-            // verbatim as a real chat message instead of intercepting it as a
-            // local-only command. Lets you test another bot's commands (e.g.
-            // "!!trivia join") from this bot's own tab as if it were just
-            // another channel member, instead of it silently running against
-            // this bot's own (likely idle) engine.
-            await Engine.SendChatCommandAsync(text[1..]);
-        }
-        else if (isTriggered)
-        {
-            await Engine.RunLocalCommandAsync(text);
+            if (text.Length > 1 && text[1] == '/')
+            {
+                await Engine.SendChatCommandAsync(text[1..]);
+            }
+            else
+            {
+                await Engine.RunLocalCommandAsync(text);
+            }
         }
         else
         {
@@ -225,7 +276,151 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     private void OnLog(IReadOnlyList<ChatLogSegment> segments) =>
         Dispatcher.UIThread.Post(() => ChatLines.Add(new ChatLineViewModel(segments)));
 
-    private void OnChatMessage(ChatEvent e) => Dispatcher.UIThread.Post(() => HandleChatEvent(e));
+    private static bool IsUnreadWorthy(ChatEventType type) => type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Broadcast;
+
+    private void OnChatMessage(ChatEvent e) => Dispatcher.UIThread.Post(() =>
+    {
+        if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
+        {
+            var channel = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
+            channel?.HandleChatEvent(e, Engine.Palette);
+            if (IsUnreadWorthy(e.Type))
+            {
+                if (channel is not null && channel != SelectedChannel)
+                {
+                    channel.HasUnread = true;
+                }
+
+                if (!IsActive)
+                {
+                    HasUnread = true;
+                }
+            }
+
+            return;
+        }
+
+        HandleChatEvent(e);
+    });
+
+    private void OnSc2ChannelJoined(byte channelIndex, ChatChannel channel, ObservableCollection<Person> users) =>
+        Dispatcher.UIThread.Post(() =>
+        {
+            // Defensive: a duplicate Joined for an index this UI already has a tab for would
+            // otherwise add a second ChannelTabViewModel with the same ChannelIndex, and every
+            // later lookup-by-index (leave, active-channel tracking) only ever finds the first
+            // match — the second becomes an orphaned, stuck tab with no way to close it.
+            if (Channels.Any(c => c.ChannelIndex == channelIndex))
+            {
+                return;
+            }
+
+            var tab = new ChannelTabViewModel(channelIndex, channel, users);
+            Channels.Add(tab);
+            SelectedChannel ??= tab;
+        });
+
+    private void OnSc2ChannelLeft(byte channelIndex) => Dispatcher.UIThread.Post(() =>
+    {
+        var tab = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
+        if (tab is null)
+        {
+            return;
+        }
+
+        Channels.Remove(tab);
+        if (SelectedChannel == tab)
+        {
+            SelectedChannel = Channels.Count > 0 ? Channels[0] : null;
+        }
+    });
+
+    private void OnSc2ChannelJoinRejected(string reason) => Dispatcher.UIThread.Post(() =>
+        (SelectedChannel?.ChatLines ?? ChatLines).Add(new ChatLineViewModel(reason, Engine.Palette.Error)));
+
+    private void OnSc2ChannelActionFailed(string reason) => Dispatcher.UIThread.Post(() =>
+        (SelectedChannel?.ChatLines ?? ChatLines).Add(new ChatLineViewModel(reason, Engine.Palette.Error)));
+
+    private void OnSc2PublicChannelsReceived(IReadOnlyList<ChatChannel> channels) => Dispatcher.UIThread.Post(() =>
+    {
+        AvailablePublicChannels.Clear();
+        foreach (var channel in channels.OfType<PublicChannel>())
+        {
+            AvailablePublicChannels.Add(channel);
+        }
+    });
+
+    partial void OnSelectedChannelChanged(ChannelTabViewModel? value)
+    {
+        if (value is not null)
+        {
+            Engine.SetActiveSc2Channel(value.ChannelIndex);
+            value.HasUnread = false;
+        }
+    }
+
+    [RelayCommand]
+    private void LeaveChannel(ChannelTabViewModel tab) => Engine.LeaveSc2Channel(tab.ChannelIndex);
+
+    [RelayCommand]
+    private void JoinPublicChannel(PublicChannel channel) => Engine.TryJoinSc2PublicChannel(channel.Id);
+
+    [RelayCommand]
+    private void JoinPrivateChannel()
+    {
+        if (string.IsNullOrWhiteSpace(JoinChannelName))
+        {
+            return;
+        }
+
+        if (Engine.TryJoinSc2PrivateChannel(JoinChannelName))
+        {
+            JoinChannelName = "";
+        }
+    }
+
+    /// <summary>Finds or creates the thread for a peer, appends the message, and bumps it to the top of WhisperThreads (most-recently-active first) — the single entry point both incoming Whisper and outgoing WhisperSent events go through, see HandleChatEvent.</summary>
+    private WhisperThreadViewModel UpsertWhisper(string peer, string text, bool incoming, ChatPalette palette)
+    {
+        var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
+        if (thread is null)
+        {
+            thread = new WhisperThreadViewModel(this, peer);
+            WhisperThreads.Insert(0, thread);
+        }
+        else
+        {
+            var currentIndex = WhisperThreads.IndexOf(thread);
+            if (currentIndex != 0)
+            {
+                WhisperThreads.Move(currentIndex, 0);
+            }
+        }
+
+        var lineText = incoming ? $"{peer}: {text}" : $"You: {text}";
+        thread.Messages.Add(new ChatLineViewModel(lineText, incoming ? palette.Whisper : palette.SelfUserName));
+        thread.LastActivityUtc = DateTime.UtcNow;
+        if (incoming && SelectedWhisperThread != thread)
+        {
+            thread.HasUnread = true;
+        }
+
+        return thread;
+    }
+
+    /// <summary>Sends a whisper thread's DraftText to its peer through this bot's own engine — works for both classic BNCS (server-parsed "/w") and Stimpak-backed products (BotEngine.Sc2.cs intercepts the same "/w " convention and routes it to Stimpak's dedicated whisper API instead).</summary>
+    [RelayCommand]
+    private async Task SendWhisperAsync(WhisperThreadViewModel thread)
+    {
+        var text = thread.DraftText.Trim();
+        if (text.Length == 0)
+        {
+            return;
+        }
+
+        thread.DraftText = "";
+        await Engine.SendChatCommandAsync($"/w {thread.Peer} {text}");
+    }
 
     /// <summary>
     /// Reconciles the Friends collection with the engine's current list by
@@ -267,11 +462,31 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             friend.ProductCode = entry.ProductCode;
             friend.LocationName = entry.LocationName;
         }
+
+        // Online-first, otherwise stable (OrderByDescending doesn't reorder two friends that
+        // are both online, or both offline, relative to each other — so within each group this
+        // keeps the server's own position order from the loop above). Applied as a sequence of
+        // in-place Moves, not a rebuild, for the same selection/scroll-preserving reason the
+        // reconciliation above is structured this way.
+        var sorted = Friends.OrderByDescending(f => f.IsOnline).ToList();
+        for (var i = 0; i < sorted.Count; i++)
+        {
+            var currentIndex = Friends.IndexOf(sorted[i]);
+            if (currentIndex != i)
+            {
+                Friends.Move(currentIndex, i);
+            }
+        }
     });
 
     private void HandleChatEvent(ChatEvent e)
     {
         var palette = Engine.Palette;
+        if (IsUnreadWorthy(e.Type) && !IsActive)
+        {
+            HasUnread = true;
+        }
+
         switch (e.Type)
         {
             case ChatEventType.Channel:
@@ -312,11 +527,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
                 break;
 
             case ChatEventType.Whisper:
-                ChatLines.Add(new ChatLineViewModel($"[{e.Username} whispers]: {e.Text}", palette.Whisper));
+                UpsertWhisper(e.Username, e.Text, incoming: true, palette);
                 break;
 
             case ChatEventType.WhisperSent:
-                ChatLines.Add(new ChatLineViewModel($"[whisper to {e.Username}]: {e.Text}", palette.Whisper));
+                UpsertWhisper(e.Username, e.Text, incoming: false, palette);
                 break;
 
             case ChatEventType.Info:
@@ -362,6 +577,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine.Log -= OnLog;
         Engine.ChatMessage -= OnChatMessage;
         Engine.FriendsListUpdated -= OnFriendsListUpdated;
+        Engine.Sc2ChannelJoined -= OnSc2ChannelJoined;
+        Engine.Sc2ChannelLeft -= OnSc2ChannelLeft;
+        Engine.Sc2ChannelJoinRejected -= OnSc2ChannelJoinRejected;
+        Engine.Sc2ChannelActionFailed -= OnSc2ChannelActionFailed;
+        Engine.Sc2PublicChannelsReceived -= OnSc2PublicChannelsReceived;
         IconOverrideStore.OverridesChanged -= OnIconOverrideChanged;
         Invigoration.Core.Clan.ClanRosterStore.RosterChanged -= OnClanRosterChanged;
         return Engine.DisposeAsync();

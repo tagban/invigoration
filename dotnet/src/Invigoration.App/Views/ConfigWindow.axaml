@@ -3,6 +3,7 @@
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Invigoration.App.ViewModels"
+        xmlns:cfg="using:Invigoration.Core.Config"
         mc:Ignorable="d" d:DesignWidth="680" d:DesignHeight="900"
         x:Class="Invigoration.App.Views.ConfigWindow"
         x:DataType="vm:ConfigViewModel"
@@ -25,6 +26,12 @@
         <StackPanel Margin="16" Spacing="10">
 
             <TextBox PlaceholderText="Display name" Text="{Binding Config.DisplayName}" FontSize="16" />
+
+            <StackPanel Spacing="2">
+                <TextBox PlaceholderText="Tab group (optional)" Text="{Binding Config.TabGroup}" FontSize="12" />
+                <TextBlock Text="Bots sharing the same tab group collapse into one top-level tab, with their own sub-tabs — handy for several bots on the same server. Leave blank to keep this bot as its own tab."
+                           TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+            </StackPanel>
 
             <!-- Game: select the product first; everything else reacts to this -->
             <Expander Header="Game" IsExpanded="True">
@@ -68,52 +75,77 @@
                     </Grid>
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="Only triggers on a disconnect this bot didn't cause itself (clicking Disconnect never auto-reconnects). On official Battle.net, a dropped connection can be the server enforcing an anti-bot check (ExtraWork) this bot doesn't implement — reconnecting won't change that outcome, just retries like a normal client would after losing its connection." />
-                    <StackPanel Orientation="Horizontal" Spacing="16">
-                        <RadioButton GroupName="ConnMode" Content="Standard (BNCS)" IsChecked="{Binding IsBncsBinary}" />
-                        <RadioButton GroupName="ConnMode" Content="Telnet / Chat Gateway (PVPGN only)" IsChecked="{Binding IsTelnetGateway}" />
+
+                    <TextBlock IsVisible="{Binding IsChatProtocol}"
+                               TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
+                               Text="Chat/Telnet is an older plain-text login (no BNLS, CD-key, or version-check — just a username/password prompt) that some PVPGN networks still run alongside the normal protocol, e.g. eurobattle.net. Official Battle.net does not support it." />
+
+                    <StackPanel IsVisible="{Binding !IsSc2Product}" Spacing="8">
+                        <TextBlock Text="Battle.net Server" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
+
+                        <ComboBox ItemsSource="{Binding OfficialServerOptions}"
+                                  SelectedItem="{Binding SelectedOfficialServer}"
+                                  IsVisible="{Binding AllowsOfficialServers}"
+                                  HorizontalAlignment="Stretch" />
+
+                        <AutoCompleteBox ItemsSource="{Binding ServerSuggestions}"
+                                          Text="{Binding BattlenetServer, Mode=TwoWay}"
+                                          PlaceholderText="Pick a suggestion or type any server address"
+                                          FilterMode="StartsWith"
+                                          IsVisible="{Binding !AllowsOfficialServers}" />
+                        <AutoCompleteBox ItemsSource="{Binding ServerSuggestions}"
+                                          Text="{Binding BattlenetServer, Mode=TwoWay}"
+                                          PlaceholderText="Custom server address"
+                                          FilterMode="StartsWith"
+                                          IsVisible="{Binding IsOtherServerSelected}" />
+
+                        <TextBlock Text="Only private/PVPGN servers work for this game — it no longer works on official Battle.net."
+                                   IsVisible="{Binding !AllowsOfficialServers}"
+                                   TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange" />
+
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <TextBox Grid.Column="0" PlaceholderText="Battle.net port" Text="{Binding Config.BattlenetPort}" />
+                            <TextBox Grid.Column="1" PlaceholderText="Realm (D2 only)" Text="{Binding Config.Realm}" />
+                        </Grid>
+
+                        <StackPanel IsVisible="{Binding !IsChatProtocol}" Spacing="8">
+                            <TextBlock Text="BNLS Server (hashing helper — defaults to bnls.bnetdocs.org, change only if it stops working)"
+                                       FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
+                                <TextBox Grid.Column="0" PlaceholderText="BNLS server" Text="{Binding Config.BnlsServer}" />
+                                <TextBox Grid.Column="1" PlaceholderText="Port" Width="90" Text="{Binding Config.BnlsPort}" />
+                            </Grid>
+
+                            <TextBlock Text="Version byte override (advanced — leave blank for normal)"
+                                       FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
+                            <TextBox PlaceholderText="e.g. 0x1A or 26 — blank uses whatever BNLS returns" Text="{Binding Config.VersionByteOverride}" />
+                            <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                                       Text="Only needed against a private/PVPGN server pinned to an older client version than BNLS's database assumes for this product — its version check rejects BNLS's byte even though the CD-key/hash parts are fine. Leave blank unless you actually hit that; the debug log (Debug logging checkbox) shows both BNLS's own value and this override when set, for comparison." />
+                        </StackPanel>
                     </StackPanel>
-                    <TextBlock Text="Both use the same server and port — Telnet just switches to a plain-text login instead of the binary protocol, and only works against PVPGN."
-                               TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
 
-                    <TextBlock Text="Battle.net Server" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
-
-                    <ComboBox ItemsSource="{Binding OfficialServerOptions}"
-                              SelectedItem="{Binding SelectedOfficialServer}"
-                              IsVisible="{Binding AllowsOfficialServers}"
-                              HorizontalAlignment="Stretch" />
-
-                    <AutoCompleteBox ItemsSource="{Binding ServerSuggestions}"
-                                      Text="{Binding Config.BattlenetServer, Mode=TwoWay}"
-                                      PlaceholderText="Pick a suggestion or type any server address"
-                                      FilterMode="StartsWith"
-                                      IsVisible="{Binding !AllowsOfficialServers}" />
-                    <AutoCompleteBox ItemsSource="{Binding ServerSuggestions}"
-                                      Text="{Binding Config.BattlenetServer, Mode=TwoWay}"
-                                      PlaceholderText="Custom server address"
-                                      FilterMode="StartsWith"
-                                      IsVisible="{Binding IsOtherServerSelected}" />
-
-                    <TextBlock Text="Only private/PVPGN servers work for this game — it no longer works on official Battle.net."
-                               IsVisible="{Binding !AllowsOfficialServers}"
-                               TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange" />
-
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                        <TextBox Grid.Column="0" PlaceholderText="Battle.net port" Text="{Binding Config.BattlenetPort}" />
-                        <TextBox Grid.Column="1" PlaceholderText="Realm (D2 only)" Text="{Binding Config.Realm}" />
-                    </Grid>
-
-                    <TextBlock Text="BNLS Server (hashing helper — defaults to bnls.bnetdocs.org, change only if it stops working)"
-                               FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
-                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                        <TextBox Grid.Column="0" PlaceholderText="BNLS server" Text="{Binding Config.BnlsServer}" />
-                        <TextBox Grid.Column="1" PlaceholderText="Port" Width="90" Text="{Binding Config.BnlsPort}" />
-                    </Grid>
+                    <TextBlock IsVisible="{Binding IsSc2Product}"
+                               TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
+                               Text="StarCraft II connects through Battle.net's modern login system instead — no server address, BNLS, or version byte to configure here. Log in under Account below." />
 
                     <TextBlock Text="Flood protection: minimum delay between outgoing messages (ms)"
                                FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
                     <TextBox PlaceholderText="Flood protection delay (ms)" Text="{Binding Config.FloodProtectionDelayMs}" />
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="Every outgoing chat message (including trivia questions/hints/answers) waits at least this long after the previous one before sending, so a fast burst doesn't get the bot disconnected or muted by the server's flood protection. Raise it if you still get flooded off; lower it if your server is more permissive." />
+
+                    <CheckBox Content="Disable join/leave notifications entirely" IsChecked="{Binding Config.SuppressJoinLeaveNotifications}" Margin="0,8,0,0" />
+                    <CheckBox Content="Hide join/leave spam" IsChecked="{Binding Config.HideJoinLeaveSpamEnabled}"
+                              IsVisible="{Binding !Config.SuppressJoinLeaveNotifications}" />
+                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto" ColumnSpacing="8" IsVisible="{Binding Config.HideJoinLeaveSpamEnabled}">
+                        <TextBlock Grid.Column="0" Text="More than" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
+                        <TextBox Grid.Column="1" Width="50" Text="{Binding Config.HideJoinLeaveSpamThreshold}" />
+                        <TextBlock Grid.Column="2" Text="times within (seconds)" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
+                        <TextBox Grid.Column="3" Width="60" Text="{Binding Config.HideJoinLeaveSpamWindowSeconds}" />
+                    </Grid>
+                    <TextBlock IsVisible="{Binding Config.HideJoinLeaveSpamEnabled}"
+                               TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                               Text="Once a user crosses this rate (e.g. a flaky connection bouncing in and out), further join/leave lines for just that user stop showing in the chat log until they quiet back down — everything else (roster tracking, rank behaviors, join count) still happens exactly as normal underneath." />
                 </StackPanel>
             </Expander>
 
@@ -149,20 +181,42 @@
             <!-- Account -->
             <Expander Header="Account" IsExpanded="True">
                 <StackPanel Margin="8" Spacing="8">
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                        <TextBox Grid.Column="0" PlaceholderText="Username" Text="{Binding Config.Username}" />
-                        <TextBox Grid.Column="1" PlaceholderText="Password" Text="{Binding Config.Password}" PasswordChar="*" />
-                    </Grid>
-                    <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsVisible="{Binding RequiresCdKey}">
-                        <TextBox Grid.Column="0" PlaceholderText="CD Key" Text="{Binding Config.CdKey}" />
-                        <TextBox Grid.Column="1" PlaceholderText="Expansion CD Key" Text="{Binding Config.ExpansionCdKey}"
-                                 IsVisible="{Binding RequiresExpansionKey}" />
-                    </Grid>
+                    <!-- StarCraft II: a saved Battle.net login profile instead of username/password/CD-key -->
+                    <StackPanel IsVisible="{Binding IsSc2Product}" Spacing="8">
+                        <TextBlock Text="Battle.net Profile" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                        <ComboBox ItemsSource="{Binding AvailableProfiles}" SelectedItem="{Binding SelectedProfile}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="cfg:BattlenetCredentialProfile">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <StackPanel IsVisible="{Binding IsCreatingNewProfile}" Orientation="Horizontal" Spacing="8">
+                            <TextBox PlaceholderText="Profile name" Text="{Binding NewProfileName}" Width="200" />
+                            <Button Content="Create" Command="{Binding CreateProfileCommand}" />
+                        </StackPanel>
+                        <TextBlock Text="Reuse a profile to share one Battle.net login across multiple bots (e.g. a future WC3:Reforged bot on the same account); pick + New Profile for a separate login. Signing in happens automatically on Connect, or from Customize → Manage Battle.net Profiles..."
+                                   TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+                    </StackPanel>
+
+                    <StackPanel IsVisible="{Binding !IsSc2Product}" Spacing="8">
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
+                            <TextBox Grid.Column="0" PlaceholderText="Username" Text="{Binding Config.Username}" />
+                            <TextBox Grid.Column="1" PlaceholderText="Password" Text="{Binding Config.Password}" PasswordChar="*" />
+                        </Grid>
+                        <Grid ColumnDefinitions="*,*" ColumnSpacing="12" IsVisible="{Binding RequiresCdKey}">
+                            <TextBox Grid.Column="0" PlaceholderText="CD Key" Text="{Binding Config.CdKey}" />
+                            <TextBox Grid.Column="1" PlaceholderText="Expansion CD Key" Text="{Binding Config.ExpansionCdKey}"
+                                     IsVisible="{Binding RequiresExpansionKey}" />
+                        </Grid>
+                    </StackPanel>
+
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
                         <TextBox Grid.Column="0" PlaceholderText="Bot Master (always has full command access)" Text="{Binding Config.BotMaster}" />
                         <TextBox Grid.Column="1" PlaceholderText="Trigger" Width="70" MaxLength="1" Text="{Binding Config.Trigger}" />
                     </Grid>
-                    <TextBox PlaceholderText="Home channel" Text="{Binding Config.HomeChannel}" />
+                    <TextBox PlaceholderText="Home channel" Text="{Binding HomeChannel}" IsVisible="{Binding !IsSc2Product}" />
                 </StackPanel>
             </Expander>
 
@@ -192,10 +246,23 @@
                     <TextBox Margin="0,6,0,0" PlaceholderText="Trivia group (optional)" Text="{Binding Config.TriviaGroup}" />
                     <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11"
                                Text="Bots naming the same trivia group share one round: whichever one runs '!trivia on' relays the question to every group member's own channel, and a correct answer on any of them ends it for the whole group — e.g. link a Warcraft II bot and a StarCraft II bot to run one trivia game across both. Leave blank to keep this bot's trivia independent." />
+
+                    <TextBlock Margin="0,10,0,0" Text="Scoring" FontWeight="Bold" Opacity="0.8" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                               Text="Points awarded for a correct answer, graduated by how many hints were already shown." />
+                    <Grid ColumnDefinitions="Auto,Auto" RowDefinitions="Auto,Auto,Auto" ColumnSpacing="8" RowSpacing="4">
+                        <TextBlock Grid.Row="0" Grid.Column="0" Text="Before first hint:" VerticalAlignment="Center" />
+                        <TextBox Grid.Row="0" Grid.Column="1" Width="80" Text="{Binding Config.TriviaPointsBeforeFirstHint}" />
+                        <TextBlock Grid.Row="1" Grid.Column="0" Text="After first hint:" VerticalAlignment="Center" />
+                        <TextBox Grid.Row="1" Grid.Column="1" Width="80" Text="{Binding Config.TriviaPointsAfterFirstHint}" />
+                        <TextBlock Grid.Row="2" Grid.Column="0" Text="After second hint:" VerticalAlignment="Center" />
+                        <TextBox Grid.Row="2" Grid.Column="1" Width="80" Text="{Binding Config.TriviaPointsAfterSecondHint}" />
+                    </Grid>
                 </StackPanel>
             </Expander>
 
-            <!-- Appearance: chat color scheme -->
+            <!-- Appearance: pick which shared color scheme and icon set this bot uses — editing/creating either
+                 one happens in their own windows under the top-level Customize menu, not here. -->
             <Expander Header="Appearance" IsExpanded="False">
                 <StackPanel Margin="8" Spacing="8">
                     <TextBlock Text="Chat Color Scheme" FontWeight="Bold" FontSize="11" Opacity="0.8" />
@@ -228,8 +295,8 @@
                     </ItemsControl>
 
                     <StackPanel IsVisible="{Binding IsCustomScheme}" Spacing="6" Margin="0,8,0,0">
-                        <TextBlock Text="Load from library" FontWeight="Bold" FontSize="11" Opacity="0.8" />
-                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                        <TextBlock Text="Which custom scheme" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
                             <ComboBox Grid.Column="0" ItemsSource="{Binding LibrarySchemes}"
                                       SelectedItem="{Binding SelectedLibraryScheme}"
                                       HorizontalAlignment="Stretch" PlaceholderText="Pick a saved scheme...">
@@ -240,28 +307,17 @@
                                 </ComboBox.ItemTemplate>
                             </ComboBox>
                             <Button Grid.Column="1" Content="Load" Command="{Binding LoadLibrarySchemeCommand}" />
-                            <Button Grid.Column="2" Content="Import File..." Click="OnImportSchemeClick" />
                         </Grid>
-                        <TextBlock Text="Shared scheme files live in the Colors folder inside Open Config Folder — drop one in to add it here, or copy one out to send to someone else."
+                        <TextBlock Text="Create or edit schemes from Customize → Manage Colors..."
                                    TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
-
-                        <TextBlock Text="Custom colors — pick any role below to override it"
-                                   FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,8,0,0" />
-                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
-                            <TextBox Grid.Column="0" Text="{Binding CustomSchemeName}" PlaceholderText="Scheme name" />
-                            <Button Grid.Column="1" Content="Save to Library" Command="{Binding SaveSchemeToLibraryCommand}" />
-                        </Grid>
-                        <ItemsControl ItemsSource="{Binding CustomColorSlots}">
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate>
-                                    <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
-                                        <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="12" VerticalAlignment="Center" />
-                                        <ColorPicker Grid.Column="1" Color="{Binding Value, Mode=TwoWay}" Width="130" />
-                                    </Grid>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
-                        </ItemsControl>
                     </StackPanel>
+
+                    <TextBlock Text="Icon Set" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,10,0,0" />
+                    <ComboBox ItemsSource="{Binding AvailableIconSets}"
+                              SelectedItem="{Binding IconSetName}"
+                              HorizontalAlignment="Stretch" />
+                    <TextBlock Text="Create or edit icon sets from Customize → Manage Icons..."
+                               TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
                 </StackPanel>
             </Expander>
 
@@ -273,7 +329,7 @@
                 </StackPanel>
             </Expander>
 
-            <!-- Discord bridge (config only, not wired to a live relay yet) -->
+            <!-- Discord bridge: connects/disconnects alongside this bot's own Connect/Disconnect, no separate button -->
             <Expander Header="Discord Bridge" IsExpanded="False">
                 <StackPanel Margin="8" Spacing="6">
                     <CheckBox Content="Enabled" IsChecked="{Binding Config.Discord.Enabled}" />
@@ -282,6 +338,8 @@
                     <TextBox PlaceholderText="Relay delay (seconds)" Text="{Binding Config.Discord.RelayDelaySeconds}" />
                     <CheckBox Content="Relay Battle.net chat to Discord" IsChecked="{Binding Config.Discord.RelayBattlenetToDiscord}" />
                     <CheckBox Content="Relay Discord messages to Battle.net" IsChecked="{Binding Config.Discord.RelayDiscordToBattlenet}" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11" Foreground="Orange" Margin="0,4,0,0"
+                               Text="Requires the bot application's 'Message Content' privileged gateway intent to be turned on in the Discord Developer Portal (Bot page) — without it, other users' messages arrive empty and nothing relays. The channel ID is the numeric ID Discord shows when you right-click a channel with Developer Mode on (User Settings → Advanced)." />
                 </StackPanel>
             </Expander>
 

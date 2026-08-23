@@ -39,7 +39,10 @@ public sealed partial class BotEngine
     /// <summary>Sends a trivia round message to this bot's own channel, and to every other bot sharing its TriviaGroup, so linked channels all see the game. A dead/disconnected peer is logged and skipped rather than failing the whole broadcast.</summary>
     private async Task BroadcastTriviaMessageAsync(string text)
     {
-        await SendChatCommandAsync(text).ConfigureAwait(false);
+        // Explicit channel, not the ambient active one: an operator switching sub-tabs
+        // mid-round must not redirect the rest of this round's messages to a different
+        // channel than the one it actually started in. No-op override (null) for BNCS.
+        await SendChatCommandAsync(text, _sc2TriviaChannelIndex).ConfigureAwait(false);
 
         foreach (var peer in TriviaGroupRegistry.GetGroupPeers(Config.TriviaGroup, this))
         {
@@ -66,7 +69,11 @@ public sealed partial class BotEngine
         switch (trimmed.ToLowerInvariant())
         {
             case "on":
-                await HandleTriviaOnAsync(reply, category: null).ConfigureAwait(false);
+                await HandleTriviaOnAsync(reply, category: null, gameshowMode: false).ConfigureAwait(false);
+                break;
+
+            case "all":
+                await HandleTriviaOnAsync(reply, category: null, gameshowMode: true).ConfigureAwait(false);
                 break;
 
             case "off":
@@ -90,19 +97,19 @@ public sealed partial class BotEngine
             case "":
                 await reply(_trivia.IsEnabled
                         ? "Use: !trivia ( off | score | categories )"
-                        : "Use: !trivia ( on | <category> | score | categories )")
+                        : "Use: !trivia ( on | all | <category> | score | categories )")
                     .ConfigureAwait(false);
                 break;
 
             // Anything else is treated as an attempted category name, so "!trivia Blizzard"
             // starts a round using only that category's questions — see HandleTriviaOnAsync.
             default:
-                await HandleTriviaOnAsync(reply, category: trimmed).ConfigureAwait(false);
+                await HandleTriviaOnAsync(reply, category: trimmed, gameshowMode: false).ConfigureAwait(false);
                 break;
         }
     }
 
-    private async Task HandleTriviaOnAsync(Func<string, Task> reply, string? category)
+    private async Task HandleTriviaOnAsync(Func<string, Task> reply, string? category, bool gameshowMode)
     {
         if (_trivia.IsEnabled)
         {
@@ -139,6 +146,7 @@ public sealed partial class BotEngine
         }
 
         _trivia.Start(questions);
+        _sc2TriviaChannelIndex = Protocol.BncsProduct.IsStimpakBacked(Config.Product) ? _sc2ActiveChannelIndex : null;
         var categoryNote = string.IsNullOrEmpty(category) ? "" : $" ({category})";
         var startedMessage = $"Trivia started{categoryNote} with {questions.Count} questions! Just answer in chat to play.";
         if (string.IsNullOrWhiteSpace(Config.TriviaGroup))
@@ -152,7 +160,7 @@ public sealed partial class BotEngine
 
         _triviaRoundCts?.Cancel();
         _triviaRoundCts = new CancellationTokenSource();
-        _ = RunTriviaRoundAsync(_triviaRoundCts.Token);
+        _ = RunTriviaRoundAsync(gameshowMode, _triviaRoundCts.Token);
     }
 
     private Task HandleTriviaCategoriesAsync(Func<string, Task> reply)
@@ -202,7 +210,14 @@ public sealed partial class BotEngine
         return reply("You're in! Answer trivia questions in chat to earn points.");
     }
 
-    private async Task RunTriviaRoundAsync(CancellationToken ct)
+    /// <summary>
+    /// gameshowMode (set via "!trivia all") announces each question's
+    /// category as its own message, with a short pause, before the question
+    /// itself — versus the default single combined "- Category: X -
+    /// Question: ..." line, which every other trivia entry point still uses
+    /// unchanged.
+    /// </summary>
+    private async Task RunTriviaRoundAsync(bool gameshowMode, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested && _trivia.IsEnabled)
         {
@@ -214,12 +229,30 @@ public sealed partial class BotEngine
                 break;
             }
 
-            var categoryText = question.Category.Length > 0 ? $" - Category: {question.Category}" : "";
-            await BroadcastTriviaMessageAsync($"/me{categoryText} - Question: {question.QuestionText} - Hint: {question.Hint0}")
-                .ConfigureAwait(false);
+            if (gameshowMode && question.Category.Length > 0)
+            {
+                await BroadcastTriviaMessageAsync($"/me \U0001F3AF Category: {question.Category}!").ConfigureAwait(false);
+                try
+                {
+                    await Task.Delay(1200, ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    break;
+                }
+            }
+
+            // In gameshow mode the category was just announced as its own
+            // message above, so it's left out of the question line to avoid
+            // saying it twice.
+            var categoryText = !gameshowMode && question.Category.Length > 0 ? $" - Category: {question.Category}" : "";
+            var questionMessage = question.IsMultipleChoice
+                ? $"/me{categoryText} - Question: {question.QuestionText} - {string.Join("  ", question.Choices.Select(c => $"{c.Letter}) {c.Text}"))}"
+                : $"/me{categoryText} - Question: {question.QuestionText} - Hint: {question.Hint0}";
+            await BroadcastTriviaMessageAsync(questionMessage).ConfigureAwait(false);
 
             _trivia.PendingAnswer = null;
-            var (result, winner) = await WaitForAnswerOrTimeoutAsync(question, ct).ConfigureAwait(false);
+            var (result, winner, stage) = await WaitForAnswerOrTimeoutAsync(question, ct).ConfigureAwait(false);
 
             if (result == TriviaWaitResult.Cancelled)
             {
@@ -232,12 +265,18 @@ public sealed partial class BotEngine
             if (result == TriviaWaitResult.Answered && winner is { } win)
             {
                 _trivia.RecordAnswered();
-                await AnnounceWinnerAsync(question, win).ConfigureAwait(false);
+                await AnnounceWinnerAsync(question, win, stage).ConfigureAwait(false);
             }
             else
             {
                 _trivia.RecordTimeout();
-                var correct = string.Join(", ", question.Answers.Select(a => $"\"{a}\""));
+                // For multiple choice, Answers[0] is always the correct
+                // option's actual text (Answers[1] is just its letter, not a
+                // second real synonym worth repeating here) — see
+                // TriviaQuestion's private multiple-choice constructor.
+                var correct = question.IsMultipleChoice
+                    ? $"\"{question.Answers[0]}\""
+                    : string.Join(", ", question.Answers.Select(a => $"\"{a}\""));
                 await BroadcastTriviaMessageAsync($"/me - Time's up! The correct answer was {correct}").ConfigureAwait(false);
 
                 if (_trivia.UnansweredStreak == 9)
@@ -266,24 +305,38 @@ public sealed partial class BotEngine
         }
     }
 
-    private async Task AnnounceWinnerAsync(TriviaQuestion question, (string Username, string MatchedAnswer) win)
+    /// <summary>Which graduated-scoring tier an answer landed in — 0 = before the first hint, 1 = after the first hint, 2 = after the second hint. Multiple-choice questions never advance past 0, since there's no hint progression to speak of.</summary>
+    private double PointsForStage(int stage) => stage switch
     {
+        0 => Config.TriviaPointsBeforeFirstHint,
+        1 => Config.TriviaPointsAfterFirstHint,
+        _ => Config.TriviaPointsAfterSecondHint,
+    };
+
+    private async Task AnnounceWinnerAsync(TriviaQuestion question, (string Username, string MatchedAnswer, string Source) win, int stage)
+    {
+        var points = PointsForStage(stage);
         var extra = "!";
         var member = ClanRosterStore.Find(win.Username);
         if (member is not null)
         {
-            member.TriviaScore++;
+            member.TriviaScore += points;
             ClanRosterStore.Save();
-            extra = $"! Your score is {member.TriviaScore}.";
+            extra = $"! (+{points.ToString("0.##")}) Your score is {member.TriviaScore.ToString("0.##")}.";
         }
 
-        var alternates = question.Answers.Where(a => a != win.MatchedAnswer).ToList();
+        // The multiple-choice Answers list carries the correct text plus its
+        // assigned letter as two equally-valid ways to match — not real
+        // alternate synonyms worth listing back to the winner.
+        var alternates = question.IsMultipleChoice
+            ? []
+            : question.Answers.Where(a => a != win.MatchedAnswer).ToList();
         if (alternates.Count > 0)
         {
             extra += " Other acceptable answers were: " + string.Join(", ", alternates.Select(a => $"\"{a}\""));
         }
 
-        await BroadcastTriviaMessageAsync($"/me - \"{win.MatchedAnswer}\" is correct, {win.Username}{extra}").ConfigureAwait(false);
+        await BroadcastTriviaMessageAsync($"/me - \"{win.MatchedAnswer}\" is correct, {win.Username} (from {win.Source}){extra}").ConfigureAwait(false);
     }
 
     private enum TriviaWaitResult
@@ -301,44 +354,53 @@ public sealed partial class BotEngine
     /// Re-checks _trivia.IsEnabled (not just the token) at the top of every
     /// iteration, so "!trivia off" mid-question stops within one tick instead
     /// of letting an already-due hint or timeout slip out afterward.
+    /// Multiple-choice questions skip both hint reveals entirely — every
+    /// option is already visible, so the returned stage stays 0 (see
+    /// PointsForStage) for the whole 30-second window.
     /// </summary>
-    private async Task<(TriviaWaitResult Result, (string Username, string MatchedAnswer)? Winner)> WaitForAnswerOrTimeoutAsync(
+    private async Task<(TriviaWaitResult Result, (string Username, string MatchedAnswer, string Source)? Winner, int Stage)> WaitForAnswerOrTimeoutAsync(
         TriviaQuestion question, CancellationToken ct)
     {
         var askedAt = DateTime.UtcNow;
         var hint1Given = false;
         var hint2Given = false;
+        var stage = 0;
 
         while (true)
         {
             if (!_trivia.IsEnabled || ct.IsCancellationRequested)
             {
-                return (TriviaWaitResult.Cancelled, null);
+                return (TriviaWaitResult.Cancelled, null, 0);
             }
 
             if (_trivia.PendingAnswer is { } answer)
             {
                 _trivia.PendingAnswer = null;
-                return (TriviaWaitResult.Answered, answer);
+                return (TriviaWaitResult.Answered, answer, stage);
             }
 
             var elapsed = DateTime.UtcNow - askedAt;
 
-            if (!hint1Given && elapsed.TotalSeconds > 10)
+            if (!question.IsMultipleChoice)
             {
-                hint1Given = true;
-                await BroadcastTriviaMessageAsync($"/me - 20 seconds left! Hint: {question.Hint1}").ConfigureAwait(false);
-            }
+                if (!hint1Given && elapsed.TotalSeconds > 10)
+                {
+                    hint1Given = true;
+                    stage = 1;
+                    await BroadcastTriviaMessageAsync($"/me - 20 seconds left! Hint: {question.Hint1}").ConfigureAwait(false);
+                }
 
-            if (!hint2Given && elapsed.TotalSeconds > 20)
-            {
-                hint2Given = true;
-                await BroadcastTriviaMessageAsync($"/me - 10 seconds left! Hint: {question.Hint2}").ConfigureAwait(false);
+                if (!hint2Given && elapsed.TotalSeconds > 20)
+                {
+                    hint2Given = true;
+                    stage = 2;
+                    await BroadcastTriviaMessageAsync($"/me - 10 seconds left! Hint: {question.Hint2}").ConfigureAwait(false);
+                }
             }
 
             if (elapsed.TotalSeconds >= 30)
             {
-                return (TriviaWaitResult.TimedOut, null);
+                return (TriviaWaitResult.TimedOut, null, 0);
             }
 
             try
@@ -347,7 +409,7 @@ public sealed partial class BotEngine
             }
             catch (OperationCanceledException)
             {
-                return (TriviaWaitResult.Cancelled, null);
+                return (TriviaWaitResult.Cancelled, null, 0);
             }
         }
     }

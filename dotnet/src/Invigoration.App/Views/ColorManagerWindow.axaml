@@ -1,0 +1,80 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Invigoration.App.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="620" d:DesignHeight="700"
+        x:Class="Invigoration.App.Views.ColorManagerWindow"
+        x:DataType="vm:ColorManagerViewModel"
+        Width="620" Height="700"
+        Title="Manage Colors">
+
+    <Design.DataContext>
+        <vm:ColorManagerViewModel />
+    </Design.DataContext>
+
+    <Grid RowDefinitions="Auto,*">
+        <Border Grid.Row="0" Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="16,10">
+            <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0" Text="Manage Colors" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Close" Click="OnCloseClick" />
+            </Grid>
+        </Border>
+
+        <ScrollViewer Grid.Row="1">
+            <StackPanel Margin="16" Spacing="10">
+                <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11"
+                           Text="Shared across every bot — each bot's Config window picks one of these saved schemes by name rather than editing colors itself. Changes here apply immediately to whichever scheme is selected below; click Save to keep them." />
+
+                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                    <ComboBox Grid.Column="0" ItemsSource="{Binding Schemes}"
+                              SelectedItem="{Binding SelectedScheme}"
+                              HorizontalAlignment="Stretch" PlaceholderText="Pick a saved scheme...">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                    <Button Grid.Column="1" Content="+ New" Command="{Binding NewSchemeCommand}" />
+                </Grid>
+
+                <ItemsControl ItemsSource="{Binding PaletteSwatches}" Margin="0,4,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel Orientation="Horizontal" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="4" Margin="0,0,12,6">
+                                <Border Background="{Binding Brush}" Width="14" Height="14" CornerRadius="3"
+                                        BorderBrush="#3A3A3A" BorderThickness="1" />
+                                <TextBlock Text="{Binding Label}" FontSize="11" Opacity="0.85" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8" Margin="0,8,0,0">
+                    <TextBox Grid.Column="0" Text="{Binding SchemeName}" PlaceholderText="Scheme name" />
+                    <Button Grid.Column="1" Content="Save" Command="{Binding SaveCommand}" />
+                    <Button Grid.Column="2" Content="Delete" Command="{Binding DeleteCommand}" IsEnabled="{Binding SelectedScheme, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                </Grid>
+                <Button Content="Import File..." Click="OnImportSchemeClick" HorizontalAlignment="Left" />
+
+                <TextBlock Text="Colors" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,8,0,0" />
+                <ItemsControl ItemsSource="{Binding ColorSlots}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,0,0,4">
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" FontSize="12" VerticalAlignment="Center" />
+                                <ColorPicker Grid.Column="1" Color="{Binding Value, Mode=TwoWay}" Width="130" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
+</Window>

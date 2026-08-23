@@ -49,7 +49,11 @@ public static class LogonResponse3Decoder
             SkipModuleInput(reader);
         }
 
-        var pingTimeoutSeconds = unchecked((int)reader.Read(32));
+        // Battlenet::s32 (core/src/native/schema/wire.rs type 37): IntegerRange { bit_width: 32,
+        // minimum: -2147483648 }. BSN always computes value = raw + minimum, which for this
+        // minimum is a sign-bit flip before a two's-complement reinterpretation, NOT a plain
+        // unchecked((int)raw) bit-cast. Same fix as ResumeHandshake.ReadS32.
+        var pingTimeoutSeconds = unchecked((int)(reader.Read(32) ^ 0x8000_0000UL));
         if (reader.Read(1) != 0 && reader.Read(1) != 0) // regulatorRules present, and it's LeakyBucket
         {
             reader.Read(32);

@@ -3,14 +3,24 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:vm="using:Invigoration.App.ViewModels"
+             xmlns:stimpak="using:Stimpak"
+             xmlns:views="using:Invigoration.App.Views"
+             xmlns:conv="using:Invigoration.App.Converters"
+             xmlns:models="using:Invigoration.App.Models"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
              x:Class="Invigoration.App.Views.BotTabView"
              x:DataType="vm:BotTabViewModel">
 
-    <Grid ColumnDefinitions="*,180" RowDefinitions="Auto,*,Auto">
+    <Grid RowDefinitions="Auto,*,Auto">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" MinWidth="200" />
+            <ColumnDefinition Width="4" />
+            <!-- User-resizable (drag the GridSplitter below) — 180 is just the initial width, not a cap. -->
+            <ColumnDefinition Width="180" MinWidth="120" MaxWidth="500" />
+        </Grid.ColumnDefinitions>
 
         <!-- Status / connect bar -->
-        <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Orientation="Horizontal"
+        <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal"
                     Spacing="8" Margin="8">
             <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding !IsConnected}" />
             <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
@@ -20,13 +30,81 @@
 
         <!-- Chat log: one continuous SelectableTextBlock (built up in code-behind)
              so drag-select and Ctrl+C work across whole lines and multiple
-             lines at once, not just within a single colored segment. -->
-        <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll" Background="{Binding BackgroundBrush}">
+             lines at once, not just within a single colored segment. Classic
+             BNCS/Chat-Telnet only — a SupportsMultiChannel bot (SC2/SC:R/WC3:R)
+             uses the per-channel sub-tabs below instead. -->
+        <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll" Background="{Binding BackgroundBrush}"
+                      IsVisible="{Binding !SupportsMultiChannel}">
             <SelectableTextBlock Name="ChatText" Margin="8" TextWrapping="Wrap" />
         </ScrollViewer>
 
+        <!-- Per-channel sub-tabs for a bot that can be joined to several channels at once
+             (SC2/SC:R/WC3:R) — each ChannelTabViewModel gets its own chat log (rendered by
+             ChannelTabView, resolved via the same global ViewLocator MainWindow.axaml's own
+             bot-tab TabControl relies on) and its own roster (see the Users tab below). -->
+        <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*" IsVisible="{Binding SupportsMultiChannel}"
+              Background="{Binding BackgroundBrush}">
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,0">
+                <Button Content="+" Padding="8,2" FontSize="12" ToolTip.Tip="Join another channel">
+                    <Button.Flyout>
+                        <Flyout>
+                            <StackPanel Spacing="8" Width="240">
+                                <TextBlock Text="Join a public channel" FontWeight="Bold" FontSize="12" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <ComboBox Grid.Column="0" Name="PublicChannelPicker"
+                                              ItemsSource="{Binding AvailablePublicChannels}"
+                                              PlaceholderText="Choose a channel..." HorizontalAlignment="Stretch">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="stimpak:PublicChannel">
+                                                <TextBlock Text="{Binding Name}" />
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Grid.Column="1" Content="Join"
+                                            Command="{Binding JoinPublicChannelCommand}"
+                                            CommandParameter="{Binding #PublicChannelPicker.SelectedItem}" />
+                                </Grid>
+                                <TextBlock Text="Or join a private channel" FontWeight="Bold" FontSize="12" />
+                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                    <TextBox Grid.Column="0" Text="{Binding JoinChannelName}" PlaceholderText="Channel name" />
+                                    <Button Grid.Column="1" Content="Join" Command="{Binding JoinPrivateChannelCommand}" />
+                                </Grid>
+                            </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+            </StackPanel>
+
+            <TabControl Grid.Row="1" ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel}">
+                <TabControl.Styles>
+                    <Style Selector="TabItem:selected Border.tabHighlight">
+                        <Setter Property="BorderThickness" Value="0,0,0,3" />
+                    </Style>
+                </TabControl.Styles>
+                <TabControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:ChannelTabViewModel">
+                        <Grid ColumnDefinitions="Auto,Auto">
+                            <Border Grid.Column="0" Classes="tabHighlight"
+                                    BorderBrush="{Binding $parent[TabControl].((vm:BotTabViewModel)DataContext).HighlightBrush}"
+                                    BorderThickness="0" Padding="0,0,4,4">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <TextBlock Text="{Binding Title}" />
+                                    <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                                </StackPanel>
+                            </Border>
+                            <Button Grid.Column="1" Content="×" Padding="4,0" FontSize="11" Background="Transparent" BorderThickness="0"
+                                    Click="OnLeaveChannelClick" ToolTip.Tip="Leave this channel" />
+                        </Grid>
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+            </TabControl>
+        </Grid>
+
+        <GridSplitter Grid.Row="1" Grid.Column="1" Width="4" Background="#3A3A3A"
+                      HorizontalAlignment="Stretch" ResizeDirection="Columns" />
+
         <!-- Right-hand panel: users in the current channel, friends list, and (per-game) clan roster -->
-        <TabControl Grid.Row="1" Grid.Column="1" Margin="0,4,8,8"
+        <TabControl Grid.Row="1" Grid.Column="2" Margin="0,4,8,8"
                     Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="6" Padding="0">
             <TabControl.Styles>
                 <!-- Compact header text (this panel is otherwise all small/dense text — Fluent's default TabItem
@@ -48,7 +126,9 @@
                         <TextBlock Text="Users" />
                     </Border>
                 </TabItem.Header>
-                <ListBox ItemsSource="{Binding ChannelUsers}" Background="Transparent" BorderThickness="0" Padding="0,4">
+                <Panel>
+                <ListBox ItemsSource="{Binding ChannelUsers}" Background="Transparent" BorderThickness="0" Padding="0,4"
+                         IsVisible="{Binding !SupportsMultiChannel}">
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="8,1" />
@@ -87,6 +167,32 @@
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
+
+                <!-- SC2/SC:R/WC3:R: the *currently selected* channel sub-tab's own roster, bound
+                     straight to Stimpak's own Person collection (see ChannelTabViewModel) — a
+                     much shorter row than classic BNCS's above, since Stimpak's protocol surface
+                     doesn't carry per-user operator flags, ping, or a statstring. -->
+                <ListBox ItemsSource="{Binding SelectedChannel.Users}" Background="Transparent" BorderThickness="0" Padding="0,4"
+                         IsVisible="{Binding SupportsMultiChannel}">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="8,1" />
+                            <Setter Property="MinHeight" Value="0" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="stimpak:Person">
+                            <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding ., Converter={x:Static conv:PersonDetailsTooltipConverter.Instance}}">
+                                <views:PresenceIcon State="{Binding Presence, Converter={x:Static conv:PresenceConverter.Instance}}" />
+                                <!-- Person.Name is "&lt;TAG&gt; Username" (tag prefixed) per Stimpak's own
+                                     formatting — reordered to a trailing tag instead, per request. -->
+                                <TextBlock Text="{Binding ., Converter={x:Static conv:PersonNameWithTrailingClanTagConverter.Instance}}"
+                                           Foreground="White" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+                </Panel>
             </TabItem>
 
             <!-- Hidden entirely for games whose server doesn't push a friends list (Diablo 1, Warcraft II: BNE) -->
@@ -108,18 +214,92 @@
                         </ListBox.Styles>
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                                <Grid ColumnDefinitions="Auto,Auto,*" RowDefinitions="Auto,Auto">
+                                    <!-- Right-click anywhere on a friend's row for a small inline "Whisper" compose
+                                         popup — ContextFlyout (not ContextMenu) shows arbitrary content, not just
+                                         menu items, so this skips a separate right-click-menu step entirely. -->
+                                    <Grid.ContextFlyout>
+                                        <Flyout Placement="Pointer">
+                                            <StackPanel Width="220" Spacing="6" Margin="4">
+                                                <TextBlock Text="{Binding Account, StringFormat='Whisper {0}'}" FontWeight="Bold" FontSize="12" />
+                                                <TextBox PlaceholderText="Message..." Text="{Binding WhisperDraft}" />
+                                                <Button Content="Send" HorizontalAlignment="Right" Padding="10,3"
+                                                        Click="OnSendInlineWhisperClick" />
+                                            </StackPanel>
+                                        </Flyout>
+                                    </Grid.ContextFlyout>
                                     <Image Grid.Row="0" Grid.RowSpan="2" Grid.Column="0" Source="{Binding ProductIconImage}"
                                            MaxWidth="32" MaxHeight="32" Margin="0,0,6,0" VerticalAlignment="Center"
                                            Stretch="Uniform"
                                            IsVisible="{Binding ProductIconImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                                    <TextBlock Grid.Row="0" Grid.Column="1" Text="{Binding Account}" Foreground="White" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding StatusText}" Foreground="White" Opacity="0.6" FontSize="10" />
+                                    <views:PresenceIcon Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Margin="0,0,6,0"
+                                                         State="{Binding PresenceState}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Account}" Foreground="White" />
+                                    <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding StatusText}" Foreground="White" Opacity="0.6" FontSize="10" />
                                 </Grid>
                             </DataTemplate>
                         </ListBox.ItemTemplate>
                     </ListBox>
                 </DockPanel>
+            </TabItem>
+
+            <!-- One entry per peer this bot has whispered with — always available regardless of
+                 product, since it's the only reliable place to read/send a whisper on a
+                 SupportsMultiChannel (SC2/SC:R/WC3:R) bot, where whispers aren't channel-scoped
+                 and so have no natural sub-tab of their own. -->
+            <TabItem>
+                <TabItem.Header>
+                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="0,0,0,4">
+                        <TextBlock Text="Whispers" />
+                    </Border>
+                </TabItem.Header>
+                <Grid ColumnDefinitions="140,*">
+                    <ListBox Grid.Column="0" ItemsSource="{Binding WhisperThreads}" SelectedItem="{Binding SelectedWhisperThread}"
+                              Background="Transparent" BorderThickness="0,0,1,0" BorderBrush="#3A3A3A" Padding="0,4">
+                        <ListBox.Styles>
+                            <Style Selector="ListBoxItem">
+                                <Setter Property="Padding" Value="8,4" />
+                                <Setter Property="MinHeight" Value="0" />
+                            </Style>
+                        </ListBox.Styles>
+                        <ListBox.ItemTemplate>
+                            <DataTemplate x:DataType="models:WhisperThreadViewModel">
+                                <StackPanel Orientation="Horizontal" Spacing="4">
+                                    <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                                    <TextBlock Text="{Binding Peer}" Foreground="White" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <Grid Grid.Column="1" RowDefinitions="*,Auto" IsVisible="{Binding SelectedWhisperThread, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <ScrollViewer Grid.Row="0" Name="WhisperScroll">
+                            <ItemsControl ItemsSource="{Binding SelectedWhisperThread.Messages}" Margin="8">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ChatLineViewModel">
+                                        <ItemsControl ItemsSource="{Binding Segments}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate>
+                                                    <WrapPanel />
+                                                </ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="models:ChatSegmentViewModel">
+                                                    <TextBlock Text="{Binding Text}" Foreground="{Binding Brush}" TextWrapping="Wrap" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="8">
+                            <TextBox Grid.Column="0" PlaceholderText="Type a whisper..." Text="{Binding SelectedWhisperThread.DraftText}"
+                                     Name="WhisperInputBox" />
+                            <Button Grid.Column="1" Content="Send" Margin="4,0,0,0" Padding="10,3"
+                                    Command="{Binding SendWhisperCommand}" CommandParameter="{Binding SelectedWhisperThread}" />
+                        </Grid>
+                    </Grid>
+                </Grid>
             </TabItem>
 
             <!-- The bot's own clan-management system (roster/rank/alias/trivia-score), not Battle.net's native clan protocol.
@@ -160,7 +340,7 @@
         </TabControl>
 
         <!-- Input -->
-        <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="8">
+        <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" Margin="8">
             <!-- Tinted with the scheme's Highlight color, thickening on focus, so it's obvious this box has focus before you type. -->
             <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message or /command..."
                      Classes="chatInput" BorderBrush="{Binding HighlightBrush}" BorderThickness="1">

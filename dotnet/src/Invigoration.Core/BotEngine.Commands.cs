@@ -11,26 +11,40 @@ namespace Invigoration.Core;
 public sealed partial class BotEngine
 {
     /// <summary>
-    /// No URL here on purpose — Battle.net/PVPGN chat filters can mangle
-    /// "https://..." text (e.g. rendering it as "https://github!@#$/"), so
-    /// the version reply just states the build instead of linking out.
+    /// Points at bnet.cc (releases page + direct download links) rather than
+    /// a full "https://..." URL — a bare domain like this is far less likely
+    /// to get mangled by Battle.net/PVPGN chat filters (some rewrite full
+    /// URLs, e.g. turning "https://github.com/x" into "https://github!@#$/").
     /// </summary>
-    private const string VersionLine = $"/me is an Invigoration v{AppVersion.Current}";
+    private const string VersionLine = $"/me is an Invigoration v{AppVersion.Current} - bnet.cc";
 
-    /// <summary>Runs a command typed locally in the bot's own UI — always trusted, no bot-master check.</summary>
-    public Task RunLocalCommandAsync(string message) => HandleCommandAsync(Config.Username, message, isLocal: true, isWhisper: false);
+    /// <summary>Runs a command typed locally in the bot's own UI — always trusted, no bot-master check. No origin channel: an operator-typed reply always goes to the active/focused sub-tab (see SendSc2Async), not a specific triggering message's channel.</summary>
+    public Task RunLocalCommandAsync(string message) => HandleCommandAsync(Config.Username, message, isLocal: true, isWhisper: false, originChannelIndex: null);
 
-    private Task HandleCommandAsync(string username, string message, bool isWhisper) =>
-        HandleCommandAsync(username, message, isLocal: false, isWhisper);
+    private Task HandleCommandAsync(string username, string message, bool isWhisper, byte? originChannelIndex) =>
+        HandleCommandAsync(username, message, isLocal: false, isWhisper, originChannelIndex);
 
-    private async Task HandleCommandAsync(string username, string message, bool isLocal, bool isWhisper)
+    private async Task HandleCommandAsync(string username, string message, bool isLocal, bool isWhisper, byte? originChannelIndex)
     {
         if (message.Equals("?trigger", StringComparison.OrdinalIgnoreCase))
         {
-            message = Config.Trigger + "trigger";
+            // "?trigger" is a fixed, trigger-agnostic query anyone in the channel can use to ask
+            // the bot what its trigger character is, without needing to already know it. Typed
+            // locally, "/trigger" already works directly, but that path only recognizes "/" now
+            // (see below), so this still needs to rewrite into that instead of the real trigger.
+            message = isLocal ? "/trigger" : Config.Trigger + "trigger";
         }
 
-        if (message.Length == 0 || (message[0] != Config.Trigger[0] && message[0] != '/'))
+        // Local (typed in this bot's own input box) only ever runs a command via "/" — the
+        // configured Trigger character is for other users to invoke commands from the channel,
+        // not something the operator needs typed back at their own bot. Anything else typed
+        // locally (including something starting with the Trigger character) is just sent as
+        // ordinary chat text.
+        var isCommandPrefix = isLocal
+            ? message.Length > 0 && message[0] == '/'
+            : message.Length > 0 && (message[0] == Config.Trigger[0] || message[0] == '/');
+
+        if (!isCommandPrefix)
         {
             return;
         }
@@ -46,7 +60,7 @@ public sealed partial class BotEngine
             return;
         }
 
-        Task Reply(string text) => ReplyAsync(text, username, isWhisper);
+        Task Reply(string text) => ReplyAsync(text, username, isWhisper, originChannelIndex);
 
         switch (command.ToLowerInvariant())
         {
@@ -126,9 +140,32 @@ public sealed partial class BotEngine
                 break;
 
             case "join":
-                await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_LEAVECHAT).ConfigureAwait(false);
-                await SendBncsAsync(new PacketWriter().WriteDword(2).WriteNTString(rest), BncsPacketId.SID_JOINCHANNEL)
-                    .ConfigureAwait(false);
+                if (BncsProduct.IsStimpakBacked(Config.Product))
+                {
+                    await HandleSc2JoinCommandAsync(rest, Reply).ConfigureAwait(false);
+                }
+                else
+                {
+                    await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_LEAVECHAT).ConfigureAwait(false);
+                    await SendBncsAsync(new PacketWriter().WriteDword(2).WriteNTString(rest), BncsPacketId.SID_JOINCHANNEL)
+                        .ConfigureAwait(false);
+                }
+
+                break;
+
+            // Only meaningful for SC2/SC:R/WC3:R, which can be joined to several channels at
+            // once — classic BNCS/Chat-Telnet are single-channel, so there's nothing for this
+            // to do there (falls through to the raw "/leave" passthrough below like before).
+            case "leave":
+                if (BncsProduct.IsStimpakBacked(Config.Product))
+                {
+                    await HandleSc2LeaveCommandAsync(rest, Reply).ConfigureAwait(false);
+                }
+                else if (isLocal)
+                {
+                    await SendChatCommandAsync("/leave " + rest).ConfigureAwait(false);
+                }
+
                 break;
 
             case "user":
@@ -478,7 +515,7 @@ public sealed partial class BotEngine
         var rank = member.Rank.Length > 0 ? member.Rank : "unranked";
         var lastSeen = member.LastSeenUtc is { } seenUtc ? FormatLastSeen(seenUtc) : "never";
         return reply(
-            $"{member.Name} :: rank: {rank} :: aliases: {aliases} :: trivia score: {member.TriviaScore} :: last seen: {lastSeen}");
+            $"{member.Name} :: rank: {rank} :: aliases: {aliases} :: trivia score: {member.TriviaScore.ToString("0.##")} :: last seen: {lastSeen}");
     }
 
     /// <summary>"clanscore &lt;name&gt; &lt;+/-delta&gt;" — adjusts a tracked member's trivia score; the running total a future trivia game would add to.</summary>
@@ -486,7 +523,7 @@ public sealed partial class BotEngine
     {
         var parts = rest.Split(' ', 2);
         if (parts.Length < 2 ||
-            !int.TryParse(parts[1], System.Globalization.NumberStyles.AllowLeadingSign, System.Globalization.CultureInfo.InvariantCulture, out var delta))
+            !double.TryParse(parts[1], System.Globalization.NumberStyles.AllowLeadingSign | System.Globalization.NumberStyles.AllowDecimalPoint, System.Globalization.CultureInfo.InvariantCulture, out var delta))
         {
             return reply("Usage: clanscore <name> <+/-delta>");
         }
@@ -499,7 +536,7 @@ public sealed partial class BotEngine
 
         member.TriviaScore += delta;
         ClanRosterStore.Save();
-        return reply($"{member.Name}'s trivia score is now {member.TriviaScore}.");
+        return reply($"{member.Name}'s trivia score is now {member.TriviaScore.ToString("0.##")}.");
     }
 
     private static string FormatLastSeen(DateTime seenUtc)
@@ -564,8 +601,8 @@ public sealed partial class BotEngine
         return reply("Idle message set.");
     }
 
-    private Task ReplyAsync(string text, string username, bool asWhisper) =>
-        asWhisper ? SendChatCommandAsync($"/w {username} {text}") : SendChatCommandAsync(text);
+    private Task ReplyAsync(string text, string username, bool asWhisper, byte? originChannelIndex) =>
+        asWhisper ? SendChatCommandAsync($"/w {username} {text}") : SendChatCommandAsync(text, originChannelIndex);
 
     private static string FormatCount(int count, string verb) => count switch
     {

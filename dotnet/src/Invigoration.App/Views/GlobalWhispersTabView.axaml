@@ -1,0 +1,67 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             xmlns:models="using:Invigoration.App.Models"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="Invigoration.App.Views.GlobalWhispersTabView"
+             x:DataType="vm:GlobalWhispersTabViewModel">
+
+    <!-- Same two-pane thread-list/messages/reply layout as a per-bot BotTabView's own Whispers
+         tab, except every thread here can belong to a different bot — each row and the message
+         header both show which login/bot it came from, since that's the whole point of this
+         being a separate, cross-bot view. -->
+    <Grid ColumnDefinitions="220,*">
+        <ListBox Grid.Column="0" ItemsSource="{Binding Threads}" SelectedItem="{Binding SelectedThread}"
+                  Background="Transparent" BorderThickness="0,0,1,0" BorderBrush="#3A3A3A" Padding="0,4">
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="8,4" />
+                    <Setter Property="MinHeight" Value="0" />
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="models:WhisperThreadViewModel">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                        <StackPanel>
+                            <TextBlock Text="{Binding Peer}" Foreground="White" FontSize="12" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Text="{Binding Owner.Title}" Foreground="White" Opacity="0.5" FontSize="10" TextTrimming="CharacterEllipsis" />
+                        </StackPanel>
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto" IsVisible="{Binding SelectedThread, Converter={x:Static ObjectConverters.IsNotNull}}">
+            <TextBlock Grid.Row="0" Text="{Binding SelectedThread.Owner.Title, StringFormat='via {0}'}"
+                       Foreground="White" Opacity="0.6" FontSize="11" Margin="8,6,8,0" />
+            <ScrollViewer Grid.Row="1" Name="WhisperScroll">
+                <ItemsControl ItemsSource="{Binding SelectedThread.Messages}" Margin="8">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:ChatLineViewModel">
+                            <ItemsControl ItemsSource="{Binding Segments}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="models:ChatSegmentViewModel">
+                                        <TextBlock Text="{Binding Text}" Foreground="{Binding Brush}" TextWrapping="Wrap" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+            <Grid Grid.Row="2" ColumnDefinitions="*,Auto" Margin="8">
+                <TextBox Grid.Column="0" PlaceholderText="Type a whisper..." Text="{Binding SelectedThread.DraftText}"
+                         Name="WhisperInputBox" />
+                <Button Grid.Column="1" Content="Send" Margin="4,0,0,0" Padding="10,3"
+                        Command="{Binding SelectedThread.Owner.SendWhisperCommand}" CommandParameter="{Binding SelectedThread}" />
+            </Grid>
+        </Grid>
+    </Grid>
+</UserControl>

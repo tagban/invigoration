@@ -22,6 +22,15 @@ public static class ChatIcon
     /// </summary>
     public static string GetProductIconKey(string statString)
     {
+        // Not a wire-order product code at all: BotEngine.Sc2.cs stamps this literal
+        // sentinel on every Stimpak-backed (SC2/SC:R/WC3:R) friend, since Stimpak's own
+        // Friend/Person records don't carry a per-contact product code the way classic
+        // BNCS's statstring does — every Stimpak contact gets the same icon today.
+        if (statString == "sc2")
+        {
+            return "sc2";
+        }
+
         var product = statString.Length >= 4 ? statString[..4] : statString;
         return product switch
         {
@@ -35,6 +44,10 @@ public static class ChatIcon
             "RTSJ" => "jsc",
             "NB2W" => "war2",
             "TAHC" => "chat",
+            // "[CHAT]" is the literal client-type tag the plain-text Chat/Telnet connection
+            // type reports in place of a real statstring (see ChatTelnetEventParser) — its
+            // first 4 characters are "[CHA", not the wire-reversed "TAHC" used elsewhere.
+            "[CHA" => "chat",
             _ => "",
         };
     }

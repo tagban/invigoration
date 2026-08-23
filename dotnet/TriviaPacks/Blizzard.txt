@@ -13,3 +13,5 @@ What year was Overwatch released?*2016
 What is the name of Blizzard's 2015 multiplayer online battle arena featuring heroes from across its franchises?*Heroes of the Storm
 What was the codename of Blizzard's cancelled StarCraft stealth-action spin-off?*StarCraft: Ghost*Ghost
 Which publisher merged with Blizzard's parent company in 2008 to form Activision Blizzard?*Activision
+MC*Blizzard*Which Blizzard game introduced the Secret Cow Level?*Diablo II*StarCraft*Warcraft III*Hearthstone
+MC*Blizzard*What class of enemy is Diablo himself?*Demon*Undead*Dragon

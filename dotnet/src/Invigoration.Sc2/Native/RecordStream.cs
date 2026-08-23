@@ -98,5 +98,8 @@ public sealed class RecordStream : IDisposable
     private static bool IsBufferUnderrun(Exception ex) =>
         ex is IndexOutOfRangeException or ArgumentOutOfRangeException or ArgumentException;
 
+    /// <summary>Diagnostic-only: hex dump of the buffered-but-not-yet-consumed bytes, for capturing a real record this project doesn't have a decoder for yet.</summary>
+    public string PendingHex() => Convert.ToHexString(_inbound.ToArray());
+
     public void Dispose() => _stream.Dispose();
 }

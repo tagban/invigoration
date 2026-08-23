@@ -17,8 +17,21 @@ public enum ChatEventType : uint
     Emote = 0x17,
 }
 
-/// <summary>A parsed SID_CHATEVENT. Replaces bnetbot.cls's per-event-type VB6 events with one typed record.</summary>
-public sealed record ChatEvent(ChatEventType Type, string Username, uint Flags, int Ping, string Text);
+/// <summary>Where a ChatEvent came from — distinguishes a Discord-relayed message from a real Battle.net one when they'd otherwise look identical (both have a null ChannelIndex; see BotEngine.Discord.cs/HandleDiscordMessageAsync).</summary>
+public enum ChatEventOrigin
+{
+    Battlenet,
+    Discord,
+}
+
+/// <summary>
+/// A parsed SID_CHATEVENT. Replaces bnetbot.cls's per-event-type VB6 events
+/// with one typed record. <see cref="ChannelIndex"/> is always null for
+/// classic BNCS/Chat-Telnet (protocol-level single-channel, so there's
+/// nothing to distinguish) — only ever set for a Stimpak-backed (SC2/SC:R/
+/// WC3:R) bot, which can be joined to several channels at once.
+/// </summary>
+public sealed record ChatEvent(ChatEventType Type, string Username, uint Flags, int Ping, string Text, byte? ChannelIndex = null, ChatEventOrigin Origin = ChatEventOrigin.Battlenet);
 
 [Flags]
 public enum UserFlags : uint

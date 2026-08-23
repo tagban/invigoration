@@ -18,6 +18,7 @@ public static class ChatCommands
 {
     public const byte ChatSlot = 5;
     public const byte ToonSlot = 15;
+    public const byte CacheSlot = 11;
     public const int ChannelIndexCount = 7;
 
     private const byte ChatJoinRequestCommand = 0;
@@ -27,6 +28,7 @@ public static class ChatCommands
     private const byte ChatMessageCommand = 11;
     private const byte ChatWhisperSendCommand = 19;
     private const byte ToonSelectCommand = 5;
+    private const byte CacheGetStreamItemsCommand = 9;
 
     private static BitWriter RecordWriter(byte command, byte serviceSlot)
     {
@@ -163,6 +165,38 @@ public static class ChatCommands
         writer.WriteBytes(rawName, aligned: true);
         WriteGeneratedChecksum(writer, width: 10, seed: 2);
         writer.Write(realm, 32);
+        writer.Align();
+        return writer.ToBytes();
+    }
+
+    /// <summary>
+    /// Requests a Battle.net "cache stream" item — this is how the client pulls
+    /// its bootstrap catalogs (Battle.net error strings, the public-channel
+    /// list) at the start of ChatBootstrap, before selecting a toon. Ported
+    /// from core/src/native/protocol.rs's cache_get_stream_items; upstream's
+    /// own LiveChat::establish sends exactly two of these immediately on
+    /// connecting (token 1: "BNET"/"ERRS"/"enUS" for the error catalog; token
+    /// 2: "BNET"/"CONF"/"enUS" for the public-channel catalog, whose response
+    /// is what resolves "General"'s numeric channel id). Response is decoded
+    /// as a CacheStreamItems payload on the Cache slot/command 9.
+    /// </summary>
+    public static byte[] CacheGetStreamItems(uint token, string channel, string itemName, string locale)
+    {
+        if (channel.Length != 4 || itemName.Length != 4 || locale.Length != 4)
+        {
+            throw new ArgumentException("Cache stream channel, item name, and locale must each be a four-character FourCC.");
+        }
+
+        var writer = RecordWriter(CacheGetStreamItemsCommand, CacheSlot);
+        writer.Write(token, 32);
+        WriteGeneratedChecksum(writer, width: 23, seed: 7);
+        writer.Write(0, 6);
+        writer.Write(1, 1);
+        writer.Write(FourCc.Encode(channel), 32);
+        writer.Write(FourCc.Encode(itemName), 32);
+        writer.Write(FourCc.Encode(locale), 32);
+        writer.Write(0xFFFF_FFFF, 32);
+        writer.Write(0, 1);
         writer.Align();
         return writer.ToBytes();
     }

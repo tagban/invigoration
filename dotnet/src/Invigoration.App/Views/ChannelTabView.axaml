@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="500"
+             x:Class="Invigoration.App.Views.ChannelTabView"
+             x:DataType="vm:ChannelTabViewModel">
+
+    <!-- One joined SC2/SC:R/WC3:R channel's chat log — same hand-rolled single
+         SelectableTextBlock approach as BotTabView's own flat log (see its
+         remarks), just scoped to this channel's own ChatLines instead of the
+         whole bot's. Background is set by the parent BotTabView, which knows
+         the bot's palette; this control only owns the channel-specific content. -->
+    <ScrollViewer Name="ChatScroll">
+        <SelectableTextBlock Name="ChatText" Margin="8" TextWrapping="Wrap" />
+    </ScrollViewer>
+</UserControl>

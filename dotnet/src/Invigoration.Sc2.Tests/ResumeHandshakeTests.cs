@@ -39,15 +39,56 @@ public class ResumeHandshakeTests
         Assert.Equal(FourCc.Encode("Mc64"), (uint)reader.Read(32));
         Assert.Equal(0x000a16a7u, (uint)reader.Read(32));
 
-        var accountLength = (int)reader.Read(9);
+        // Account::Mail length is biased -3 (IntegerRange { bit_width: 9, minimum: 3 }).
+        var accountLength = (int)reader.Read(9) + 3;
         var accountBytes = reader.ReadBytes(accountLength, aligned: true);
         Assert.Equal("player@example.com", Encoding.UTF8.GetString(accountBytes));
 
         Assert.Equal(1u, reader.Read(8));
 
-        var nameLength = (int)reader.Read(5);
+        // GameAccount::Name length is biased -1 (IntegerRange { bit_width: 5, minimum: 1 }).
+        var nameLength = (int)reader.Read(5) + 1;
         var nameBytes = reader.ReadBytes(nameLength, aligned: true);
         Assert.Equal("Tagban", Encoding.UTF8.GetString(nameBytes));
+    }
+
+    /// <summary>
+    /// Regression test for the live Boom(6)-rejection bug: the length prefixes for m_account and
+    /// m_gameAccountName must be biased by their schema's minimum (see the class remarks on
+    /// <see cref="ResumeHandshake"/>), not the raw byte count. This decodes the length fields as a
+    /// naive raw read (no bias) and asserts they do NOT equal the actual byte counts -- guarding
+    /// against a regression back to the unbiased encoding that upstream's server rejected.
+    /// </summary>
+    [Fact]
+    public void EncodeResumeRequest_LengthPrefixesAreBiasedNotRaw()
+    {
+        var account = "player@example.com"; // 19 bytes
+        var name = "Tagban"; // 6 bytes
+        var record = ResumeHandshake.EncodeResumeRequest(account, gameAccountRegion: 1, name);
+
+        var reader = new BitReader(record);
+        RoutingHeader.Decode(reader);
+        for (var i = 0; i < 3; i++)
+        {
+            reader.Read(32);
+        }
+
+        reader.Read(6); // m_versions count
+        for (var i = 0; i < 5; i++)
+        {
+            reader.Read(32);
+            reader.Read(32);
+            reader.Read(32);
+        }
+
+        var rawAccountLength = (int)reader.Read(9);
+        Assert.Equal(Encoding.UTF8.GetByteCount(account) - 3, rawAccountLength);
+        reader.ReadBytes(rawAccountLength + 3, aligned: true);
+
+        reader.Read(8); // m_gameAccountRegion
+
+        var rawNameLength = (int)reader.Read(5);
+        Assert.Equal(Encoding.UTF8.GetByteCount(name) - 1, rawNameLength);
     }
 
     [Fact]
@@ -124,13 +165,16 @@ public class ResumeHandshakeTests
         Assert.Empty(modules[0].Data);
     }
 
+    /// <summary>Battlenet::s32's wire value is `raw + minimum` with minimum = -2^31, i.e. the raw 32 bits with the sign bit flipped -- not a plain two's-complement bit-cast. See <see cref="ResumeHandshake"/>'s private ReadS32.</summary>
+    private static ulong BiasedS32(int value) => unchecked((uint)value) ^ 0x8000_0000UL;
+
     [Fact]
     public void DecodeResumeResponse_Success_ParsesPingTimeoutAndNoRegulator()
     {
         var writer = new BitWriter();
         writer.Write(0, 1); // success
         writer.Write(0, 3); // no final requests
-        writer.Write((uint)30, 32); // ping timeout
+        writer.Write(BiasedS32(30), 32); // ping timeout
         writer.Write(0, 1); // regulator rules absent
 
         var result = ResumeHandshake.DecodeResumeResponse(new BitReader(writer.ToBytes()));
@@ -147,7 +191,7 @@ public class ResumeHandshakeTests
         var writer = new BitWriter();
         writer.Write(0, 1); // success
         writer.Write(0, 3); // no final requests
-        writer.Write((uint)15, 32); // ping timeout
+        writer.Write(BiasedS32(15), 32); // ping timeout
         writer.Write(1, 1); // regulator rules present
         writer.Write(1, 1); // Info selector: LeakyBucket
         writer.Write(1000, 32); // threshold
@@ -169,7 +213,7 @@ public class ResumeHandshakeTests
         writer.Write(0, 1); // strings absent
         writer.Write(1, 2); // reason selector: failure
         writer.Write(1234, 16); // error code
-        writer.Write((uint)5, 32); // wait seconds
+        writer.Write(BiasedS32(5), 32); // wait seconds
 
         var result = ResumeHandshake.DecodeResumeResponse(new BitReader(writer.ToBytes()));
 
@@ -178,6 +222,23 @@ public class ResumeHandshakeTests
         var reason = Assert.IsType<ResumeFailureReason.Failed>(failure.Reason);
         Assert.Equal(1234, reason.ErrorCode);
         Assert.Equal(5, reason.WaitSeconds);
+    }
+
+    /// <summary>Regression test: a naive raw (unbiased) 32-bit read must NOT round-trip correctly for a nonzero value -- guards against reverting <c>ReadS32</c> back to a plain bit-cast.</summary>
+    [Fact]
+    public void DecodeResumeResponse_PingTimeout_IsNotADirectBitCast()
+    {
+        var writer = new BitWriter();
+        writer.Write(0, 1); // success
+        writer.Write(0, 3); // no final requests
+        writer.Write(BiasedS32(30), 32); // ping timeout, correctly biased
+        writer.Write(0, 1); // regulator rules absent
+
+        var result = ResumeHandshake.DecodeResumeResponse(new BitReader(writer.ToBytes()));
+
+        var success = Assert.IsType<ResumeResult.Success>(result);
+        Assert.NotEqual(unchecked((int)BiasedS32(30)), success.PingTimeoutSeconds);
+        Assert.Equal(30, success.PingTimeoutSeconds);
     }
 
     [Fact]

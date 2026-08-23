@@ -73,6 +73,19 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     public event Action<ChatEvent>? ChatMessage;
 
+    /// <summary>
+    /// Raised when BotEngine has mutated its own Config in a way that must
+    /// reach bots.json even though nothing routed through the Config window
+    /// (currently just BattlenetCredentialProfileId auto-assignment on first
+    /// SC2 connect — see BotEngine.Sc2.cs's EnsureBattlenetCredentialProfileId).
+    /// Nothing today calls SaveAll() on a bare Connect (only add/remove-bot,
+    /// a config-window save, or app close do), so without this an
+    /// auto-connect-on-startup bot that never touches those could lose the
+    /// assignment and recreate an orphaned profile next launch. The App
+    /// layer should treat this exactly like "please save the bot list now".
+    /// </summary>
+    public event Action? ConfigPersistNeeded;
+
     public BotEngine(BotConfig config)
     {
         Config = config;
@@ -92,6 +105,9 @@ public sealed partial class BotEngine : IAsyncDisposable
             BncsDisconnected?.Invoke(ex);
             MaybeScheduleAutoReconnect();
         };
+
+        WireChatTelnet();
+        WireDiscordBridge();
     }
 
     private bool _isIntentionalDisconnect;
@@ -167,11 +183,18 @@ public sealed partial class BotEngine : IAsyncDisposable
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         _isIntentionalDisconnect = false;
+        StartDiscordBridgeIfEnabled();
 
-        if (Config.ConnectionMode == ConnectionMode.TelnetGateway)
+        if (Config.ConnectionMode == ConnectionMode.Chat)
         {
-            throw new NotSupportedException(
-                "Telnet/chat-gateway mode is planned but not implemented yet; use BncsBinary.");
+            await ConnectChatTelnetAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        if (Config.Product == BncsProduct.Sc2)
+        {
+            await ConnectSc2Async(cancellationToken).ConfigureAwait(false);
+            return;
         }
 
         if (BncsProduct.IsLikelyIncompatible(Config.Product, Config.BattlenetServer))
@@ -195,15 +218,17 @@ public sealed partial class BotEngine : IAsyncDisposable
             string.IsNullOrEmpty(Config.ProxyUsername) ? null : Config.ProxyPassword)
         : null;
 
-    public Task DisconnectAsync()
+    public async Task DisconnectAsync()
     {
         _isIntentionalDisconnect = true;
         _autoReconnectCts?.Cancel();
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
+        _chatTelnet.Close();
+        await DisconnectSc2Async().ConfigureAwait(false);
+        await StopDiscordBridgeAsync().ConfigureAwait(false);
         LogInfo("Disconnected.");
-        return Task.CompletedTask;
     }
 
     /// <summary>
@@ -224,7 +249,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// this connection, so several of the user's own linked bots sending
     /// around the same moment still queue up rather than bursting together.
     /// </summary>
-    public async Task SendChatCommandAsync(string text)
+    public async Task SendChatCommandAsync(string text, byte? sc2ChannelOverride = null)
     {
         await ChatSendGate.WaitAsync().ConfigureAwait(false);
         try
@@ -240,8 +265,19 @@ public sealed partial class BotEngine : IAsyncDisposable
             var isSlashCommand = text.Length > 0 && text[0] == '/';
             var outgoing = isSlashCommand ? text : ApplyTextEffects(text);
 
-            await SendBncsAsync(new PacketWriter().WriteNTString(outgoing), BncsPacketId.SID_CHATCOMMAND)
-                .ConfigureAwait(false);
+            if (Config.ConnectionMode == ConnectionMode.Chat)
+            {
+                await _chatTelnet.SendLineAsync(outgoing).ConfigureAwait(false);
+            }
+            else if (Config.Product == BncsProduct.Sc2)
+            {
+                await SendSc2Async(outgoing, sc2ChannelOverride).ConfigureAwait(false);
+            }
+            else
+            {
+                await SendBncsAsync(new PacketWriter().WriteNTString(outgoing), BncsPacketId.SID_CHATCOMMAND)
+                    .ConfigureAwait(false);
+            }
 
             if (!isSlashCommand)
             {
@@ -279,6 +315,12 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     public async Task JoinHomeAsync()
     {
+        if (Config.ConnectionMode == ConnectionMode.Chat)
+        {
+            await _chatTelnet.SendLineAsync($"/join {Config.HomeChannel}").ConfigureAwait(false);
+            return;
+        }
+
         await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_LEAVECHAT).ConfigureAwait(false);
         await SendBncsAsync(
             new PacketWriter().WriteDword(2).WriteNTString(Config.HomeChannel),
@@ -431,12 +473,14 @@ public sealed partial class BotEngine : IAsyncDisposable
         }
     }
 
-    public ValueTask DisposeAsync()
+    public async ValueTask DisposeAsync()
     {
         Trivia.TriviaGroupRegistry.UnregisterEngine(this);
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
-        return ValueTask.CompletedTask;
+        _chatTelnet.Close();
+        await DisconnectSc2Async().ConfigureAwait(false);
+        await StopDiscordBridgeAsync().ConfigureAwait(false);
     }
 }

@@ -69,6 +69,14 @@ public static class ColorSchemeLibrary
         return path;
     }
 
+    public static void Delete(string filePath)
+    {
+        if (File.Exists(filePath))
+        {
+            File.Delete(filePath);
+        }
+    }
+
     private static string SanitizeFileName(string name)
     {
         var invalid = Path.GetInvalidFileNameChars();
