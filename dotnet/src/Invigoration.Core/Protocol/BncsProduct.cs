@@ -86,15 +86,20 @@ public static class BncsProduct
     public const string Chat = "TAHC";
 
     /// <summary>
-    /// Not a real BNCS product — a UI-only marker for StarCraft II, whose
-    /// modern Front/GameUtilities/Sunken login (Invigoration.Sc2, a separate
-    /// project) is an entirely different protocol with no classic-BNCS wire
-    /// form at all. Deliberately kept out of <see cref="Catalog"/>, same
-    /// reasoning as <see cref="Chat"/> — callers that reach the classic
-    /// BNCS/BNLS connect path (BotEngine.ConnectAsync) must check for this
-    /// and refuse instead of treating "SC2" as if it were a 4-char wire code.
+    /// Not a real BNCS product — a UI-only marker for StarCraft II, whose modern Battle.net
+    /// login (via the Stimpak native library — see BotEngine.Sc2.cs) is an entirely different
+    /// protocol with no classic-BNCS wire form at all. Deliberately kept out of
+    /// <see cref="Catalog"/>, same reasoning as <see cref="Chat"/> — callers that reach the
+    /// classic BNCS/BNLS connect path (BotEngine.ConnectAsync) must check for this and refuse
+    /// instead of treating "SC2" as if it were a 4-char wire code.
     /// </summary>
     public const string Sc2 = "SC2";
+
+    /// <summary>Same idea as <see cref="Sc2"/> — StarCraft: Remastered connects identically (Stimpak's own API has no per-game selector at all; see <see cref="IsStimpakBacked"/>).</summary>
+    public const string ScRemastered = "SCR";
+
+    /// <summary>Same idea as <see cref="Sc2"/> — Warcraft III: Reforged connects identically (Stimpak's own API has no per-game selector at all; see <see cref="IsStimpakBacked"/>).</summary>
+    public const string Wc3Reforged = "W3R";
 
     public static readonly IReadOnlyDictionary<string, BncsProductInfo> Catalog =
         new Dictionary<string, BncsProductInfo>
@@ -176,8 +181,14 @@ public static class BncsProduct
     public static byte? GetBnlsProductByte(string wireCode) =>
         Catalog.TryGetValue(wireCode, out var info) ? info.BnlsProductByte : null;
 
-    public static string GetDisplayName(string wireCode) =>
-        wireCode == Chat ? "Chat / Telnet" : Catalog.TryGetValue(wireCode, out var info) ? info.DisplayName : wireCode;
+    public static string GetDisplayName(string wireCode) => wireCode switch
+    {
+        Chat => "Chat / Telnet",
+        Sc2 => "StarCraft II",
+        ScRemastered => "StarCraft: Remastered",
+        Wc3Reforged => "Warcraft III: Reforged",
+        _ => Catalog.TryGetValue(wireCode, out var info) ? info.DisplayName : wireCode,
+    };
 
     /// <summary>Products that use the NLS/SRP-based new login system instead of the old double-hash system.</summary>
     public static bool UsesNewLoginSystem(string wireCode) => wireCode is Warcraft3 or Warcraft3TFT;
@@ -204,17 +215,14 @@ public static class BncsProduct
         Catalog.TryGetValue(wireCode, out var info) ? info.SupportsFriendsList : true;
 
     /// <summary>
-    /// Whether this product connects via ncarrillo/superiority's Stimpak
-    /// native library (modern web-auth login, multi-channel chat) rather
-    /// than the classic BNCS/Chat-Telnet path. Only SC2 today; StarCraft:
-    /// Remastered and WarCraft III: Reforged will also return true once
-    /// they exist as bot products, since the same Battle.net account and
-    /// connection mechanism covers all three — code that branches on this
-    /// (multi-channel UI, Battle.net credential profiles) should gate on
-    /// this helper rather than a literal "== Sc2" check, so adding those
-    /// products later doesn't mean hunting down every such check.
+    /// Whether this product connects via ncarrillo/superiority's Stimpak native library
+    /// (modern web-auth login, multi-channel chat) rather than the classic BNCS/Chat-Telnet
+    /// path. SC2, SC:Remastered, and WC3:Reforged all connect identically — the same Battle.net
+    /// account and connection mechanism covers all three, and Stimpak's own C# API has no
+    /// per-game selector at all — so code that branches on this (multi-channel UI, Battle.net
+    /// credential profiles) should gate on this helper rather than a literal "== Sc2" check.
     /// </summary>
-    public static bool IsStimpakBacked(string wireCode) => wireCode == Sc2;
+    public static bool IsStimpakBacked(string wireCode) => wireCode is Sc2 or ScRemastered or Wc3Reforged;
 
     /// <summary>Heuristic check used to warn before connecting a PrivateOnly product to what looks like official Battle.net.</summary>
     public static bool LooksLikeOfficialBattlenetHost(string hostOrAddress) =>

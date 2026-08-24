@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Invigoration.App.Models;
+using Invigoration.Core;
 using Invigoration.Core.Config;
 using Stimpak;
 
@@ -96,7 +97,11 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
         IsSigningIn = true;
         try
         {
-            using var client = new StimpakClient(BattlenetCredentialProfileStore.CredentialFilePath(Profile.Id));
+            StimpakNativeResolver.Register();
+            using var client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration")
+            {
+                CredentialPath = BattlenetCredentialProfileStore.CredentialFilePath(Profile.Id),
+            });
             var outcome = new TaskCompletionSource();
             client.EventReceived += next =>
             {

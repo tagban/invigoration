@@ -10,6 +10,13 @@ public class BotEngineSc2ChannelStateTests
 {
     private static BotEngine NewSc2Engine()
     {
+        // These tests construct a StimpakClient directly (below), bypassing
+        // BotEngine.ConnectSc2Async entirely — that's normally where this registration
+        // happens, so it needs to happen here too, or the very first StimpakClient
+        // construction in the whole test run throws (the OS finds Stimpak's own managed
+        // assembly before ever probing runtimes/<rid>/native/ — see StimpakNativeResolver).
+        StimpakNativeResolver.Register();
+
         var config = new BotConfig { Product = BncsProduct.Sc2, DisplayName = $"bot-{Guid.NewGuid():N}" };
         var engine = new BotEngine(config);
 
@@ -17,7 +24,7 @@ public class BotEngineSc2ChannelStateTests
         // unconditional client.People.Apply(next) has something real to call —
         // this is the same native library the app itself links against.
         var credentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin");
-        var client = new StimpakClient(credentialPath);
+        var client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = credentialPath });
         typeof(BotEngine).GetField("_sc2Client", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(engine, client);
 
         return engine;

@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Networking;
+using Stimpak;
 
 namespace Invigoration.Core.Config;
 
@@ -47,14 +48,16 @@ public sealed class BotConfig
     public string BattlenetCredentialProfileId { get; set; } = "";
 
     /// <summary>
-    /// Names of the channels joined last time this bot was connected (SC2/SC:R/WC3:R only —
-    /// classic BNCS/Chat-Telnet are single-channel and have nothing to remember here). Replayed
-    /// after connecting so the bot's set of open channels survives a reconnect or app restart;
-    /// the always-auto-joined default channel doesn't need special-casing since replay skips
-    /// any name already joined. Kept in sync automatically as channels are joined/left — not
-    /// meant to be hand-edited.
+    /// The channels joined last time this bot was connected (SC2/SC:R/WC3:R only — classic
+    /// BNCS/Chat-Telnet are single-channel and have nothing to remember here). Handed straight
+    /// to Stimpak's own StimpakConnectOptions.Channels on the next connect, which restores them
+    /// natively (an empty list just means the default "General") — not replayed by hand after
+    /// the fact. Kept in sync automatically as channels are joined/left — not meant to be
+    /// hand-edited. Stimpak's ChannelTarget is reused directly here (it already serializes via
+    /// the same JsonPolymorphic/JsonDerivedType attributes ConfigStore's plain
+    /// System.Text.Json options already understand) rather than re-deriving an equivalent type.
     /// </summary>
-    public List<string> Sc2LastChannelNames { get; set; } = new();
+    public List<ChannelTarget> Sc2LastChannels { get; set; } = new();
 
     /// <summary>
     /// Which named group this bot's top-level tab belongs to in MainWindow — "" means

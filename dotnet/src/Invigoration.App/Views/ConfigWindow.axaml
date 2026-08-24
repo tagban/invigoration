@@ -80,7 +80,7 @@
                                TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
                                Text="Chat/Telnet is an older plain-text login (no BNLS, CD-key, or version-check — just a username/password prompt) that some PVPGN networks still run alongside the normal protocol, e.g. eurobattle.net. Official Battle.net does not support it." />
 
-                    <StackPanel IsVisible="{Binding !IsSc2Product}" Spacing="8">
+                    <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">
                         <TextBlock Text="Battle.net Server" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
 
                         <ComboBox ItemsSource="{Binding OfficialServerOptions}"
@@ -124,7 +124,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <TextBlock IsVisible="{Binding IsSc2Product}"
+                    <TextBlock IsVisible="{Binding IsStimpakBackedProduct}"
                                TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
                                Text="StarCraft II connects through Battle.net's modern login system instead — no server address, BNLS, or version byte to configure here. Log in under Account below." />
 
@@ -182,7 +182,7 @@
             <Expander Header="Account" IsExpanded="True">
                 <StackPanel Margin="8" Spacing="8">
                     <!-- StarCraft II: a saved Battle.net login profile instead of username/password/CD-key -->
-                    <StackPanel IsVisible="{Binding IsSc2Product}" Spacing="8">
+                    <StackPanel IsVisible="{Binding IsStimpakBackedProduct}" Spacing="8">
                         <TextBlock Text="Battle.net Profile" FontWeight="Bold" FontSize="11" Opacity="0.8" />
                         <ComboBox ItemsSource="{Binding AvailableProfiles}" SelectedItem="{Binding SelectedProfile}"
                                   HorizontalAlignment="Stretch">
@@ -200,7 +200,7 @@
                                    TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
                     </StackPanel>
 
-                    <StackPanel IsVisible="{Binding !IsSc2Product}" Spacing="8">
+                    <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <TextBox Grid.Column="0" PlaceholderText="Username" Text="{Binding Config.Username}" />
                             <TextBox Grid.Column="1" PlaceholderText="Password" Text="{Binding Config.Password}" PasswordChar="*" />
@@ -216,7 +216,7 @@
                         <TextBox Grid.Column="0" PlaceholderText="Bot Master (always has full command access)" Text="{Binding Config.BotMaster}" />
                         <TextBox Grid.Column="1" PlaceholderText="Trigger" Width="70" MaxLength="1" Text="{Binding Config.Trigger}" />
                     </Grid>
-                    <TextBox PlaceholderText="Home channel" Text="{Binding HomeChannel}" IsVisible="{Binding !IsSc2Product}" />
+                    <TextBox PlaceholderText="Home channel" Text="{Binding HomeChannel}" IsVisible="{Binding !IsStimpakBackedProduct}" />
                 </StackPanel>
             </Expander>
 

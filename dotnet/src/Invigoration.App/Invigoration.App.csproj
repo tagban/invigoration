@@ -31,19 +31,7 @@
   <ItemGroup>
     <ProjectReference Include="..\Invigoration.Core\Invigoration.Core.csproj" />
     <ProjectReference Include="..\Invigoration.Sc2\Invigoration.Sc2.csproj" />
-    <!--
-      Referenced directly (not just transitively through Core) with the exact
-      same AdditionalProperties Core uses — otherwise MSBuild treats Core's
-      configured instance and App's transitive view of it as two different
-      project instances (different global-property sets), builds Stimpak
-      twice, and App's own output-copy step picks up the *other* (default,
-      unrenamed) instance. See Invigoration.Core.csproj's own comment on why
-      AssemblyName is overridden at all.
-    -->
-    <ProjectReference Include="..\..\..\native\superiority\stimpak\csharp\Stimpak\Stimpak.csproj">
-      <AdditionalProperties>StimpakBuildNative=false;AssemblyName=Stimpak.Managed</AdditionalProperties>
-    </ProjectReference>
   </ItemGroup>
 
-  <Import Project="..\StimpakNativeAssets.props" />
+  <Import Project="..\StimpakPackage.props" />
 </Project>

@@ -64,16 +64,26 @@ public class Sc2WhisperParsingTests
     }
 }
 
-/// <summary>Covers Config.Sc2LastChannelNames staying in sync with actually-joined channels, so a later reconnect can restore the same set — see BotEngine.Sc2.cs's RejoinRememberedSc2Channels/PersistSc2ChannelList.</summary>
+/// <summary>
+/// Covers Config.Sc2LastChannels staying in sync with actually-joined channels — see
+/// BotEngine.Sc2.cs's PersistSc2ChannelList. Channel *restoration* on connect is now handled
+/// natively by Stimpak itself (StimpakConnectOptions.Channels, passed in ConnectSc2Async), not
+/// something this engine replays by hand any more, so there's nothing left to test for that
+/// half — only that we keep an accurate list for the next connect to hand back to Stimpak.
+/// </summary>
 public class BotEngineSc2ChannelPersistenceTests
 {
     private static BotEngine NewSc2Engine(out BotConfig config)
     {
+        // See BotEngineSc2ChannelStateTests.NewSc2Engine's matching comment — bypassing
+        // ConnectSc2Async means this registration (normally done there) has to happen here too.
+        StimpakNativeResolver.Register();
+
         config = new BotConfig { Product = BncsProduct.Sc2, DisplayName = $"bot-{Guid.NewGuid():N}" };
         var engine = new BotEngine(config);
 
         var credentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin");
-        var client = new StimpakClient(credentialPath);
+        var client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = credentialPath });
         typeof(BotEngine).GetField("_sc2Client", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(engine, client);
 
         return engine;
@@ -87,7 +97,7 @@ public class BotEngineSc2ChannelPersistenceTests
     }
 
     [Fact]
-    public async Task JoiningAChannel_AddsItsNameToConfigAndFiresConfigPersistNeeded()
+    public async Task JoiningAPublicChannel_AddsItToConfigAndFiresConfigPersistNeeded()
     {
         await using var engine = NewSc2Engine(out var config);
         var fired = 0;
@@ -95,12 +105,22 @@ public class BotEngineSc2ChannelPersistenceTests
 
         await InvokeHandleSc2Event(engine, new Joined(1, new PublicChannel(100, "General"), 1));
 
-        Assert.Equal(["General"], config.Sc2LastChannelNames);
+        Assert.Equal([ChannelTarget.Public(100)], config.Sc2LastChannels);
         Assert.Equal(1, fired);
     }
 
     [Fact]
-    public async Task LeavingAChannel_RemovesItsNameFromConfig()
+    public async Task JoiningAPrivateChannel_AddsItByName()
+    {
+        await using var engine = NewSc2Engine(out var config);
+
+        await InvokeHandleSc2Event(engine, new Joined(1, new PrivateChannel("Clan BNU"), 1));
+
+        Assert.Equal([ChannelTarget.Private("Clan BNU")], config.Sc2LastChannels);
+    }
+
+    [Fact]
+    public async Task LeavingAChannel_RemovesItFromConfig()
     {
         await using var engine = NewSc2Engine(out var config);
 
@@ -108,58 +128,6 @@ public class BotEngineSc2ChannelPersistenceTests
         await InvokeHandleSc2Event(engine, new Joined(2, new PrivateChannel("Clan BNU"), 1));
         await InvokeHandleSc2Event(engine, new Left(1, null));
 
-        Assert.Equal(["Clan BNU"], config.Sc2LastChannelNames);
-    }
-
-    [Fact]
-    public async Task RejoinRememberedChannels_SkipsANameThatIsAlreadyJoined()
-    {
-        // The default channel auto-joins unconditionally on connect; if it happens to match a
-        // remembered name, replay must not attempt a redundant (and native-call-triggering)
-        // second join for it.
-        await using var engine = NewSc2Engine(out var config);
-        config.Sc2LastChannelNames = ["General"];
-        await InvokeHandleSc2Event(engine, new Joined(1, new PublicChannel(100, "General"), 1));
-
-        var fired = 0;
-        engine.ConfigPersistNeeded += () => fired++;
-
-        var method = typeof(BotEngine).GetMethod("RejoinRememberedSc2Channels", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        method.Invoke(engine, []);
-
-        // Only "General" is remembered and it's already joined, so nothing should have changed.
-        Assert.Equal(["General"], config.Sc2LastChannelNames);
-        Assert.Equal(0, fired);
-    }
-
-    /// <summary>
-    /// Regression test for a real bug: replay used to run as soon as PublicChannelsReceived
-    /// arrived, with no guarantee the always-auto-joined default channel's own Joined
-    /// confirmation had landed first. If it hadn't, replay couldn't see the default channel in
-    /// _sc2Channels yet and re-attempted joining it — the server correctly rejected the
-    /// duplicate, surfacing a confusing "Could not join General" error even though the bot was
-    /// already in General. MaybeRejoinRememberedSc2Channels now gates on both preconditions and
-    /// only ever runs once per connection.
-    /// </summary>
-    [Fact]
-    public async Task MaybeRejoinRememberedChannels_OnlyRunsOnceBothPreconditionsAreMetAndNeverTwice()
-    {
-        await using var engine = NewSc2Engine(out var config);
-        config.Sc2LastChannelNames = ["General"];
-        var attemptedField = typeof(BotEngine).GetField("_sc2RejoinAttempted", BindingFlags.NonPublic | BindingFlags.Instance)!;
-
-        // Default channel confirmed, but the catalog hasn't arrived yet — must not attempt yet.
-        await InvokeHandleSc2Event(engine, new Joined(1, new PublicChannel(100, "General"), 1));
-        Assert.False((bool)attemptedField.GetValue(engine)!);
-
-        // Catalog arrives — both preconditions are now met, so the guard flips (the actual
-        // replay attempt for "General" is a no-op since it's already joined).
-        await InvokeHandleSc2Event(engine, new PublicChannelsReceived([new PublicChannel(100, "General")]));
-        Assert.True((bool)attemptedField.GetValue(engine)!);
-
-        // A second PublicChannelsReceived must not re-run replay.
-        var namesBefore = config.Sc2LastChannelNames.ToList();
-        await InvokeHandleSc2Event(engine, new PublicChannelsReceived([new PublicChannel(100, "General")]));
-        Assert.Equal(namesBefore, config.Sc2LastChannelNames);
+        Assert.Equal([ChannelTarget.Private("Clan BNU")], config.Sc2LastChannels);
     }
 }

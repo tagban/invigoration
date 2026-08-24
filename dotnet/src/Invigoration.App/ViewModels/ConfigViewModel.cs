@@ -31,7 +31,14 @@ public partial class ConfigViewModel : ObservableObject
             [
                 new ProductOption(BncsProduct.Chat, "Chat / Telnet (no game, PVPGN only)", GameIconLoader.Get("chat")),
                 new ProductOption(BncsProduct.Sc2, "StarCraft II", GameIconLoader.Get("sc2")),
-                new ProductOption("SCRM", "StarCraft: Remastered (coming soon)", null, IsSelectable: false),
+                // Dedicated SC:R/WC3:R icons are still pending (the user's own future-icon-work
+                // backlog item) — these borrow the closest existing classic icon for the picker
+                // specifically. The Friends-list/roster side is a separate, harder limitation:
+                // Stimpak's own data has no per-contact game field at all, so every Stimpak-
+                // backed contact there falls back to the plain "sc2" icon regardless — see
+                // ChatIcon.GetProductIconKey's "sc2" sentinel case.
+                new ProductOption(BncsProduct.ScRemastered, "StarCraft: Remastered", GameIconLoader.Get("sc")),
+                new ProductOption(BncsProduct.Wc3Reforged, "Warcraft III: Reforged", GameIconLoader.Get("war3")),
             ])
             .ToList();
 
@@ -42,13 +49,13 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(ServerCompatibilityNote))]
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
     [NotifyPropertyChangedFor(nameof(IsChatProtocol))]
-    [NotifyPropertyChangedFor(nameof(IsSc2Product))]
+    [NotifyPropertyChangedFor(nameof(IsStimpakBackedProduct))]
     public partial string Product { get; set; }
 
     /// <summary>True when "Chat / Telnet" is the selected Game entry — hides the BNLS section (unused in that mode: no BNLS/CD-key/version-check at all, just a username/password prompt) and shows an explanatory note. Selecting this Product is the only way to turn on Config.ConnectionMode.Chat; see OnProductChanged.</summary>
     public bool IsChatProtocol => Product == BncsProduct.Chat;
 
-    public bool IsSc2Product => Product == BncsProduct.Sc2;
+    public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
 
     // --- StarCraft II login: which saved Battle.net login (see "Manage Battle.net
     // Profiles..." under the Customize menu) this bot uses. The actual sign-in itself
@@ -150,9 +157,9 @@ public partial class ConfigViewModel : ObservableObject
 
     public ObservableCollection<string> ServerSuggestions { get; } = [];
 
-    public bool RequiresExpansionKey => !IsSc2Product && BncsProduct.RequiresExpansionCdKey(Product);
+    public bool RequiresExpansionKey => !IsStimpakBackedProduct && BncsProduct.RequiresExpansionCdKey(Product);
 
-    public bool RequiresCdKey => !IsSc2Product && BncsProduct.RequiresCdKey(Product);
+    public bool RequiresCdKey => !IsStimpakBackedProduct && BncsProduct.RequiresCdKey(Product);
 
     public bool AllowsOfficialServers => BncsProduct.GetServerCompatibility(Product) == ServerCompatibility.Both;
 
@@ -160,8 +167,13 @@ public partial class ConfigViewModel : ObservableObject
         BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.Notes : null;
 
     public Bitmap? ProductIconImage => GameIconLoader.Get(
-        IsSc2Product ? "sc2" :
-        BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.IconKey : ChatIcon.GetProductIconKey(Product));
+        Product switch
+        {
+            BncsProduct.Sc2 => "sc2",
+            BncsProduct.ScRemastered => "sc",
+            BncsProduct.Wc3Reforged => "war3",
+            _ => BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.IconKey : ChatIcon.GetProductIconKey(Product),
+        });
 
     // --- Official server picker (4 fixed choices + "Other...") ---
 

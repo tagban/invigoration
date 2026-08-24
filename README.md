@@ -47,7 +47,7 @@ Swap any chat icon for your own image — game icons, status icons, all overrida
 
 ### StarCraft II / SC:Remastered / WC3:Reforged
 
-Set a bot's **Product** to StarCraft II (or SC:R/WC3:R, once available) in its Configuration window and Connect — these products log in through Blizzard's modern Battle.net service instead of the classic protocol the rest of this app uses, so a few things work differently:
+Set a bot's **Product** to StarCraft II, StarCraft: Remastered, or Warcraft III: Reforged in its Configuration window and Connect — these products log in through Blizzard's modern Battle.net service instead of the classic protocol the rest of this app uses, so a few things work differently:
 
 - **Battle.net credential profiles**: instead of each bot having its own implicit login, a bot picks a named **Battle.net Profile** from a dropdown in its Configuration window. Point two bots at the same profile to share one signed-in login (handy for running an SC2 and a WC3:R bot on the same account); give a bot its own profile for a separate login. Manage profiles — rename, sign in, remove — from **Customize → Manage Battle.net Profiles...**.
 - **Multi-channel chat**: unlike classic Battle.net's single-channel chat, these products can be joined to several channels at once (up to 6). Each joined channel gets its own sub-tab with its own chat log and user list; use the **+** button above the sub-tabs to join another public or private channel, and the **×** on a sub-tab to leave it. The bot remembers which channels it had open and rejoins them on reconnect.
@@ -94,26 +94,19 @@ Grab the latest build from the [Releases page](https://github.com/tagban/invigor
 
 ## Building from source
 
-Requires the [.NET 10 SDK](https://dotnet.microsoft.com/download) and, for StarCraft II/SC:R/WC3:R connectivity, a [Rust toolchain](https://rustup.rs) (this repo vendors [ncarrillo/superiority](https://github.com/ncarrillo/superiority) as a git submodule for that).
+Requires only the [.NET 10 SDK](https://dotnet.microsoft.com/download) — StarCraft II/SC:R/WC3:R connectivity comes from the prebuilt [Stimpak](https://www.nuget.org/packages/Stimpak) NuGet package (Windows, macOS, and Linux native binaries all ship in the package itself), so no Rust toolchain or git submodule is needed.
 
 ```bash
-git clone --recurse-submodules https://github.com/tagban/invigoration.git
-# already cloned without submodules? git submodule update --init --recursive
-
-cd invigoration/native
-./build.sh              # builds the SC2 native library once — needed before the first App build
-
-cd ../dotnet
-dotnet build src/Invigoration.App/Invigoration.App.csproj
+git clone https://github.com/tagban/invigoration.git
+cd invigoration/dotnet
+dotnet build Invigoration.slnx
 ```
 
-Build `Invigoration.App.csproj` directly, not the `.slnx` — a solution-level build uses a different project-graph traversal that doesn't reliably apply the `AssemblyName` override the native SC2 library needs to avoid colliding with its own managed assembly on a case-insensitive filesystem (Windows).
-
-macOS releases are built, signed with a Developer ID certificate, and notarized via `dotnet/build-macos.sh`. Linux releases are packaged via `dotnet/build-linux.sh`. See those scripts for the full pipeline.
+macOS releases are built, signed with a Developer ID certificate, and notarized via `dotnet/build-macos.sh`. Linux releases are packaged via `dotnet/build-linux.sh`. Windows releases are packaged as a single-file exe via `dotnet/build-windows.ps1`. See those scripts for the full pipeline.
 
 ## Acknowledgments
 
-StarCraft II, StarCraft: Remastered, and Warcraft III: Reforged connectivity is built on protocol research from [Superiority](https://github.com/ncarrillo/superiority) — its Rust implementation was the reference for Invigoration's own native client.
+StarCraft II, StarCraft: Remastered, and Warcraft III: Reforged connectivity is powered by [Stimpak](https://github.com/ncarrillo/superiority), ncarrillo's native Battle.net client library.
 
 ## Status
 
