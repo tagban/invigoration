@@ -155,6 +155,16 @@ public partial class MainWindowViewModel : ViewModelBase
     /// TabControl currently has selected, not the group as a whole. Re-run whenever either
     /// selection level changes (see SetActiveTopLevelItem and the groupTab.PropertyChanged
     /// subscription above) so both stay in sync with what's actually on screen.
+    ///
+    /// Also keeps SelectedBot itself pointed at whichever bot is genuinely visible — this used
+    /// to be MainWindow.axaml.cs's job alone (OnTopLevelTabSelectionChanged), but that only ever
+    /// fires for a plain top-level bot tab, never for switching sub-tabs *inside* a group's own
+    /// nested TabControl. A grouped bot's own click only ever reached this method (via the
+    /// groupTab.PropertyChanged subscription below), so SelectedBot — what "Edit/Remove Selected
+    /// Bot" actually reads — stayed frozen on whichever bot last selected it directly (e.g. the
+    /// last-added bot), regardless of which grouped sub-tab was actually showing. Skipped when
+    /// active is null (e.g. the Whispers tab is showing) so the existing "last real bot you were
+    /// looking at" fallback for those menu actions is preserved.
     /// </summary>
     private void RecomputeActiveBot()
     {
@@ -168,6 +178,11 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var bot in Bots)
         {
             bot.IsActive = bot == active;
+        }
+
+        if (active is not null)
+        {
+            SelectedBot = active;
         }
     }
 

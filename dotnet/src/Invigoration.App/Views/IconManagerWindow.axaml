@@ -48,8 +48,8 @@
                     <ItemsControl ItemsSource="{Binding GameIcons}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:IconSlotViewModel">
-                                <Grid ColumnDefinitions="48,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
-                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxWidth="40" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
+                                <Grid ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
+                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="White" VerticalAlignment="Center" Margin="10,0" />
                                     <Button Grid.Column="2" Content="Change..." Click="OnChangeIconClick" Margin="4,0" />
                                     <Button Grid.Column="3" Content="Reset"
@@ -67,8 +67,8 @@
                     <ItemsControl ItemsSource="{Binding StatusIcons}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:IconSlotViewModel">
-                                <Grid ColumnDefinitions="48,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
-                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxWidth="32" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
+                                <Grid ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
+                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="White" VerticalAlignment="Center" Margin="10,0" />
                                     <Button Grid.Column="2" Content="Change..." Click="OnChangeIconClick" Margin="4,0" />
                                     <Button Grid.Column="3" Content="Reset"
@@ -86,8 +86,29 @@
                     <ItemsControl ItemsSource="{Binding FriendIcons}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:IconSlotViewModel">
-                                <Grid ColumnDefinitions="48,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
-                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxWidth="32" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
+                                <Grid ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
+                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="White" VerticalAlignment="Center" Margin="10,0" />
+                                    <Button Grid.Column="2" Content="Change..." Click="OnChangeIconClick" Margin="4,0" />
+                                    <Button Grid.Column="3" Content="Reset"
+                                            Command="{Binding $parent[ItemsControl].((vm:IconManagerViewModel)DataContext).ResetIconCommand}"
+                                            CommandParameter="{Binding}"
+                                            IsVisible="{Binding HasOverride}" Margin="4,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Custom Icons" FontWeight="Bold" Foreground="White" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,0,0,4"
+                               Text="Not tied to any Blizzard product — connection-type badges and the global Whispers tab's icon." />
+                    <ItemsControl ItemsSource="{Binding CustomIcons}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IconSlotViewModel">
+                                <Grid ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
+                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
                                     <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="White" VerticalAlignment="Center" Margin="10,0" />
                                     <Button Grid.Column="2" Content="Change..." Click="OnChangeIconClick" Margin="4,0" />
                                     <Button Grid.Column="3" Content="Reset"

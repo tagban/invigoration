@@ -28,9 +28,22 @@
             <TextBox PlaceholderText="Display name" Text="{Binding Config.DisplayName}" FontSize="16" />
 
             <StackPanel Spacing="2">
-                <TextBox PlaceholderText="Tab group (optional)" Text="{Binding Config.TabGroup}" FontSize="12" />
+                <TextBox PlaceholderText="Tab group (optional)" Text="{Binding TabGroup}" FontSize="12" />
                 <TextBlock Text="Bots sharing the same tab group collapse into one top-level tab, with their own sub-tabs — handy for several bots on the same server. Leave blank to keep this bot as its own tab."
                            TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0" IsVisible="{Binding IsInTabGroup}">
+                    <TextBlock Text="Group icon:" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
+                    <ComboBox ItemsSource="{Binding AvailableGroupIcons}" SelectedItem="{Binding SelectedGroupIcon}" Width="220">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IconOption">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Image Source="{Binding Icon}" Width="20" Height="20" Stretch="Uniform" />
+                                    <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
             </StackPanel>
 
             <!-- Game: select the product first; everything else reacts to this -->
@@ -188,7 +201,7 @@
                                   HorizontalAlignment="Stretch">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="cfg:BattlenetCredentialProfile">
-                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding DisplayLabel}" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>

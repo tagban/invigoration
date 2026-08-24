@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +21,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     public BotConfig Config => Engine.Config;
 
     public string Title => Config.DisplayName;
+
+    /// <summary>Small game/client icon shown next to this tab's title — same icon key the Config window's own product picker uses (see BncsProduct.GetIconKey), just rendered smaller here.</summary>
+    public Bitmap? TabIconImage => GameIconLoader.Get(BncsProduct.GetIconKey(Config.Product));
 
     /// <summary>The active bot's scheme-specific accent, for marking this tab as the open one and/or the chat input as focused.</summary>
     public IBrush HighlightBrush => new SolidColorBrush(
@@ -74,11 +78,6 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// <summary>One entry per peer this bot has whispered with, most-recently-active first — see UpsertWhisper. The only place a whisper's text is shown; it no longer also appears in the normal chat log (see HandleChatEvent's Whisper/WhisperSent cases).</summary>
     public ObservableCollection<WhisperThreadViewModel> WhisperThreads { get; } = [];
 
-    [ObservableProperty]
-    public partial WhisperThreadViewModel? SelectedWhisperThread { get; set; }
-
-    partial void OnSelectedWhisperThreadChanged(WhisperThreadViewModel? value) => value?.MarkRead();
-
     /// <summary>Read-only snapshot of the shared roster for the Clan tab, filtered to formal members (IsClanMember) only — everyone else the bot has auto-tracked from chatting stays out of this tab, and only shows in the full Seen List window. Edits happen in the dedicated Clan Members window, opened via the "Manage Members..." button there.</summary>
     public ObservableCollection<ClanMemberViewModel> ClanRoster { get; } = [];
 
@@ -119,6 +118,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine.Config = newConfig;
         OnPropertyChanged(nameof(Config));
         OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(TabIconImage));
         OnPropertyChanged(nameof(HighlightBrush));
         OnPropertyChanged(nameof(BackgroundBrush));
         OnPropertyChanged(nameof(SupportsFriends));
@@ -379,9 +379,17 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    /// <summary>Battle.net's own system account for account-notification whispers (e.g. "you have unread mail") — not a real user, pure noise for a bot. Ignored only for incoming whispers; a deliberately-sent outgoing one (unlikely, but conceivable) isn't suppressed.</summary>
+    private const string IgnoredWhisperSender = "# Email Service #";
+
     /// <summary>Finds or creates the thread for a peer, appends the message, and bumps it to the top of WhisperThreads (most-recently-active first) — the single entry point both incoming Whisper and outgoing WhisperSent events go through, see HandleChatEvent.</summary>
-    private WhisperThreadViewModel UpsertWhisper(string peer, string text, bool incoming, ChatPalette palette)
+    private WhisperThreadViewModel? UpsertWhisper(string peer, string text, bool incoming, ChatPalette palette)
     {
+        if (incoming && string.Equals(peer, IgnoredWhisperSender, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
         if (thread is null)
         {
@@ -400,7 +408,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         var lineText = incoming ? $"{peer}: {text}" : $"You: {text}";
         thread.Messages.Add(new ChatLineViewModel(lineText, incoming ? palette.Whisper : palette.SelfUserName));
         thread.LastActivityUtc = DateTime.UtcNow;
-        if (incoming && SelectedWhisperThread != thread)
+        if (incoming)
         {
             thread.HasUnread = true;
         }

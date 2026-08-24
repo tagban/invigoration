@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
+using Invigoration.App.Models;
+using Invigoration.Core.Config;
 
 namespace Invigoration.App.ViewModels;
 
@@ -18,6 +21,14 @@ public sealed partial class BotGroupTabViewModel : ViewModelBase
 
     /// <summary>Borrows the first member's scheme color rather than picking one of its own — a group has no palette of its own to draw from.</summary>
     public IBrush HighlightBrush { get; }
+
+    /// <summary>
+    /// A user can assign this group its own icon from the Config window (next to the Tab Group
+    /// field — see TabGroupIconStore); with no assignment, falls back to borrowing the first
+    /// member's own icon, same "no palette of its own" idea as HighlightBrush.
+    /// </summary>
+    public Bitmap? TabIconImage => GameIconLoader.Get(TabGroupIconStore.GetIconKey(Title) ?? "")
+        ?? (Bots.Count > 0 ? Bots[0].TabIconImage : null);
 
     /// <summary>Same normal-tab header look as a plain BotTabViewModel — see GlobalWhispersTabViewModel's matching properties for why the Whispers pseudo-tab overrides both.</summary>
     public double HeaderFontSize => 13;

@@ -191,7 +191,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             return;
         }
 
-        if (Config.Product == BncsProduct.Sc2)
+        if (BncsProduct.IsStimpakBacked(Config.Product))
         {
             await ConnectSc2Async(cancellationToken).ConfigureAwait(false);
             return;
@@ -269,7 +269,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             {
                 await _chatTelnet.SendLineAsync(outgoing).ConfigureAwait(false);
             }
-            else if (Config.Product == BncsProduct.Sc2)
+            else if (BncsProduct.IsStimpakBacked(Config.Product))
             {
                 await SendSc2Async(outgoing, sc2ChannelOverride).ConfigureAwait(false);
             }

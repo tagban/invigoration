@@ -57,6 +57,28 @@ public partial class ConfigViewModel : ObservableObject
 
     public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
 
+    // --- Tab group icon: which icon (see IconCatalog) this bot's Tab Group shows on its
+    // collapsed top-level tab, once it has one — see TabGroupIconStore. Groups aren't a
+    // separate persisted entity, so this is keyed by the group name text itself; changing
+    // the name switches which assignment is being edited. ---
+
+    private static readonly IconOption NoGroupIconSentinel = new("", "(use first bot's icon)", null);
+
+    public IReadOnlyList<IconOption> AvailableGroupIcons { get; } =
+        new[] { NoGroupIconSentinel }
+            .Concat(IconCatalog.GameIcons.Concat(IconCatalog.CustomIcons)
+                .Select(s => new IconOption(s.Key, s.DisplayName, GameIconLoader.Get(s.Key))))
+            .ToList();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsInTabGroup))]
+    public partial string TabGroup { get; set; }
+
+    [ObservableProperty]
+    public partial IconOption SelectedGroupIcon { get; set; } = NoGroupIconSentinel;
+
+    public bool IsInTabGroup => !string.IsNullOrWhiteSpace(TabGroup);
+
     // --- StarCraft II login: which saved Battle.net login (see "Manage Battle.net
     // Profiles..." under the Customize menu) this bot uses. The actual sign-in itself
     // happens through Stimpak's own native window on first real connect (or from the
@@ -166,14 +188,7 @@ public partial class ConfigViewModel : ObservableObject
     public string? ServerCompatibilityNote =>
         BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.Notes : null;
 
-    public Bitmap? ProductIconImage => GameIconLoader.Get(
-        Product switch
-        {
-            BncsProduct.Sc2 => "sc2",
-            BncsProduct.ScRemastered => "sc",
-            BncsProduct.Wc3Reforged => "war3",
-            _ => BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.IconKey : ChatIcon.GetProductIconKey(Product),
-        });
+    public Bitmap? ProductIconImage => GameIconLoader.Get(BncsProduct.GetIconKey(Product));
 
     // --- Official server picker (4 fixed choices + "Other...") ---
 
@@ -263,6 +278,8 @@ public partial class ConfigViewModel : ObservableObject
     {
         Config = config;
         Product = config.Product;
+        TabGroup = config.TabGroup;
+        SelectedGroupIcon = AvailableGroupIcons.FirstOrDefault(o => o.Key == TabGroupIconStore.GetIconKey(TabGroup)) ?? NoGroupIconSentinel;
         ProxyEnabled = config.ProxyEnabled;
         ProxyProtocol = config.ProxyProtocol;
         SelectedOfficialServer = BncsProduct.OfficialBattlenetServers.Contains(config.BattlenetServer)
@@ -359,6 +376,21 @@ public partial class ConfigViewModel : ObservableObject
 
     partial void OnProxyProtocolChanged(ProxyProtocol value) => Config.ProxyProtocol = value;
 
+    partial void OnTabGroupChanged(string value)
+    {
+        Config.TabGroup = value;
+        SelectedGroupIcon = AvailableGroupIcons.FirstOrDefault(o => o.Key == TabGroupIconStore.GetIconKey(value)) ?? NoGroupIconSentinel;
+    }
+
+    /// <summary>Applied immediately (not batched into Save) since a group's icon is shared state keyed by name, not part of this one bot's own Config.</summary>
+    partial void OnSelectedGroupIconChanged(IconOption value)
+    {
+        if (!string.IsNullOrWhiteSpace(TabGroup))
+        {
+            TabGroupIconStore.SetIconKey(TabGroup, value.Key);
+        }
+    }
+
     partial void OnProxyEnabledChanged(bool value) => Config.ProxyEnabled = value;
 
     partial void OnSelectedOfficialServerChanged(string value)
@@ -397,6 +429,9 @@ public sealed record ProductOption(string WireCode, string DisplayName, Bitmap? 
 {
     public double DisplayOpacity => IsSelectable ? 1.0 : 0.4;
 }
+
+/// <summary>One pickable entry in a "choose an icon" list — see ConfigViewModel.AvailableGroupIcons.</summary>
+public sealed record IconOption(string Key, string DisplayName, Bitmap? Icon);
 
 public sealed record ColorSchemeOption(ChatColorScheme Value, string DisplayName);
 

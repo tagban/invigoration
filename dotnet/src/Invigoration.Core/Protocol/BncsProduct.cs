@@ -224,6 +224,26 @@ public static class BncsProduct
     /// </summary>
     public static bool IsStimpakBacked(string wireCode) => wireCode is Sc2 or ScRemastered or Wc3Reforged;
 
+    /// <summary>
+    /// Chat-icon key identifying this exact product — used anywhere a picker/tab needs to show
+    /// one specific product's icon rather than a roster entry's own (ambiguous) statstring-based
+    /// one. Stimpak-backed products get a dedicated case here since <see cref="Chat.ChatIcon"/>
+    /// .GetProductIconKey has no real notion of them at all — it's driven by BNCS statstrings,
+    /// not <c>BotConfig.Product</c>'s own 3-character "SC2"/"SCR"/"W3R" sentinels (its lone
+    /// Stimpak special-case matches lowercase "sc2" only, a friend-roster sentinel BotEngine.Sc2.cs
+    /// stamps — comparing this uppercase constant against it directly would silently miss).
+    /// Everything else resolves through Catalog's own IconKey (which already prefers a picker-only
+    /// IconKeyOverride over the plain statstring-based lookup), falling back to GetProductIconKey
+    /// directly for a wire code with no Catalog entry (e.g. Chat's own "TAHC").
+    /// </summary>
+    public static string GetIconKey(string wireCode) => wireCode switch
+    {
+        Sc2 => "sc2",
+        ScRemastered => "sc",
+        Wc3Reforged => "war3",
+        _ => Catalog.TryGetValue(wireCode, out var info) ? info.IconKey : Invigoration.Core.Chat.ChatIcon.GetProductIconKey(wireCode),
+    };
+
     /// <summary>Heuristic check used to warn before connecting a PrivateOnly product to what looks like official Battle.net.</summary>
     public static bool LooksLikeOfficialBattlenetHost(string hostOrAddress) =>
         hostOrAddress.Equals("battle.net", StringComparison.OrdinalIgnoreCase) ||

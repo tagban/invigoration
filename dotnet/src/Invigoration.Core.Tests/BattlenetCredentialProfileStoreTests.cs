@@ -3,6 +3,39 @@ using Invigoration.Core.Config;
 
 namespace Invigoration.Core.Tests;
 
+/// <summary>
+/// Redirects BattlenetCredentialProfileStore to an isolated temp directory for the whole
+/// "BattlenetCredentialProfileStore" test collection, so these tests never touch the real
+/// %AppData%/Invigoration/battlenet-credential-profiles.json — they used to, since the store
+/// (a static class with a hardcoded path, like ClanRankStore) had no test-injectable override,
+/// which quietly wrote a real, permanent, ever-growing "profile-&lt;guid&gt;" entry into the
+/// user's actual profile list on every single test run (confirmed live: 25 leftover junk
+/// profiles found in a real %AppData% after this session's several `dotnet test` runs — the
+/// per-test `finally` cleanup only ever removed the in-memory List entry, never called Save(),
+/// so the on-disk file was never actually cleaned up).
+/// </summary>
+public sealed class BattlenetCredentialProfileStoreFixture : IDisposable
+{
+    private readonly string _tempDir = Path.Combine(Path.GetTempPath(), $"invigoration-test-credprofiles-{Guid.NewGuid():N}");
+
+    public BattlenetCredentialProfileStoreFixture() => BattlenetCredentialProfileStore.ConfigDirectoryOverride = _tempDir;
+
+    public void Dispose()
+    {
+        BattlenetCredentialProfileStore.ConfigDirectoryOverride = null;
+        try
+        {
+            Directory.Delete(_tempDir, recursive: true);
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+    }
+}
+
+[CollectionDefinition("BattlenetCredentialProfileStore")]
+public class BattlenetCredentialProfileStoreCollection : ICollectionFixture<BattlenetCredentialProfileStoreFixture>;
+
 [Collection("BattlenetCredentialProfileStore")]
 public class BattlenetCredentialProfileStoreTests
 {

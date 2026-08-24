@@ -72,16 +72,24 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsSigningIn { get; set; }
 
+    [ObservableProperty]
+    public partial string? BattleTag { get; set; }
+
     public BattlenetCredentialProfileViewModel(BattlenetCredentialProfile profile)
     {
         Profile = profile;
         Name = profile.Name;
+        BattleTag = profile.BattleTag;
         RefreshIsSignedIn();
     }
 
     partial void OnNameChanged(string value) => Profile.Name = value;
 
-    private void RefreshIsSignedIn() => IsSignedIn = BattlenetCredentialProfileStore.HasCachedCredential(Profile.Id);
+    private void RefreshIsSignedIn()
+    {
+        IsSignedIn = BattlenetCredentialProfileStore.HasCachedCredential(Profile.Id);
+        BattleTag = Profile.BattleTag;
+    }
 
     /// <summary>
     /// Standalone verification/sign-in: spins up a throwaway StimpakClient
@@ -112,6 +120,10 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
                         break;
                     case AuthenticationRequired auth:
                         _ = SubmitChallengeAsync(client, auth, owner, outcome);
+                        break;
+                    case AccountConnected connected:
+                        BattlenetCredentialProfileStore.UpdateBattleTag(Profile.Id, connected.Account.BattleTag);
+                        BattleTag = connected.Account.BattleTag;
                         break;
                     case SessionFailed failed:
                         outcome.TrySetException(new InvalidOperationException(failed.Message));

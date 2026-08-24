@@ -243,65 +243,6 @@
                 </DockPanel>
             </TabItem>
 
-            <!-- One entry per peer this bot has whispered with — always available regardless of
-                 product, since it's the only reliable place to read/send a whisper on a
-                 SupportsMultiChannel (SC2/SC:R/WC3:R) bot, where whispers aren't channel-scoped
-                 and so have no natural sub-tab of their own. -->
-            <TabItem>
-                <TabItem.Header>
-                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="0,0,0,4">
-                        <TextBlock Text="Whispers" />
-                    </Border>
-                </TabItem.Header>
-                <Grid ColumnDefinitions="140,*">
-                    <ListBox Grid.Column="0" ItemsSource="{Binding WhisperThreads}" SelectedItem="{Binding SelectedWhisperThread}"
-                              Background="Transparent" BorderThickness="0,0,1,0" BorderBrush="#3A3A3A" Padding="0,4">
-                        <ListBox.Styles>
-                            <Style Selector="ListBoxItem">
-                                <Setter Property="Padding" Value="8,4" />
-                                <Setter Property="MinHeight" Value="0" />
-                            </Style>
-                        </ListBox.Styles>
-                        <ListBox.ItemTemplate>
-                            <DataTemplate x:DataType="models:WhisperThreadViewModel">
-                                <StackPanel Orientation="Horizontal" Spacing="4">
-                                    <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
-                                    <TextBlock Text="{Binding Peer}" Foreground="White" FontSize="12" TextTrimming="CharacterEllipsis" />
-                                </StackPanel>
-                            </DataTemplate>
-                        </ListBox.ItemTemplate>
-                    </ListBox>
-                    <Grid Grid.Column="1" RowDefinitions="*,Auto" IsVisible="{Binding SelectedWhisperThread, Converter={x:Static ObjectConverters.IsNotNull}}">
-                        <ScrollViewer Grid.Row="0" Name="WhisperScroll">
-                            <ItemsControl ItemsSource="{Binding SelectedWhisperThread.Messages}" Margin="8">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate x:DataType="models:ChatLineViewModel">
-                                        <ItemsControl ItemsSource="{Binding Segments}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate>
-                                                    <WrapPanel />
-                                                </ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="models:ChatSegmentViewModel">
-                                                    <TextBlock Text="{Binding Text}" Foreground="{Binding Brush}" TextWrapping="Wrap" />
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
-                        <Grid Grid.Row="1" ColumnDefinitions="*,Auto" Margin="8">
-                            <TextBox Grid.Column="0" PlaceholderText="Type a whisper..." Text="{Binding SelectedWhisperThread.DraftText}"
-                                     Name="WhisperInputBox" />
-                            <Button Grid.Column="1" Content="Send" Margin="4,0,0,0" Padding="10,3"
-                                    Command="{Binding SendWhisperCommand}" CommandParameter="{Binding SelectedWhisperThread}" />
-                        </Grid>
-                    </Grid>
-                </Grid>
-            </TabItem>
-
             <!-- The bot's own clan-management system (roster/rank/alias/trivia-score), not Battle.net's native clan protocol.
                  Only shown once this bot has ClanFeatureEnabled turned on (Config window) AND the shared roster has at
                  least one member — see BotTabViewModel.SupportsClan. -->

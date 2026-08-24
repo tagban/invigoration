@@ -412,6 +412,22 @@ public sealed partial class BotEngine
                 await HandleSc2AuthenticationRequiredAsync(client, auth).ConfigureAwait(false);
                 break;
 
+            case AccountConnected connected:
+                // Ties this profile to the real signed-in BattleTag so it's identifiable if the
+                // user has more than one Battle.net account — see BattlenetCredentialProfile
+                // .DisplayLabel. Config.BattlenetCredentialProfileId is already guaranteed set by
+                // now (ConnectSc2Async resolves it via Sc2CredentialPath before Connect is called).
+                BattlenetCredentialProfileStore.UpdateBattleTag(Config.BattlenetCredentialProfileId, connected.Account.BattleTag);
+
+                // Account.Games is presumably which Blizzard products this account can actually
+                // play (so a future check could refuse connecting a WC3:Reforged bot to an
+                // account with no WC3:R license, matching what upstream's author described) — its
+                // real string values haven't been observed yet against a live account, so this is
+                // logged rather than acted on for now. Once a real value is seen here, wire an
+                // actual gate instead of guessing at the format.
+                LogDebug($"StarCraft II account: {connected.Account.BattleTag} — games: [{string.Join(", ", connected.Account.Games ?? [])}]");
+                break;
+
             case Joined joined:
                 var isFirstChannel = _sc2Channels.Count == 0;
                 _sc2Channels[joined.ChannelIndex] = new Sc2ChannelSession(joined.ChannelIndex, joined.Channel);
@@ -487,6 +503,18 @@ public sealed partial class BotEngine
                 break;
 
             case SessionEnded:
+                // Used to close every sub-tab silently and stop there — this bot then sat there
+                // looking "connected" (no error, no BncsDisconnected) with a dead client
+                // underneath: any further join/send just failed quietly. A real Battle.net
+                // account can only run one live chat session at a time, so this reliably fires
+                // whenever a second Stimpak-backed bot (SC2/SC:R/WC3:R) signs in with the *same*
+                // shared Battle.net credential profile while this one is still connected — the
+                // account's session gets handed to whichever client authenticated most recently,
+                // and every other client sharing that profile is silently dropped. Surfacing it
+                // properly (LogError + BncsDisconnected + the same auto-reconnect path a real
+                // connection loss uses) at least makes that visible instead of silent — running
+                // more than one Stimpak-backed bot on the *same* profile at the same time isn't
+                // really supported by Battle.net itself, not something fixable purely client-side.
                 foreach (var channelIndex in _sc2Channels.Keys.ToList())
                 {
                     Sc2ChannelLeft?.Invoke(channelIndex);
@@ -494,6 +522,9 @@ public sealed partial class BotEngine
 
                 _sc2Channels.Clear();
                 _sc2ActiveChannelIndex = null;
+                LogError("StarCraft II session ended — another bot may have signed in with the same Battle.net profile.");
+                BncsDisconnected?.Invoke(null);
+                MaybeScheduleAutoReconnect();
                 break;
 
             // Not surfaced anywhere yet: roster snapshots (the UI binds Stimpak's own

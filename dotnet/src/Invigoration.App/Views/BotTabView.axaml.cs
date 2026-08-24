@@ -32,19 +32,6 @@ public partial class BotTabView : UserControl
                 }
             };
         }
-
-        var whisperInputBox = this.FindControl<TextBox>("WhisperInputBox");
-        if (whisperInputBox is not null)
-        {
-            whisperInputBox.KeyDown += (_, e) =>
-            {
-                if (e.Key == Key.Enter && DataContext is BotTabViewModel { SelectedWhisperThread: { } thread } vm)
-                {
-                    vm.SendWhisperCommand.Execute(thread);
-                    e.Handled = true;
-                }
-            };
-        }
     }
 
     private void AttachChatLog()

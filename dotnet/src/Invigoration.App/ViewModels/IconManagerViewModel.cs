@@ -31,22 +31,6 @@ public partial class IconSlotViewModel(string key, string displayName) : Observa
 /// <summary>Lets a user replace any bundled chat icon with their own image, stored via <see cref="IconOverrideStore"/>.</summary>
 public partial class IconManagerViewModel : ViewModelBase
 {
-    private static readonly (string Key, string DisplayName)[] GameIconSlots =
-    [
-        ("sc", "StarCraft"),
-        ("scbw", "StarCraft: Brood War"),
-        ("jsc", "StarCraft (Japanese release)"),
-        ("sware", "StarCraft (Shareware)"),
-        ("war2", "Warcraft II: Battle.net Edition"),
-        ("war3", "Warcraft III"),
-        ("w3tft", "Warcraft III: The Frozen Throne"),
-        ("diablo", "Diablo"),
-        ("dshr", "Diablo: Shareware"),
-        ("diablo2", "Diablo II"),
-        ("d2exp", "Diablo II: Lord of Destruction"),
-        ("chat", "Chat Client (generic)"),
-    ];
-
     /// <summary>
     /// Keys with a bundled 64x64 alternate available under Assets/GameIconsHD
     /// — the same set classic.battle.net's WC3 ladder pages served
@@ -57,25 +41,13 @@ public partial class IconManagerViewModel : ViewModelBase
     private static readonly string[] HighResolutionKeys =
         ["blizz", "sysop", "mega", "ignore", "chat", "diablo", "diablo2", "d2exp", "sc", "scbw", "war2"];
 
-    private static readonly (string Key, string DisplayName)[] StatusIconSlots =
-    [
-        ("blizz", "Blizzard Representative"),
-        ("sysop", "Administrator"),
-        ("mod-gavel", "Channel Operator"),
-        ("mega", "Speaker / VIP"),
-        ("ignore", "Squelched"),
-    ];
-
-    private static readonly (string Key, string DisplayName)[] FriendIconSlots =
-    [
-        ("offline", "Offline Friend Indicator"),
-    ];
-
     public ObservableCollection<IconSlotViewModel> GameIcons { get; } = [];
 
     public ObservableCollection<IconSlotViewModel> StatusIcons { get; } = [];
 
     public ObservableCollection<IconSlotViewModel> FriendIcons { get; } = [];
+
+    public ObservableCollection<IconSlotViewModel> CustomIcons { get; } = [];
 
     /// <summary>Names of user-saved icon sets, each an ordinary folder under IconSetStore.Directory (inside the app's config folder, so it travels with any config backup).</summary>
     public ObservableCollection<string> SavedSets { get; } = [];
@@ -88,19 +60,24 @@ public partial class IconManagerViewModel : ViewModelBase
 
     public IconManagerViewModel()
     {
-        foreach (var (key, displayName) in GameIconSlots)
+        foreach (var (key, displayName) in IconCatalog.GameIcons)
         {
             GameIcons.Add(CreateSlot(key, displayName));
         }
 
-        foreach (var (key, displayName) in StatusIconSlots)
+        foreach (var (key, displayName) in IconCatalog.StatusIcons)
         {
             StatusIcons.Add(CreateSlot(key, displayName));
         }
 
-        foreach (var (key, displayName) in FriendIconSlots)
+        foreach (var (key, displayName) in IconCatalog.FriendIcons)
         {
             FriendIcons.Add(CreateSlot(key, displayName));
+        }
+
+        foreach (var (key, displayName) in IconCatalog.CustomIcons)
+        {
+            CustomIcons.Add(CreateSlot(key, displayName));
         }
 
         RefreshSavedSets();
@@ -133,7 +110,7 @@ public partial class IconManagerViewModel : ViewModelBase
             IconOverrideStore.SetOverrideBytes(key, buffer.ToArray(), ".gif");
         }
 
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons))
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons))
         {
             slot.Refresh();
         }
@@ -143,7 +120,7 @@ public partial class IconManagerViewModel : ViewModelBase
     [RelayCommand]
     private void ResetAllIcons()
     {
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons))
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons))
         {
             IconOverrideStore.ClearOverride(slot.Key);
             slot.Refresh();
@@ -173,7 +150,7 @@ public partial class IconManagerViewModel : ViewModelBase
         }
 
         IconSetStore.ApplySet(SelectedSet);
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons))
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons))
         {
             slot.Refresh();
         }

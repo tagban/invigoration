@@ -97,6 +97,8 @@
                 <DataTemplate x:CompileBindings="False">
                     <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
                         <StackPanel Orientation="Horizontal" Spacing="4">
+                            <!-- Tiny game/client icon — null on a group/Whispers tab with no single game of its own, in which case Image just renders nothing. -->
+                            <Image Source="{Binding TabIconImage}" MaxHeight="20" Stretch="Uniform" VerticalAlignment="Center" />
                             <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
                             <!-- Subtle "something happened while you weren't looking" dot — see
                                  BotTabViewModel/BotGroupTabViewModel/GlobalWhispersTabViewModel's
