@@ -1,9 +1,11 @@
 using System.Collections.Specialized;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 using Invigoration.App.Models;
@@ -165,6 +167,22 @@ public partial class BotTabView : UserControl
         if (inlines.Count > 0)
         {
             inlines.Add(new LineBreak());
+        }
+
+        if (line.Icon is not null)
+        {
+            // A plain Image's own Width/Height aren't reliably honored once embedded via
+            // InlineUIContainer inside a text flow — wrapping in a Viewbox forces the exact
+            // rendered size regardless of how the surrounding line measures its inline content.
+            inlines.Add(new InlineUIContainer(new Viewbox
+            {
+                Width = 16,
+                Height = 16,
+                Stretch = Avalonia.Media.Stretch.Uniform,
+                Margin = new Thickness(0, 0, 4, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new Image { Source = line.Icon },
+            }));
         }
 
         foreach (var segment in line.Segments)

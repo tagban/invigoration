@@ -89,10 +89,6 @@
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="Only triggers on a disconnect this bot didn't cause itself (clicking Disconnect never auto-reconnects). On official Battle.net, a dropped connection can be the server enforcing an anti-bot check (ExtraWork) this bot doesn't implement — reconnecting won't change that outcome, just retries like a normal client would after losing its connection." />
 
-                    <TextBlock IsVisible="{Binding IsChatProtocol}"
-                               TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
-                               Text="Chat/Telnet is an older plain-text login (no BNLS, CD-key, or version-check — just a username/password prompt) that some PVPGN networks still run alongside the normal protocol, e.g. eurobattle.net. Official Battle.net does not support it." />
-
                     <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">
                         <TextBlock Text="Battle.net Server" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
 
@@ -121,7 +117,7 @@
                             <TextBox Grid.Column="1" PlaceholderText="Realm (D2 only)" Text="{Binding Config.Realm}" />
                         </Grid>
 
-                        <StackPanel IsVisible="{Binding !IsChatProtocol}" Spacing="8">
+                        <StackPanel Spacing="8">
                             <TextBlock Text="BNLS Server (hashing helper — defaults to bnls.bnetdocs.org, change only if it stops working)"
                                        FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -159,6 +155,10 @@
                     <TextBlock IsVisible="{Binding Config.HideJoinLeaveSpamEnabled}"
                                TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="Once a user crosses this rate (e.g. a flaky connection bouncing in and out), further join/leave lines for just that user stop showing in the chat log until they quiet back down — everything else (roster tracking, rank behaviors, join count) still happens exactly as normal underneath." />
+
+                    <CheckBox Content="Show game icons next to usernames in chat" IsChecked="{Binding Config.ShowUserIconsInChat}" Margin="0,8,0,0" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                               Text="A small icon before each chat/emote line, from the speaker's own tracked game (classic BNCS) — a Stimpak-backed bot (SC2/SC:R/WC3:R) shows this bot's own product icon for every speaker instead, since that protocol doesn't report which game each person is actually using." />
                 </StackPanel>
             </Expander>
 

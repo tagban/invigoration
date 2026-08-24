@@ -136,12 +136,33 @@ public sealed partial class BotEngine
     private async Task HandleAuthAccountCreateAsync(byte[] frame)
     {
         var reader = BncsConnection.GetPayloadReader(frame);
-        if (reader.ReadWord() == 0)
+        // The status field is a DWORD, not a WORD — ReadWord() only consumed the low 2 of its 4
+        // bytes. Coincidentally read the same numeric value for every status seen so far (the
+        // high word is always zero), so this wasn't corrupting anything downstream, but it's the
+        // wrong width regardless and worth fixing outright.
+        var status = reader.ReadDword();
+        if (status == 0)
         {
             LogInfo("Account created! Connecting with your new account...");
             var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
+            return;
         }
+
+        // This branch never used to run at all — a failed create just silently went nowhere,
+        // looking indistinguishable from a hung connection. Known official codes per bnetdocs;
+        // anything else (this server returned 8, which isn't one of them) is very likely a
+        // PVPGN-specific extension — reported as-is rather than guessed at.
+        var reason = status switch
+        {
+            2 => "the name contains invalid characters",
+            3 => "the name contains a banned word",
+            4 => "an account with this name already exists",
+            6 => "the name doesn't contain enough alphanumeric characters",
+            7 => "the name contains too many characters of the same type in a row",
+            _ => $"server-specific reason (status {status})",
+        };
+        LogError($"Could not create account \"{Config.Username}\": {reason}.");
     }
 
     private async Task HandleAuthAccountLogonAsync(byte[] frame)

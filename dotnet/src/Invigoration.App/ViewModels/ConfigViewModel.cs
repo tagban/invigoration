@@ -29,7 +29,6 @@ public partial class ConfigViewModel : ObservableObject
             .OrderBy(p => p.DisplayName)
             .Concat(
             [
-                new ProductOption(BncsProduct.Chat, "Chat / Telnet (no game, PVPGN only)", GameIconLoader.Get("chat")),
                 new ProductOption(BncsProduct.Sc2, "StarCraft II", GameIconLoader.Get("sc2")),
                 // Dedicated SC:R/WC3:R icons are still pending (the user's own future-icon-work
                 // backlog item) — these borrow the closest existing classic icon for the picker
@@ -48,12 +47,8 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(AllowsOfficialServers))]
     [NotifyPropertyChangedFor(nameof(ServerCompatibilityNote))]
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
-    [NotifyPropertyChangedFor(nameof(IsChatProtocol))]
     [NotifyPropertyChangedFor(nameof(IsStimpakBackedProduct))]
     public partial string Product { get; set; }
-
-    /// <summary>True when "Chat / Telnet" is the selected Game entry — hides the BNLS section (unused in that mode: no BNLS/CD-key/version-check at all, just a username/password prompt) and shows an explanatory note. Selecting this Product is the only way to turn on Config.ConnectionMode.Chat; see OnProductChanged.</summary>
-    public bool IsChatProtocol => Product == BncsProduct.Chat;
 
     public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
 
@@ -66,7 +61,7 @@ public partial class ConfigViewModel : ObservableObject
 
     public IReadOnlyList<IconOption> AvailableGroupIcons { get; } =
         new[] { NoGroupIconSentinel }
-            .Concat(IconCatalog.GameIcons.Concat(IconCatalog.CustomIcons)
+            .Concat(IconCatalog.GameIcons.Concat(IconCatalog.CustomIcons).Concat(IconCatalog.Bnet2Icons)
                 .Select(s => new IconOption(s.Key, s.DisplayName, GameIconLoader.Get(s.Key))))
             .ToList();
 
@@ -367,10 +362,6 @@ public partial class ConfigViewModel : ObservableObject
     partial void OnProductChanged(string value)
     {
         Config.Product = value;
-        // Selecting "Chat / Telnet" is the only way to turn on Config.ConnectionMode.Chat — there's
-        // no separate connection-protocol picker, since Chat mode isn't tied to any game at all and
-        // just replaces the product choice instead of sitting alongside it.
-        Config.ConnectionMode = value == BncsProduct.Chat ? ConnectionMode.Chat : ConnectionMode.BncsBinary;
         RefreshServerSuggestions();
     }
 

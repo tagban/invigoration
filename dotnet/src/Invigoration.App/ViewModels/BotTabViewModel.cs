@@ -130,6 +130,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine = engine;
         ShowStartupBanner();
         Engine.Log += OnLog;
+        Engine.SelfChatSent += OnSelfChatSent;
         Engine.ChatMessage += OnChatMessage;
         Engine.FriendsListUpdated += OnFriendsListUpdated;
         Engine.BncsConnected += () => Dispatcher.UIThread.Post(() =>
@@ -276,6 +277,19 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     private void OnLog(IReadOnlyList<ChatLogSegment> segments) =>
         Dispatcher.UIThread.Post(() => ChatLines.Add(new ChatLineViewModel(segments)));
 
+    /// <summary>A message this bot itself just sent — routed to wherever it actually went (the active sub-tab for a multi-channel bot, the flat log otherwise), with the same speaker-icon resolution a real Talk event gets.</summary>
+    private void OnSelfChatSent(IReadOnlyList<ChatLogSegment> segments) => Dispatcher.UIThread.Post(() =>
+    {
+        if (SupportsMultiChannel)
+        {
+            SelectedChannel?.ChatLines.Add(new ChatLineViewModel(segments, ResolveSc2UserIcon()));
+        }
+        else
+        {
+            ChatLines.Add(new ChatLineViewModel(segments, ResolveUserIcon(Config.Username)));
+        }
+    });
+
     private static bool IsUnreadWorthy(ChatEventType type) => type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Broadcast;
 
     private void OnChatMessage(ChatEvent e) => Dispatcher.UIThread.Post(() =>
@@ -283,7 +297,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
         {
             var channel = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
-            channel?.HandleChatEvent(e, Engine.Palette);
+            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon());
             if (IsUnreadWorthy(e.Type))
             {
                 if (channel is not null && channel != SelectedChannel)
@@ -527,11 +541,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
                 break;
 
             case ChatEventType.Talk:
-                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette)));
+                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette), ResolveUserIcon(e.Username)));
                 break;
 
             case ChatEventType.Emote:
-                ChatLines.Add(new ChatLineViewModel($"<{e.Username} {e.Text}>", palette.GetEmoteColor(e.Flags)));
+                ChatLines.Add(new ChatLineViewModel($"<{e.Username} {e.Text}>", palette.GetEmoteColor(e.Flags), ResolveUserIcon(e.Username)));
                 break;
 
             case ChatEventType.Whisper:
@@ -580,9 +594,32 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         return segments;
     }
 
+    /// <summary>Classic BNCS speaker icon, from whatever statstring the userlist already tracked for them — see BotConfig.ShowUserIconsInChat. Null once the toggle is off, or for a name with no tracked statstring yet (e.g. a whisper-only stranger who's never actually spoken in-channel).</summary>
+    private Bitmap? ResolveUserIcon(string username)
+    {
+        if (!Config.ShowUserIconsInChat)
+        {
+            return null;
+        }
+
+        var statString = ChannelUsers.FirstOrDefault(u => u.Username == username)?.StatString;
+        if (string.IsNullOrEmpty(statString))
+        {
+            return null;
+        }
+
+        var key = ChatIcon.GetProductIconKey(statString);
+        return string.IsNullOrEmpty(key) ? null : GameIconLoader.Get(key);
+    }
+
+    /// <summary>Stimpak-backed (SC2/SC:R/WC3:R) speaker icon — every speaker gets this bot's own product icon, since Stimpak's roster carries no per-user product field to tell them apart by (see BotConfig.ShowUserIconsInChat's remarks).</summary>
+    private Bitmap? ResolveSc2UserIcon() =>
+        Config.ShowUserIconsInChat ? GameIconLoader.Get(BncsProduct.GetIconKey(Config.Product)) : null;
+
     public ValueTask DisposeAsync()
     {
         Engine.Log -= OnLog;
+        Engine.SelfChatSent -= OnSelfChatSent;
         Engine.ChatMessage -= OnChatMessage;
         Engine.FriendsListUpdated -= OnFriendsListUpdated;
         Engine.Sc2ChannelJoined -= OnSc2ChannelJoined;

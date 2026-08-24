@@ -23,6 +23,7 @@
             <StackPanel Spacing="8">
                 <StackPanel Orientation="Horizontal" Spacing="8">
                     <Button Content="Apply Bundled 64x64 Set" Command="{Binding ApplyHighResolutionSetCommand}" />
+                    <Button Content="Apply Battle.net 2.0 Icon Set" Command="{Binding ApplyBnet2IconSetCommand}" />
                     <Button Content="Reset All to Defaults" Command="{Binding ResetAllIconsCommand}" />
                     <Button Content="Open Icon Sets Folder" Command="{Binding OpenIconSetsFolderCommand}" />
                 </StackPanel>
@@ -105,6 +106,27 @@
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,0,0,4"
                                Text="Not tied to any Blizzard product — connection-type badges and the global Whispers tab's icon." />
                     <ItemsControl ItemsSource="{Binding CustomIcons}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IconSlotViewModel">
+                                <Grid ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">
+                                    <Image Grid.Column="0" Source="{Binding PreviewImage}" MaxHeight="32" Stretch="Uniform" HorizontalAlignment="Left" />
+                                    <TextBlock Grid.Column="1" Text="{Binding DisplayName}" Foreground="White" VerticalAlignment="Center" Margin="10,0" />
+                                    <Button Grid.Column="2" Content="Change..." Click="OnChangeIconClick" Margin="4,0" />
+                                    <Button Grid.Column="3" Content="Reset"
+                                            Command="{Binding $parent[ItemsControl].((vm:IconManagerViewModel)DataContext).ResetIconCommand}"
+                                            CommandParameter="{Binding}"
+                                            IsVisible="{Binding HasOverride}" Margin="4,0,0,0" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+
+                <StackPanel Spacing="6">
+                    <TextBlock Text="Battle.net 2.0 Games" FontWeight="Bold" Foreground="White" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11" Margin="0,0,0,4"
+                               Text="Not connectable products yet — kept ready for whenever a Battle.net 2.0 friend/roster entry can report which of these it's actually playing." />
+                    <ItemsControl ItemsSource="{Binding Bnet2Icons}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:IconSlotViewModel">
                                 <Grid ColumnDefinitions="70,*,Auto,Auto" Margin="0,0,0,6" VerticalAlignment="Center">

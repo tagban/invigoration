@@ -56,9 +56,17 @@ public partial class MainWindow : Window
     {
         var dialog = new ConfigWindow(new BotConfig());
         var result = await dialog.ShowDialog<BotConfig?>(this);
-        if (result is not null)
+        if (result is not null && ViewModel is { } vm)
         {
-            ViewModel?.AddBot(result);
+            vm.AddBot(result);
+            // AddBot's own RefreshTopLevelTabs() call clears and repopulates TopLevelTabs, which
+            // resets the TabControl's own selection to index 0 (the Whispers pseudo-tab, always
+            // first) — SelectedBot is a separate ViewModel property, not something the TabControl
+            // actually reads. Restore it to the bot AddBot just set SelectedBot to.
+            if (vm.SelectedBot is { } added)
+            {
+                SelectTopLevelBot(added);
+            }
         }
     }
 
@@ -80,7 +88,35 @@ public partial class MainWindow : Window
             selected.ApplyConfig(result);
             vm.RefreshTopLevelTabs();
             vm.SaveAll();
+            // Same TabControl-selection-reset issue as AddBot — RefreshTopLevelTabs() rebuilding
+            // TopLevelTabs from scratch otherwise leaves the tab strip showing Whispers instead of
+            // the bot that was actually just edited.
+            SelectTopLevelBot(selected);
         }
+    }
+
+    /// <summary>Selects a bot's own top-level tab directly if it's ungrouped, or its containing group's tab (and that bot within the group's own nested TabControl) if it's now grouped — used after RefreshTopLevelTabs() rebuilds TopLevelTabs and resets the TabControl's own selection.</summary>
+    private void SelectTopLevelBot(BotTabViewModel bot)
+    {
+        if (this.FindControl<TabControl>("TopLevelTabControl") is not { } tabControl || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        if (vm.TopLevelTabs.Contains(bot))
+        {
+            tabControl.SelectedItem = bot;
+            return;
+        }
+
+        var group = vm.TopLevelTabs.OfType<BotGroupTabViewModel>().FirstOrDefault(g => g.Bots.Contains(bot));
+        if (group is null)
+        {
+            return;
+        }
+
+        group.SelectedBot = bot;
+        tabControl.SelectedItem = group;
     }
 
     private void OnOpenConfigFolderClick(object? sender, RoutedEventArgs e) => OpenConfigFolder();

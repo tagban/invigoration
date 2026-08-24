@@ -32,14 +32,53 @@ public partial class IconSlotViewModel(string key, string displayName) : Observa
 public partial class IconManagerViewModel : ViewModelBase
 {
     /// <summary>
-    /// Keys with a bundled 64x64 alternate available under Assets/GameIconsHD
-    /// — the same set classic.battle.net's WC3 ladder pages served
-    /// (bnet-*.gif), double-plus the resolution of the default 28x14 set.
-    /// Not every key has an HD source; the missing ones (war3/w3tft/jsc/
-    /// sware/dshr) just aren't part of that original set.
+    /// Keys with a bundled 64x64 alternate available under Assets/GameIconsHD — the classic
+    /// Battle.net "bnet-*" chat icon set (originally served from WC3 ladder pages); war3/w3tft
+    /// specifically are Bnet-war3.png/Bnet-war3x.png pulled from warcraft.wiki.gg's chat-icon
+    /// reference page (64x42, same source family as the rest of this set).
     /// </summary>
     private static readonly string[] HighResolutionKeys =
-        ["blizz", "sysop", "mega", "ignore", "chat", "diablo", "diablo2", "d2exp", "sc", "scbw", "war2"];
+        ["blizz", "sysop", "mega", "ignore", "chat", "diablo", "diablo2", "d2exp", "sc", "scbw", "war2", "war3", "w3tft"];
+
+    /// <summary>
+    /// Keys with no distinct HD chat icon of their own upstream — rather than leaving these at
+    /// the default 28x14 art (the only ones "Apply Bundled 64x64 Set" would otherwise skip),
+    /// each borrows its closest relative's HD asset: same underlying game (StarCraft) for the
+    /// Japanese release and the shareware trial, same idea for Diablo's shareware trial.
+    /// </summary>
+    private static readonly (string Key, string FallbackFrom)[] HighResolutionFallbacks =
+    [
+        ("jsc", "sc"),
+        ("sware", "sc"),
+        ("dshr", "diablo"),
+    ];
+
+    /// <summary>
+    /// The optional modern-Battle.net alternate for every classic key that has a real official
+    /// account.battle.net game icon — a separate opt-in set from the default 28x14 classic art,
+    /// same idea as HighResolutionKeys/GameIconsHD but sourced from account.battle.net's own SVGs
+    /// (rasterized under Assets/GameIconsBnet2, since nothing here renders SVG directly). Several
+    /// keys intentionally share one source image, matching how Blizzard's own modern branding
+    /// doesn't distinguish them: StarCraft/Brood War/the Japanese release/the shareware trial all
+    /// point at one "StarCraft: Remastered" icon, and the same is true for Warcraft III/TFT and
+    /// Diablo II/Lord of Destruction. sc2 and the new Bnet2Icons keys aren't here at all — they
+    /// have no classic default worth preserving as an opt-in, so they use these images as their
+    /// one and only default already (see Assets/GameIcons/sc2.png etc.)
+    /// </summary>
+    private static readonly (string Key, string SourceAssetKey)[] Bnet2ModernKeys =
+    [
+        ("diablo2", "diablo-ii"),
+        ("d2exp", "diablo-ii"),
+        ("war3", "warcraft-iii"),
+        ("w3tft", "warcraft-iii"),
+        ("war2", "warcraft-ii-remastered"),
+        ("sc", "starcraft-remastered"),
+        ("scbw", "starcraft-remastered"),
+        ("jsc", "starcraft-remastered"),
+        ("sware", "starcraft-remastered"),
+        ("diablo", "diablo"),
+        ("dshr", "diablo"),
+    ];
 
     public ObservableCollection<IconSlotViewModel> GameIcons { get; } = [];
 
@@ -48,6 +87,8 @@ public partial class IconManagerViewModel : ViewModelBase
     public ObservableCollection<IconSlotViewModel> FriendIcons { get; } = [];
 
     public ObservableCollection<IconSlotViewModel> CustomIcons { get; } = [];
+
+    public ObservableCollection<IconSlotViewModel> Bnet2Icons { get; } = [];
 
     /// <summary>Names of user-saved icon sets, each an ordinary folder under IconSetStore.Directory (inside the app's config folder, so it travels with any config backup).</summary>
     public ObservableCollection<string> SavedSets { get; } = [];
@@ -80,6 +121,11 @@ public partial class IconManagerViewModel : ViewModelBase
             CustomIcons.Add(CreateSlot(key, displayName));
         }
 
+        foreach (var (key, displayName) in IconCatalog.Bnet2Icons)
+        {
+            Bnet2Icons.Add(CreateSlot(key, displayName));
+        }
+
         RefreshSavedSets();
     }
 
@@ -97,20 +143,49 @@ public partial class IconManagerViewModel : ViewModelBase
         slot.Refresh();
     }
 
-    /// <summary>Applies the bundled 64x64 icon set to every key that has one — a concrete, one-click example of swapping in a larger icon set, using real Blizzard-hosted assets rather than a hypothetical.</summary>
+    /// <summary>Applies the bundled 64x64 icon set to every key that has one (plus HighResolutionFallbacks for the handful that don't) — a concrete, one-click example of swapping in a larger icon set, using real Blizzard-hosted assets rather than a hypothetical.</summary>
     [RelayCommand]
     private void ApplyHighResolutionSet()
     {
         foreach (var key in HighResolutionKeys)
         {
-            var uri = new Uri($"avares://Invigoration.App/Assets/GameIconsHD/{key}.gif");
+            ApplyHighResolutionAsset(targetKey: key, sourceAssetKey: key);
+        }
+
+        foreach (var (key, fallbackFrom) in HighResolutionFallbacks)
+        {
+            ApplyHighResolutionAsset(targetKey: key, sourceAssetKey: fallbackFrom);
+        }
+
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
+        {
+            slot.Refresh();
+        }
+    }
+
+    private static void ApplyHighResolutionAsset(string targetKey, string sourceAssetKey)
+    {
+        var uri = new Uri($"avares://Invigoration.App/Assets/GameIconsHD/{sourceAssetKey}.gif");
+        using var stream = AssetLoader.Open(uri);
+        using var buffer = new MemoryStream();
+        stream.CopyTo(buffer);
+        IconOverrideStore.SetOverrideBytes(targetKey, buffer.ToArray(), ".gif");
+    }
+
+    /// <summary>Applies the official account.battle.net modern icon set to every classic key that has one — see Bnet2ModernKeys.</summary>
+    [RelayCommand]
+    private void ApplyBnet2IconSet()
+    {
+        foreach (var (key, sourceAssetKey) in Bnet2ModernKeys)
+        {
+            var uri = new Uri($"avares://Invigoration.App/Assets/GameIconsBnet2/{sourceAssetKey}.png");
             using var stream = AssetLoader.Open(uri);
             using var buffer = new MemoryStream();
             stream.CopyTo(buffer);
-            IconOverrideStore.SetOverrideBytes(key, buffer.ToArray(), ".gif");
+            IconOverrideStore.SetOverrideBytes(key, buffer.ToArray(), ".png");
         }
 
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons))
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
         {
             slot.Refresh();
         }
@@ -120,7 +195,7 @@ public partial class IconManagerViewModel : ViewModelBase
     [RelayCommand]
     private void ResetAllIcons()
     {
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons))
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
         {
             IconOverrideStore.ClearOverride(slot.Key);
             slot.Refresh();
@@ -150,7 +225,7 @@ public partial class IconManagerViewModel : ViewModelBase
         }
 
         IconSetStore.ApplySet(SelectedSet);
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons))
+        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
         {
             slot.Refresh();
         }

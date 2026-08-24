@@ -222,23 +222,22 @@ public sealed class BotConfig
 
     public int HideJoinLeaveSpamWindowSeconds { get; set; } = 60;
 
+    /// <summary>
+    /// When on, a small game/client icon is shown next to a speaker's name on their chat/emote
+    /// lines — the same icon key the userlist/friends list already derive from a classic BNCS
+    /// user's statstring (Chat.ChatIcon.GetProductIconKey), or this bot's own product icon for
+    /// every speaker on a Stimpak-backed (SC2/SC:R/WC3:R) bot, since Stimpak's roster data has no
+    /// per-user product field to distinguish speakers by (same limitation noted on the friends
+    /// list). Off by default — some noise for a feature not everyone wants in a dense chat log.
+    /// </summary>
+    public bool ShowUserIconsInChat { get; set; }
+
     /// <summary>4-character BNCS product code, e.g. "VD2D" = Diablo II, "PX2D" = Diablo II: LoD.</summary>
     public string Product { get; set; } = "VD2D";
 
     public string Realm { get; set; } = "";
     public bool ZeroPing { get; set; }
     public bool NegPing { get; set; }
-
-    /// <summary>
-    /// BncsBinary (default): the normal binary game protocol every other
-    /// part of this app assumes. Chat: Battle.net/PVPGN's older plain-text,
-    /// line-based "Chat" connection type (selected by sending byte 0x03
-    /// instead of 0x01 right after connecting) — no BNLS, CD-key, or
-    /// version-check involved at all, just a username/password prompt. Some
-    /// PVPGN networks (e.g. eurobattle.net) still run this alongside the
-    /// binary protocol; official Battle.net does not.
-    /// </summary>
-    public ConnectionMode ConnectionMode { get; set; } = ConnectionMode.BncsBinary;
 
     /// <summary>
     /// Which saved <see cref="Config.IconSetStore"/> set this bot's icons come
@@ -318,11 +317,5 @@ public sealed class DiscordBridgeConfig
     public bool RelayBattlenetToDiscord { get; set; } = true;
 
     public bool RelayDiscordToBattlenet { get; set; } = true;
-}
-
-public enum ConnectionMode
-{
-    BncsBinary,
-    Chat,
 }
 

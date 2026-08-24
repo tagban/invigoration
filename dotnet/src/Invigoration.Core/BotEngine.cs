@@ -65,6 +65,18 @@ public sealed partial class BotEngine : IAsyncDisposable
     public ChatPalette Palette => ChatPalette.ForScheme(Config);
 
     public event Action<IReadOnlyList<ChatLogSegment>>? Log;
+
+    /// <summary>
+    /// A non-command message this bot itself just sent, echoed locally since Battle.net never
+    /// echoes a client's own outgoing channel messages back as a real chat event — see
+    /// SendChatCommandAsync. Deliberately its own event rather than folded into the generic Log
+    /// above: the one existing Log subscriber (BotTabViewModel.OnLog) always writes into the flat
+    /// ChatLines collection, which is hidden entirely for a SupportsMultiChannel (SC2/SC:R/WC3:R)
+    /// bot — a self-sent message routed that way was invisible on those bots, not just missing
+    /// the same speaker icon a real Talk event gets. This lets the App layer route it to wherever
+    /// the message actually went (the active sub-tab) and resolve an icon for it the same way.
+    /// </summary>
+    public event Action<IReadOnlyList<ChatLogSegment>>? SelfChatSent;
     public event Action? BnlsConnected;
     public event Action? BncsConnected;
     public event Action<Exception?>? BncsDisconnected;
@@ -106,7 +118,6 @@ public sealed partial class BotEngine : IAsyncDisposable
             MaybeScheduleAutoReconnect();
         };
 
-        WireChatTelnet();
         WireDiscordBridge();
     }
 
@@ -185,12 +196,6 @@ public sealed partial class BotEngine : IAsyncDisposable
         _isIntentionalDisconnect = false;
         StartDiscordBridgeIfEnabled();
 
-        if (Config.ConnectionMode == ConnectionMode.Chat)
-        {
-            await ConnectChatTelnetAsync(cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
         if (BncsProduct.IsStimpakBacked(Config.Product))
         {
             await ConnectSc2Async(cancellationToken).ConfigureAwait(false);
@@ -225,7 +230,6 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
-        _chatTelnet.Close();
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
         LogInfo("Disconnected.");
@@ -265,11 +269,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             var isSlashCommand = text.Length > 0 && text[0] == '/';
             var outgoing = isSlashCommand ? text : ApplyTextEffects(text);
 
-            if (Config.ConnectionMode == ConnectionMode.Chat)
-            {
-                await _chatTelnet.SendLineAsync(outgoing).ConfigureAwait(false);
-            }
-            else if (BncsProduct.IsStimpakBacked(Config.Product))
+            if (BncsProduct.IsStimpakBacked(Config.Product))
             {
                 await SendSc2Async(outgoing, sc2ChannelOverride).ConfigureAwait(false);
             }
@@ -279,11 +279,19 @@ public sealed partial class BotEngine : IAsyncDisposable
                     .ConfigureAwait(false);
             }
 
-            if (!isSlashCommand)
+            // Stimpak-backed (SC2/SC:R/WC3:R) products don't need this local echo at all — unlike
+            // classic BNCS, Stimpak's own protocol genuinely echoes a sent channel message back
+            // through the normal event stream (MessageReceived), the same way it already does for
+            // a sent whisper (WhisperReceived{Outgoing:true} — see BotEngine.Sc2.cs). Echoing it
+            // here too doubled every SC2 message: once here (with no real BattleTag to show, since
+            // Config.Username is a classic-BNCS-only field — Stimpak logs in via OAuth, not a
+            // username/password Config ever populates), and once for real once the server's own
+            // echo arrived with the correct name and clan tag.
+            if (!isSlashCommand && !BncsProduct.IsStimpakBacked(Config.Product))
             {
                 var segments = new List<ChatLogSegment> { new(Palette.SelfUserName, $"{Config.Username}: ") };
                 segments.AddRange(ChatColorFormatter.Parse(outgoing, Palette.White, Palette));
-                LogLine(segments.ToArray());
+                SelfChatSent?.Invoke(segments);
             }
         }
         finally
@@ -315,12 +323,6 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     public async Task JoinHomeAsync()
     {
-        if (Config.ConnectionMode == ConnectionMode.Chat)
-        {
-            await _chatTelnet.SendLineAsync($"/join {Config.HomeChannel}").ConfigureAwait(false);
-            return;
-        }
-
         await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_LEAVECHAT).ConfigureAwait(false);
         await SendBncsAsync(
             new PacketWriter().WriteDword(2).WriteNTString(Config.HomeChannel),
@@ -479,7 +481,6 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
-        _chatTelnet.Close();
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
     }

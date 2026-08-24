@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Invigoration.App.Models;
 using Invigoration.Core.Chat;
@@ -40,7 +41,7 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
     /// so BotTabViewModel.OnChatMessage never routes one here at all; see
     /// BotTabViewModel.WhisperThreads for where whispers actually go.
     /// </summary>
-    public void HandleChatEvent(ChatEvent e, ChatPalette palette)
+    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null)
     {
         switch (e.Type)
         {
@@ -55,11 +56,11 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
             case ChatEventType.Talk:
                 var segments = new List<ChatLogSegment> { new(palette.GetUserNameColor(e.Flags), $"{e.Username}: ") };
                 segments.AddRange(ChatColorFormatter.Parse(e.Text, palette.GetChatColor(e.Flags), palette));
-                ChatLines.Add(new ChatLineViewModel(segments));
+                ChatLines.Add(new ChatLineViewModel(segments, userIcon));
                 break;
 
             case ChatEventType.Emote:
-                ChatLines.Add(new ChatLineViewModel($"<{e.Username} {e.Text}>", palette.GetEmoteColor(e.Flags)));
+                ChatLines.Add(new ChatLineViewModel($"<{e.Username} {e.Text}>", palette.GetEmoteColor(e.Flags), userIcon));
                 break;
 
             case ChatEventType.Info:

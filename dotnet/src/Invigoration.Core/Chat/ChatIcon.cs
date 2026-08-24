@@ -43,11 +43,6 @@ public static class ChatIcon
             "RHSS" => "sware",
             "RTSJ" => "jsc",
             "NB2W" => "war2",
-            "TAHC" => "chat",
-            // "[CHAT]" is the literal client-type tag the plain-text Chat/Telnet connection
-            // type reports in place of a real statstring (see ChatTelnetEventParser) — its
-            // first 4 characters are "[CHA", not the wire-reversed "TAHC" used elsewhere.
-            "[CHA" => "chat",
             _ => "",
         };
     }

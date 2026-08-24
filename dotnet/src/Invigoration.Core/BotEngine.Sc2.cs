@@ -653,17 +653,47 @@ public sealed partial class BotEngine
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Used to tear down the Stimpak client without telling anyone: no BncsDisconnected, no
+    /// Sc2ChannelLeft for any open sub-tab. The underlying session genuinely did end (Dispose
+    /// closes it at the protocol level, same as SessionEnded's real trigger), but the UI never
+    /// found out — IsConnected stayed true, the status text stuck on "Connected", and every
+    /// channel sub-tab stayed open and stale. Now mirrors what a server-driven SessionEnded
+    /// already does: an explicit client.Disconnect() first (the native "end this session"
+    /// call, not just freeing our local handle), then the same BncsDisconnected/Sc2ChannelLeft
+    /// notifications DisconnectAsync's classic-BNCS path already fires via _bncs.Close().
+    /// </summary>
     private Task DisconnectSc2Async()
     {
         _sc2ReceiveCts?.Cancel();
         _sc2ReceiveCts = null;
+
+        var channelIndexes = _sc2Channels.Keys.ToList();
         _sc2Channels.Clear();
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
+
         if (_sc2Client is { } client)
         {
             _sc2Client = null;
+            try
+            {
+                client.Disconnect();
+            }
+            catch (StimpakException)
+            {
+                // Already disconnected, or never got past the auth handshake — Dispose below
+                // still releases the client either way.
+            }
+
             client.Dispose();
+
+            foreach (var channelIndex in channelIndexes)
+            {
+                Sc2ChannelLeft?.Invoke(channelIndex);
+            }
+
+            BncsDisconnected?.Invoke(null);
         }
 
         return Task.CompletedTask;

@@ -22,6 +22,30 @@ public static class IconCatalog
         ("diablo2", "Diablo II"),
         ("d2exp", "Diablo II: Lord of Destruction"),
         ("chat", "Chat Client (generic)"),
+        ("sc2", "StarCraft II"),
+    ];
+
+    /// <summary>
+    /// Modern Battle.net account games with no classic-era chat icon lineage at all (StarCraft II
+    /// is the exception — already a GameIcons entry, since it replaces a real classic-style
+    /// default) — mostly not connectable products yet, kept ready for whenever a Stimpak-backed
+    /// friend/roster entry can report which of these it's actually playing (see BotEngine.Sc2.cs's
+    /// HandleSc2FriendsReceived, currently hardcoded to "sc2" for every contact — Stimpak's Friend
+    /// data has no per-contact game field to read yet). Assets sourced from the official
+    /// account.battle.net game-icon SVGs, rasterized to PNG since nothing in this app renders SVG.
+    /// </summary>
+    public static readonly (string Key, string DisplayName)[] Bnet2Icons =
+    [
+        ("wow", "World of Warcraft"),
+        ("war1", "Warcraft: Remastered"),
+        ("d3", "Diablo III"),
+        ("d4", "Diablo IV"),
+        ("d2r", "Diablo II: Resurrected"),
+        ("diabloimmortal", "Diablo Immortal"),
+        ("overwatch", "Overwatch"),
+        ("hearthstone", "Hearthstone"),
+        ("hots", "Heroes of the Storm"),
+        ("wcrumble", "Warcraft Rumble"),
     ];
 
     public static readonly (string Key, string DisplayName)[] StatusIcons =
