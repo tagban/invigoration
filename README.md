@@ -29,20 +29,39 @@ Shared across every bot you run — assign ranks that grant command access and a
   <img src="screenshots/seen-list.png" width="380" alt="Seen List window">
 </p>
 
-### Bot configuration & color schemes
+### Bot configuration
 
-Each bot gets its own settings — connection, proxy, account, clan, trivia — plus a fully customizable chat color scheme.
+Each bot gets its own settings — connection, proxy, account, clan, trivia, and more.
 
 <p align="center">
-  <img src="screenshots/bot-configuration.png" width="500" alt="Bot Configuration window showing the Appearance section with chat color scheme">
+  <img src="screenshots/bot-configuration.png" width="500" alt="Bot Configuration window">
+</p>
+
+### Chat color schemes
+
+Every chat message category — usernames, whispers, errors, and more — gets its own color, fully customizable per bot.
+
+<p align="center">
+  <img src="screenshots/colors-appearance.png" width="500" alt="Bot Configuration window, Appearance section showing the chat color scheme picker and swatch legend">
 </p>
 
 ### Icon manager
 
-Swap any chat icon for your own image — game icons, status icons, all overridable per-set, with no fixed size required.
+Three switchable bundled icon sets — Battle.net 1.0 Classic, Warcraft III Classic, and Battle.net 2.0 (the default) — plus swap any individual chat icon for your own image, or save your own named set.
 
 <p align="center">
-  <img src="screenshots/manage-icons.png" width="500" alt="Manage Icons window">
+  <img src="screenshots/manage-icons.png" width="270" alt="Manage Icons window — Battle.net 1.0 Classic set">
+  <img src="screenshots/manage-icons-war3-classic.png" width="270" alt="Manage Icons window — Warcraft III Classic set">
+  <img src="screenshots/manage-icons-bnet2.png" width="270" alt="Manage Icons window — Battle.net 2.0 set">
+</p>
+
+### Music player
+
+An embedded YouTube Music, Spotify, or Pandora player, controllable from chat (`skip`/`thumbsup`/`thumbsdown`/`nowplaying`) or an optional playback bar docked at the bottom of the whole window — visible no matter which bot tab you're looking at.
+
+<p align="center">
+  <img src="screenshots/music-tab.png" width="380" alt="Music tab with an embedded YouTube Music player, plus the bottom playback bar">
+  <img src="screenshots/music-tab-spotify.png" width="380" alt="Music tab with an embedded Spotify player">
 </p>
 
 ### StarCraft II / SC:Remastered / WC3:Reforged
@@ -56,6 +75,14 @@ Set a bot's **Product** to StarCraft II, StarCraft: Remastered, or Warcraft III:
 ### Whisper tabs
 
 Every bot has its own **Whispers** tab, and there's a compact **`/w`** tab at the very top of the window that aggregates whisper conversations across *every* connected bot — click a name in either to read the conversation and reply. You can also right-click a name in a bot's Friends list to pop up a small "Whisper" compose box without leaving the list.
+
+### Battle.net profile & right-click actions
+
+Right-click a name in the classic Users list or the Friends list for Whisper, Profile Info, Clan Rank, Squelch, and Add Friend. Profile Info opens a real Battle.net 1.0 profile — Sex/Age/Location/Description — editable for your own account.
+
+<p align="center">
+  <img src="screenshots/profile-window.png" width="300" alt="Battle.net Profile window, editable Sex/Age/Location/Description fields">
+</p>
 
 ### Bot tab groups
 
