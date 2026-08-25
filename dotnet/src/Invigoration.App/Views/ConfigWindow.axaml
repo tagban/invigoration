@@ -28,9 +28,22 @@
             <TextBox PlaceholderText="Display name" Text="{Binding Config.DisplayName}" FontSize="16" />
 
             <StackPanel Spacing="2">
-                <TextBox PlaceholderText="Tab group (optional)" Text="{Binding Config.TabGroup}" FontSize="12" />
+                <TextBox PlaceholderText="Tab group (optional)" Text="{Binding TabGroup}" FontSize="12" />
                 <TextBlock Text="Bots sharing the same tab group collapse into one top-level tab, with their own sub-tabs — handy for several bots on the same server. Leave blank to keep this bot as its own tab."
                            TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0" IsVisible="{Binding IsInTabGroup}">
+                    <TextBlock Text="Group icon:" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
+                    <ComboBox ItemsSource="{Binding AvailableGroupIcons}" SelectedItem="{Binding SelectedGroupIcon}" Width="220">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="vm:IconOption">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Image Source="{Binding Icon}" Width="20" Height="20" Stretch="Uniform" />
+                                    <TextBlock Text="{Binding DisplayName}" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </StackPanel>
             </StackPanel>
 
             <!-- Game: select the product first; everything else reacts to this -->
@@ -76,11 +89,7 @@
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="Only triggers on a disconnect this bot didn't cause itself (clicking Disconnect never auto-reconnects). On official Battle.net, a dropped connection can be the server enforcing an anti-bot check (ExtraWork) this bot doesn't implement — reconnecting won't change that outcome, just retries like a normal client would after losing its connection." />
 
-                    <TextBlock IsVisible="{Binding IsChatProtocol}"
-                               TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
-                               Text="Chat/Telnet is an older plain-text login (no BNLS, CD-key, or version-check — just a username/password prompt) that some PVPGN networks still run alongside the normal protocol, e.g. eurobattle.net. Official Battle.net does not support it." />
-
-                    <StackPanel IsVisible="{Binding !IsSc2Product}" Spacing="8">
+                    <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">
                         <TextBlock Text="Battle.net Server" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
 
                         <ComboBox ItemsSource="{Binding OfficialServerOptions}"
@@ -108,7 +117,7 @@
                             <TextBox Grid.Column="1" PlaceholderText="Realm (D2 only)" Text="{Binding Config.Realm}" />
                         </Grid>
 
-                        <StackPanel IsVisible="{Binding !IsChatProtocol}" Spacing="8">
+                        <StackPanel Spacing="8">
                             <TextBlock Text="BNLS Server (hashing helper — defaults to bnls.bnetdocs.org, change only if it stops working)"
                                        FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,6,0,0" />
                             <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
@@ -124,7 +133,7 @@
                         </StackPanel>
                     </StackPanel>
 
-                    <TextBlock IsVisible="{Binding IsSc2Product}"
+                    <TextBlock IsVisible="{Binding IsStimpakBackedProduct}"
                                TextWrapping="Wrap" Opacity="0.75" FontSize="11" Foreground="Orange"
                                Text="StarCraft II connects through Battle.net's modern login system instead — no server address, BNLS, or version byte to configure here. Log in under Account below." />
 
@@ -146,6 +155,19 @@
                     <TextBlock IsVisible="{Binding Config.HideJoinLeaveSpamEnabled}"
                                TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="Once a user crosses this rate (e.g. a flaky connection bouncing in and out), further join/leave lines for just that user stop showing in the chat log until they quiet back down — everything else (roster tracking, rank behaviors, join count) still happens exactly as normal underneath." />
+
+                    <CheckBox Content="Show game icons next to usernames in chat" IsChecked="{Binding Config.ShowUserIconsInChat}" Margin="0,8,0,0" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                               Text="A small icon before each chat/emote line, from the speaker's own tracked game (classic BNCS) — a Stimpak-backed bot (SC2/SC:R/WC3:R) shows this bot's own product icon for every speaker instead, since that protocol doesn't report which game each person is actually using." />
+
+                    <TextBlock Text="Idle Message" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,10,0,0" />
+                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="Send after this many idle minutes (0 = off):" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
+                        <TextBox Grid.Column="1" Width="70" Text="{Binding Config.IdleMinutes}" />
+                    </Grid>
+                    <TextBox Text="{Binding Config.IdleMessage}" PlaceholderText="e.g. /me is away — currently playing %MusicPlaying%" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                               Text="Sent once after the channel's gone quiet for this long, not repeated until real activity resumes. Placeholders (resolved fresh each time it actually sends): %Ver%, %Uptime%, %MusicPlaying% (blank if nothing's playing), %Username%." />
                 </StackPanel>
             </Expander>
 
@@ -182,13 +204,13 @@
             <Expander Header="Account" IsExpanded="True">
                 <StackPanel Margin="8" Spacing="8">
                     <!-- StarCraft II: a saved Battle.net login profile instead of username/password/CD-key -->
-                    <StackPanel IsVisible="{Binding IsSc2Product}" Spacing="8">
+                    <StackPanel IsVisible="{Binding IsStimpakBackedProduct}" Spacing="8">
                         <TextBlock Text="Battle.net Profile" FontWeight="Bold" FontSize="11" Opacity="0.8" />
                         <ComboBox ItemsSource="{Binding AvailableProfiles}" SelectedItem="{Binding SelectedProfile}"
                                   HorizontalAlignment="Stretch">
                             <ComboBox.ItemTemplate>
                                 <DataTemplate x:DataType="cfg:BattlenetCredentialProfile">
-                                    <TextBlock Text="{Binding Name}" />
+                                    <TextBlock Text="{Binding DisplayLabel}" />
                                 </DataTemplate>
                             </ComboBox.ItemTemplate>
                         </ComboBox>
@@ -200,7 +222,7 @@
                                    TextWrapping="Wrap" Opacity="0.6" FontSize="11" />
                     </StackPanel>
 
-                    <StackPanel IsVisible="{Binding !IsSc2Product}" Spacing="8">
+                    <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
                             <TextBox Grid.Column="0" PlaceholderText="Username" Text="{Binding Config.Username}" />
                             <TextBox Grid.Column="1" PlaceholderText="Password" Text="{Binding Config.Password}" PasswordChar="*" />
@@ -216,7 +238,7 @@
                         <TextBox Grid.Column="0" PlaceholderText="Bot Master (always has full command access)" Text="{Binding Config.BotMaster}" />
                         <TextBox Grid.Column="1" PlaceholderText="Trigger" Width="70" MaxLength="1" Text="{Binding Config.Trigger}" />
                     </Grid>
-                    <TextBox PlaceholderText="Home channel" Text="{Binding HomeChannel}" IsVisible="{Binding !IsSc2Product}" />
+                    <TextBox PlaceholderText="Home channel" Text="{Binding HomeChannel}" IsVisible="{Binding !IsStimpakBackedProduct}" />
                 </StackPanel>
             </Expander>
 

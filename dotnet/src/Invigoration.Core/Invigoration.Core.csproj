@@ -12,20 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Invigoration.Sc2\Invigoration.Sc2.csproj" />
-    <!--
-      AssemblyName override: on a case-insensitive filesystem (Windows), the
-      managed Stimpak.dll assembly and the native stimpak.dll library would
-      otherwise share a name, and the OS loader's own directory-first DLL
-      search order finds the managed assembly before .NET's runtimes/<rid>/
-      native/ probing ever runs — LoadLibrary succeeds against the wrong
-      file, so every P/Invoke call fails with EntryPointNotFoundException
-      instead of the expected DllNotFoundException. Renaming only the
-      managed assembly's output file sidesteps this without touching
-      Stimpak's own native library name or any submodule source.
-    -->
-    <ProjectReference Include="..\..\..\native\superiority\stimpak\csharp\Stimpak\Stimpak.csproj">
-      <AdditionalProperties>StimpakBuildNative=false;AssemblyName=Stimpak.Managed</AdditionalProperties>
-    </ProjectReference>
   </ItemGroup>
+
+  <Import Project="..\StimpakPackage.props" />
 
 </Project>

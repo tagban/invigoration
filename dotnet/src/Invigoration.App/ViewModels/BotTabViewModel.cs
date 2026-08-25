@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -20,6 +21,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     public BotConfig Config => Engine.Config;
 
     public string Title => Config.DisplayName;
+
+    /// <summary>Small game/client icon shown next to this tab's title — same icon key the Config window's own product picker uses (see BncsProduct.GetIconKey), just rendered smaller here.</summary>
+    public Bitmap? TabIconImage => GameIconLoader.Get(BncsProduct.GetIconKey(Config.Product));
 
     /// <summary>The active bot's scheme-specific accent, for marking this tab as the open one and/or the chat input as focused.</summary>
     public IBrush HighlightBrush => new SolidColorBrush(
@@ -74,11 +78,6 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// <summary>One entry per peer this bot has whispered with, most-recently-active first — see UpsertWhisper. The only place a whisper's text is shown; it no longer also appears in the normal chat log (see HandleChatEvent's Whisper/WhisperSent cases).</summary>
     public ObservableCollection<WhisperThreadViewModel> WhisperThreads { get; } = [];
 
-    [ObservableProperty]
-    public partial WhisperThreadViewModel? SelectedWhisperThread { get; set; }
-
-    partial void OnSelectedWhisperThreadChanged(WhisperThreadViewModel? value) => value?.MarkRead();
-
     /// <summary>Read-only snapshot of the shared roster for the Clan tab, filtered to formal members (IsClanMember) only — everyone else the bot has auto-tracked from chatting stays out of this tab, and only shows in the full Seen List window. Edits happen in the dedicated Clan Members window, opened via the "Manage Members..." button there.</summary>
     public ObservableCollection<ClanMemberViewModel> ClanRoster { get; } = [];
 
@@ -119,6 +118,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine.Config = newConfig;
         OnPropertyChanged(nameof(Config));
         OnPropertyChanged(nameof(Title));
+        OnPropertyChanged(nameof(TabIconImage));
         OnPropertyChanged(nameof(HighlightBrush));
         OnPropertyChanged(nameof(BackgroundBrush));
         OnPropertyChanged(nameof(SupportsFriends));
@@ -130,6 +130,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine = engine;
         ShowStartupBanner();
         Engine.Log += OnLog;
+        Engine.SelfChatSent += OnSelfChatSent;
         Engine.ChatMessage += OnChatMessage;
         Engine.FriendsListUpdated += OnFriendsListUpdated;
         Engine.BncsConnected += () => Dispatcher.UIThread.Post(() =>
@@ -177,6 +178,12 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// FriendEntryViewModel rows on screen won't re-pull it unless something
     /// tells them to — otherwise a swapped icon only shows up after a
     /// reconnect rebuilds the list from scratch. This makes it immediate.
+    /// Also re-raises TabIconImage itself — this bot's own tab-strip icon uses
+    /// the exact same key (e.g. applying the Battle.net 2.0 icon set
+    /// overrides "sc"/"war3", the same keys BncsProduct.GetIconKey resolves
+    /// SC:Remastered/WC3:Reforged to) and was missing this notification
+    /// entirely, so a SC:R/WC3:R bot's tab kept showing the classic icon
+    /// until the app restarted even though the override had actually applied.
     /// </summary>
     private void OnIconOverrideChanged(string key) => Dispatcher.UIThread.Post(() =>
     {
@@ -188,6 +195,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         foreach (var friend in Friends)
         {
             friend.RefreshIcon();
+        }
+
+        if (key.Equals(BncsProduct.GetIconKey(Config.Product), StringComparison.OrdinalIgnoreCase))
+        {
+            OnPropertyChanged(nameof(TabIconImage));
         }
     });
 
@@ -276,6 +288,19 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     private void OnLog(IReadOnlyList<ChatLogSegment> segments) =>
         Dispatcher.UIThread.Post(() => ChatLines.Add(new ChatLineViewModel(segments)));
 
+    /// <summary>A message this bot itself just sent — routed to wherever it actually went (the active sub-tab for a multi-channel bot, the flat log otherwise), with the same speaker-icon resolution a real Talk event gets.</summary>
+    private void OnSelfChatSent(IReadOnlyList<ChatLogSegment> segments) => Dispatcher.UIThread.Post(() =>
+    {
+        if (SupportsMultiChannel)
+        {
+            SelectedChannel?.ChatLines.Add(new ChatLineViewModel(segments, ResolveSc2UserIcon()));
+        }
+        else
+        {
+            ChatLines.Add(new ChatLineViewModel(segments, ResolveUserIcon(Config.Username)));
+        }
+    });
+
     private static bool IsUnreadWorthy(ChatEventType type) => type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Broadcast;
 
     private void OnChatMessage(ChatEvent e) => Dispatcher.UIThread.Post(() =>
@@ -283,7 +308,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
         {
             var channel = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
-            channel?.HandleChatEvent(e, Engine.Palette);
+            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon());
             if (IsUnreadWorthy(e.Type))
             {
                 if (channel is not null && channel != SelectedChannel)
@@ -379,9 +404,30 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
-    /// <summary>Finds or creates the thread for a peer, appends the message, and bumps it to the top of WhisperThreads (most-recently-active first) — the single entry point both incoming Whisper and outgoing WhisperSent events go through, see HandleChatEvent.</summary>
-    private WhisperThreadViewModel UpsertWhisper(string peer, string text, bool incoming, ChatPalette palette)
+    /// <summary>Battle.net's own system account for account-notification whispers (e.g. "you have unread mail") — not a real user, pure noise for a bot. Ignored only for incoming whispers; a deliberately-sent outgoing one (unlikely, but conceivable) isn't suppressed.</summary>
+    private const string IgnoredWhisperSender = "# Email Service #";
+
+    /// <summary>Finds or creates an empty thread for a peer with no message appended — for the right-click "Whisper" action (BotTabView.axaml.cs/MainWindowViewModel.FocusWhisperThread), which just needs somewhere to open a compose box, not a logged message.</summary>
+    public WhisperThreadViewModel GetOrCreateWhisperThread(string peer)
     {
+        var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
+        if (thread is null)
+        {
+            thread = new WhisperThreadViewModel(this, peer);
+            WhisperThreads.Insert(0, thread);
+        }
+
+        return thread;
+    }
+
+    /// <summary>Finds or creates the thread for a peer, appends the message, and bumps it to the top of WhisperThreads (most-recently-active first) — the single entry point both incoming Whisper and outgoing WhisperSent events go through, see HandleChatEvent.</summary>
+    private WhisperThreadViewModel? UpsertWhisper(string peer, string text, bool incoming, ChatPalette palette)
+    {
+        if (incoming && string.Equals(peer, IgnoredWhisperSender, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
         var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
         if (thread is null)
         {
@@ -400,7 +446,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         var lineText = incoming ? $"{peer}: {text}" : $"You: {text}";
         thread.Messages.Add(new ChatLineViewModel(lineText, incoming ? palette.Whisper : palette.SelfUserName));
         thread.LastActivityUtc = DateTime.UtcNow;
-        if (incoming && SelectedWhisperThread != thread)
+        if (incoming)
         {
             thread.HasUnread = true;
         }
@@ -519,11 +565,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
                 break;
 
             case ChatEventType.Talk:
-                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette)));
+                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette), ResolveUserIcon(e.Username)));
                 break;
 
             case ChatEventType.Emote:
-                ChatLines.Add(new ChatLineViewModel($"<{e.Username} {e.Text}>", palette.GetEmoteColor(e.Flags)));
+                ChatLines.Add(new ChatLineViewModel($"<{e.Username} {e.Text}>", palette.GetEmoteColor(e.Flags), ResolveUserIcon(e.Username)));
                 break;
 
             case ChatEventType.Whisper:
@@ -548,13 +594,23 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Adds a newly-seen user, or updates an already-tracked one's flags/ping/statstring —
+    /// either way, (re)positions them via InsertUserSorted so a promotion/demotion (this same
+    /// method handles ChatEventType.UserFlags too) actually moves them in the list, matching
+    /// classic Battle.net's own "moderators float to the top" behavior instead of leaving
+    /// everyone frozen in original join order regardless of rank changes.
+    /// </summary>
     private void UpsertUser(ChatEvent e)
     {
         var user = ChannelUsers.FirstOrDefault(u => u.Username == e.Username);
-        if (user is null)
+        if (user is not null)
         {
-            user = new ChannelUserViewModel(e.Username);
-            ChannelUsers.Add(user);
+            ChannelUsers.Remove(user);
+        }
+        else
+        {
+            user = new ChannelUserViewModel(e.Username) { UseClassicIconStyle = Config.ClassicUserIconStyle };
         }
 
         user.Flags = e.Flags;
@@ -562,6 +618,42 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         if (e.Text.Length > 0)
         {
             user.StatString = e.Text;
+        }
+
+        InsertUserSorted(user);
+    }
+
+    /// <summary>Privileged users (see ChatIcon.IsPrivileged — Blizzard/Admin/Operator/Speaker) sort to the top, in their own arrival order; everyone else keeps arriving at the bottom, in theirs — the classic Battle.net "moderators, then users, each by join time" ordering.</summary>
+    private void InsertUserSorted(ChannelUserViewModel user)
+    {
+        if (!ChatIcon.IsPrivileged(user.Flags))
+        {
+            ChannelUsers.Add(user);
+            return;
+        }
+
+        var insertIndex = 0;
+        while (insertIndex < ChannelUsers.Count && ChatIcon.IsPrivileged(ChannelUsers[insertIndex].Flags))
+        {
+            insertIndex++;
+        }
+
+        ChannelUsers.Insert(insertIndex, user);
+    }
+
+    /// <summary>
+    /// Flips Config.ClassicUserIconStyle and pushes the new value into every already-tracked row
+    /// so the Users list updates immediately — called from the right-click "Classic Icon Style"
+    /// menu item (BotTabView.axaml.cs), not the Config window, per explicit request. Persisted
+    /// the same way every other BotConfig field is: whenever SaveAll next runs (window close, or
+    /// after the Config window itself is saved), not immediately here.
+    /// </summary>
+    public void ToggleClassicUserIconStyle()
+    {
+        Config.ClassicUserIconStyle = !Config.ClassicUserIconStyle;
+        foreach (var user in ChannelUsers)
+        {
+            user.UseClassicIconStyle = Config.ClassicUserIconStyle;
         }
     }
 
@@ -572,9 +664,32 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         return segments;
     }
 
+    /// <summary>Classic BNCS speaker icon, from whatever statstring the userlist already tracked for them — see BotConfig.ShowUserIconsInChat. Null once the toggle is off, or for a name with no tracked statstring yet (e.g. a whisper-only stranger who's never actually spoken in-channel).</summary>
+    private Bitmap? ResolveUserIcon(string username)
+    {
+        if (!Config.ShowUserIconsInChat)
+        {
+            return null;
+        }
+
+        var statString = ChannelUsers.FirstOrDefault(u => u.Username == username)?.StatString;
+        if (string.IsNullOrEmpty(statString))
+        {
+            return null;
+        }
+
+        var key = ChatIcon.GetProductIconKey(statString);
+        return string.IsNullOrEmpty(key) ? null : GameIconLoader.Get(key);
+    }
+
+    /// <summary>Stimpak-backed (SC2/SC:R/WC3:R) speaker icon — every speaker gets this bot's own product icon, since Stimpak's roster carries no per-user product field to tell them apart by (see BotConfig.ShowUserIconsInChat's remarks).</summary>
+    private Bitmap? ResolveSc2UserIcon() =>
+        Config.ShowUserIconsInChat ? GameIconLoader.Get(BncsProduct.GetIconKey(Config.Product)) : null;
+
     public ValueTask DisposeAsync()
     {
         Engine.Log -= OnLog;
+        Engine.SelfChatSent -= OnSelfChatSent;
         Engine.ChatMessage -= OnChatMessage;
         Engine.FriendsListUpdated -= OnFriendsListUpdated;
         Engine.Sc2ChannelJoined -= OnSc2ChannelJoined;

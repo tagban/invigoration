@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Invigoration.Core.Protocol;
 
 namespace Invigoration.Core.Clan;
 
@@ -69,6 +70,7 @@ public static class ClanRosterStore
             if (!string.IsNullOrEmpty(product))
             {
                 member.LastSeenProduct = product;
+                RecordPlatform(member, product);
             }
 
             if (!string.IsNullOrEmpty(server))
@@ -77,6 +79,23 @@ public static class ClanRosterStore
             }
 
             SaveLocked();
+        }
+    }
+
+    /// <summary>
+    /// Adds this product's display name (the same text LastSeenGameText already shows for "Last
+    /// game") to the member's Platforms list, if it isn't already there — confirmed the field was
+    /// otherwise stuck purely manual (never touched by any auto-tracking) despite LastSeenProduct
+    /// already being recorded automatically. Only for classic BNCS products, the only ones that
+    /// ever call RecordSeen/RecordProductSeen with a product code (see BotEngine.Bncs.cs) — SC2/
+    /// SC:R/WC3:R don't currently report a product here at all, a separate gap.
+    /// </summary>
+    private static void RecordPlatform(ClanMember member, string product)
+    {
+        var displayName = BncsProduct.GetDisplayName(product);
+        if (!member.Platforms.Any(p => p.Equals(displayName, StringComparison.OrdinalIgnoreCase)))
+        {
+            member.Platforms.Add(displayName);
         }
     }
 
@@ -98,6 +117,7 @@ public static class ClanRosterStore
             }
 
             member.LastSeenProduct = product;
+            RecordPlatform(member, product);
             member.LastSeenServer = server;
             SaveLocked();
         }

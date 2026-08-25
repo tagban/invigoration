@@ -36,7 +36,8 @@
                                 <!-- Collapsed row: icon, name/nickname, rank — click to expand the full editor -->
                                 <Button Background="Transparent" BorderThickness="0" Padding="0"
                                         HorizontalContentAlignment="Stretch" HorizontalAlignment="Stretch"
-                                        Command="{Binding ToggleExpandedCommand}">
+                                        Command="{Binding ToggleExpandedCommand}"
+                                        ToolTip.Tip="{Binding NotesTooltip}">
                                     <Grid ColumnDefinitions="Auto,*,Auto,Auto">
                                         <Image Grid.Column="0" Source="{Binding LastSeenProductIconImage}" MaxWidth="32" MaxHeight="32"
                                                Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center"

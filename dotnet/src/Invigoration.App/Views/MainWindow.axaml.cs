@@ -1,29 +1,101 @@
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using Invigoration.App.ViewModels;
 using Invigoration.Core;
 using Invigoration.Core.Config;
+using Invigoration.Core.Music;
 
 namespace Invigoration.App.Views;
 
 public partial class MainWindow : Window
 {
+    private const string BaseTitle = $"Invigoration v{AppVersion.Current}";
+
+    private static readonly TimeSpan TitleUpdateInterval = TimeSpan.FromSeconds(15);
+
     public MainWindow()
     {
         InitializeComponent();
-        Title = $"Invigoration v{AppVersion.Current}";
+        Title = BaseTitle;
         Closing += (_, _) => ViewModel?.SaveAll();
-        // TopLevelTabs puts the Whispers pseudo-tab first (index 0) — default to the first real
-        // bot instead, matching this window's behavior before that tab existed. Loaded (not the
-        // constructor) since DataContext isn't set yet at construction time.
+        StartTitleUpdateTimer();
+        // TopLevelTabs puts the Whispers pseudo-tab first, then (if enabled) Music — default to
+        // the first real bot/group instead, matching this window's behavior before either
+        // existed. A hardcoded SelectedIndex=1 (this used to be that) would land on Music instead
+        // of a bot whenever Music is enabled, since it now also occupies an early slot. Loaded
+        // (not the constructor) since DataContext isn't set yet at construction time.
         Loaded += (_, _) =>
         {
-            if (this.FindControl<TabControl>("TopLevelTabControl") is { } tabControl && ViewModel is { Bots.Count: > 0 })
+            if (this.FindControl<TabStrip>("TopLevelTabControl") is { } tabControl && ViewModel is { } vm)
             {
-                tabControl.SelectedIndex = 1;
+                var firstBotTab = vm.TopLevelTabs.FirstOrDefault(t => t is BotTabViewModel or BotGroupTabViewModel);
+                if (firstBotTab is not null)
+                {
+                    tabControl.SelectedItem = firstBotTab;
+                }
+
+                vm.PropertyChanged += OnViewModelPropertyChanged;
             }
         };
+    }
+
+    /// <summary>
+    /// Shows what's currently playing in the title bar (e.g. "Invigoration v2.0.3b - Spotify:
+    /// Pink Pony Club") whenever the music player is open and something's playing, falling back
+    /// to the plain BaseTitle otherwise. Polling (not event-driven) since GetNowPlayingAsync is
+    /// pull-based — nothing raises an event when the track changes; DispatcherTimer (not a
+    /// background Task/PeriodicTimer) since this only needs to run while the window exists and
+    /// writes directly to a UI property.
+    /// </summary>
+    private void StartTitleUpdateTimer()
+    {
+        var timer = new DispatcherTimer { Interval = TitleUpdateInterval };
+        timer.Tick += async (_, _) => await UpdateTitleAsync();
+        timer.Start();
+    }
+
+    private async Task UpdateTitleAsync()
+    {
+        if (MusicPlayerRegistry.Controller is not { } controller)
+        {
+            Title = BaseTitle;
+        }
+        else
+        {
+            var nowPlaying = await controller.GetNowPlayingAsync();
+            Title = nowPlaying is null ? BaseTitle : $"{BaseTitle} - {nowPlaying.Service}: {nowPlaying.Title}";
+        }
+
+        // Same tick also refreshes the optional bottom playback bar — no separate poll loop
+        // needed for it (see MusicBarViewModel's remarks).
+        if (ViewModel is { IsMusicBarEnabled: true } vm)
+        {
+            await vm.MusicBar.RefreshAsync();
+        }
+    }
+
+    /// <summary>
+    /// Toggling the Customize menu's "Music Player" checkbox rebuilds TopLevelTabs (RefreshTopLevelTabs), which — same reset-to-first-item issue AddBot/EditBot already had to work around via SelectTopLevelBot — would otherwise leave the tab strip showing Whispers instead of the Music tab the user just turned on.
+    /// Also mirrors MainWindowViewModel.FocusWhisperThread (the right-click "Whisper" action) onto the actual TabStrip control — SelectedGlobalWhisperThread itself can't drive tab selection directly since TopLevelTabs' selection isn't bound TwoWay (see SelectedTopLevelItem's remarks).
+    /// </summary>
+    private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (ViewModel is not { } vm || this.FindControl<TabStrip>("TopLevelTabControl") is not { } tabControl)
+        {
+            return;
+        }
+
+        if (e.PropertyName == nameof(MainWindowViewModel.IsMusicEnabled) && vm.IsMusicEnabled)
+        {
+            tabControl.SelectedItem = vm.MusicTab;
+        }
+        else if (e.PropertyName == nameof(MainWindowViewModel.SelectedGlobalWhisperThread) && vm.SelectedGlobalWhisperThread is not null)
+        {
+            tabControl.SelectedItem = vm.WhispersTab;
+        }
     }
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
@@ -56,9 +128,17 @@ public partial class MainWindow : Window
     {
         var dialog = new ConfigWindow(new BotConfig());
         var result = await dialog.ShowDialog<BotConfig?>(this);
-        if (result is not null)
+        if (result is not null && ViewModel is { } vm)
         {
-            ViewModel?.AddBot(result);
+            vm.AddBot(result);
+            // AddBot's own RefreshTopLevelTabs() call clears and repopulates TopLevelTabs, which
+            // resets the TabControl's own selection to index 0 (the Whispers pseudo-tab, always
+            // first) — SelectedBot is a separate ViewModel property, not something the TabControl
+            // actually reads. Restore it to the bot AddBot just set SelectedBot to.
+            if (vm.SelectedBot is { } added)
+            {
+                SelectTopLevelBot(added);
+            }
         }
     }
 
@@ -80,7 +160,35 @@ public partial class MainWindow : Window
             selected.ApplyConfig(result);
             vm.RefreshTopLevelTabs();
             vm.SaveAll();
+            // Same TabControl-selection-reset issue as AddBot — RefreshTopLevelTabs() rebuilding
+            // TopLevelTabs from scratch otherwise leaves the tab strip showing Whispers instead of
+            // the bot that was actually just edited.
+            SelectTopLevelBot(selected);
         }
+    }
+
+    /// <summary>Selects a bot's own top-level tab directly if it's ungrouped, or its containing group's tab (and that bot within the group's own nested TabControl) if it's now grouped — used after RefreshTopLevelTabs() rebuilds TopLevelTabs and resets the TabControl's own selection.</summary>
+    private void SelectTopLevelBot(BotTabViewModel bot)
+    {
+        if (this.FindControl<TabStrip>("TopLevelTabControl") is not { } tabControl || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        if (vm.TopLevelTabs.Contains(bot))
+        {
+            tabControl.SelectedItem = bot;
+            return;
+        }
+
+        var group = vm.TopLevelTabs.OfType<BotGroupTabViewModel>().FirstOrDefault(g => g.Bots.Contains(bot));
+        if (group is null)
+        {
+            return;
+        }
+
+        group.SelectedBot = bot;
+        tabControl.SelectedItem = group;
     }
 
     private void OnOpenConfigFolderClick(object? sender, RoutedEventArgs e) => OpenConfigFolder();

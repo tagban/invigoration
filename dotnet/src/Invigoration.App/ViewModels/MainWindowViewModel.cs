@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Config;
+using Invigoration.Core.Music;
 using Invigoration.Core.Trivia;
 
 namespace Invigoration.App.ViewModels;
@@ -76,9 +77,40 @@ public partial class MainWindowViewModel : ViewModelBase
 
     private readonly GlobalWhispersTabViewModel _whispersTab;
 
+    /// <summary>Exposed so a context-menu "Whisper" click deep inside a bot's own BotTabView (see BotTabView.axaml.cs's FocusWhisperThread) can switch the top-level tab strip to Whispers without needing its own reference to this pseudo-tab.</summary>
+    public GlobalWhispersTabViewModel WhispersTab => _whispersTab;
+
+    /// <summary>Exposed directly (not just via TopLevelTabs) so MainWindow.axaml can bind the permanent MusicPlayerPanel overlay's DataContext to the exact same instance the tab header represents — see MusicPlayerPanel's remarks for why it lives outside the TabControl's own content area.</summary>
+    public MusicTabViewModel MusicTab { get; } = new();
+
+    /// <summary>Whether the Music tab (and its always-alive player overlay) shows at all — the Customize menu's "Music Player" toggle, for anyone who doesn't want it. Persisted via MusicSettingsStore, not per-bot.</summary>
+    [ObservableProperty]
+    public partial bool IsMusicEnabled { get; set; }
+
+    partial void OnIsMusicEnabledChanged(bool value)
+    {
+        MusicSettingsStore.IsEnabled = value;
+        RefreshTopLevelTabs();
+    }
+
+    /// <summary>True exactly when the Music tab's header is the one currently showing — drives MusicPlayerPanel's IsVisible in MainWindow.axaml, since the panel itself is never added/removed from the tree (see its remarks).</summary>
+    [ObservableProperty]
+    public partial bool IsMusicTabSelected { get; set; }
+
+    /// <summary>The optional bottom playback-control bar's own state/commands — see MusicBarViewModel's remarks. Always exists (like MusicTab); IsMusicBarEnabled just controls whether MainWindow.axaml actually shows it.</summary>
+    public MusicBarViewModel MusicBar { get; } = new();
+
+    /// <summary>Off by default — a thin persistent playback bar docked at the bottom of the whole window, independent of whether the Music tab itself is enabled/selected. Toggled via the Customize menu.</summary>
+    [ObservableProperty]
+    public partial bool IsMusicBarEnabled { get; set; }
+
+    partial void OnIsMusicBarEnabledChanged(bool value) => MusicSettingsStore.ShowBottomBar = value;
+
     public MainWindowViewModel()
     {
         _whispersTab = new GlobalWhispersTabViewModel(this);
+        IsMusicEnabled = MusicSettingsStore.IsEnabled;
+        IsMusicBarEnabled = MusicSettingsStore.ShowBottomBar;
 
         foreach (var config in _store.Load())
         {
@@ -112,6 +144,10 @@ public partial class MainWindowViewModel : ViewModelBase
     {
         TopLevelTabs.Clear();
         TopLevelTabs.Add(_whispersTab);
+        if (IsMusicEnabled)
+        {
+            TopLevelTabs.Add(MusicTab);
+        }
 
         foreach (var bot in Bots.Where(b => string.IsNullOrEmpty(b.Config.TabGroup)))
         {
@@ -140,14 +176,33 @@ public partial class MainWindowViewModel : ViewModelBase
         RecomputeActiveBot();
     }
 
-    private object? _selectedTopLevelItem;
+    /// <summary>
+    /// Whichever top-level item is currently selected — bound by MainWindow.axaml's content-area
+    /// ContentControl (TabStrip no longer manages content itself; see that XAML's remarks) as
+    /// well as read here for RecomputeActiveBot. Set from MainWindow.axaml.cs's
+    /// OnTopLevelTabSelectionChanged via SetActiveTopLevelItem below, not bound directly
+    /// TwoWay to TabStrip.SelectedItem, to keep the existing event-driven wiring intact.
+    /// </summary>
+    [ObservableProperty]
+    public partial object? SelectedTopLevelItem { get; set; }
 
-    /// <summary>Called by MainWindow.axaml.cs whenever the top-level TabControl's selection changes — records which item is showing and recomputes which bot (if any) is actually visible.</summary>
+    /// <summary>Called by MainWindow.axaml.cs whenever the top-level TabStrip's selection changes — records which item is showing and recomputes which bot (if any) is actually visible.</summary>
     public void SetActiveTopLevelItem(object? item)
     {
-        _selectedTopLevelItem = item;
+        SelectedTopLevelItem = item;
+        IsMusicTabSelected = ReferenceEquals(item, MusicTab);
         RecomputeActiveBot();
     }
+
+    /// <summary>
+    /// The right-click "Whisper" action on a bot's classic Users list (BotTabView.axaml.cs) goes
+    /// through here rather than just setting whisper-focus silently: finds/creates the thread for
+    /// that peer, selects it (so it's ready to reply to the instant the Whispers tab shows), and
+    /// switches the top-level tab strip there — MainWindow.axaml.cs mirrors SelectedGlobalWhisperThread
+    /// changes onto the actual TabStrip control (it can't be bound TwoWay directly, see SelectedTopLevelItem's remarks).
+    /// </summary>
+    public void FocusWhisperThread(BotTabViewModel bot, string peer) =>
+        SelectedGlobalWhisperThread = bot.GetOrCreateWhisperThread(peer);
 
     /// <summary>
     /// "Active" (IsActive/HasUnread-clearing) means genuinely visible right now — for a plain
@@ -155,10 +210,20 @@ public partial class MainWindowViewModel : ViewModelBase
     /// TabControl currently has selected, not the group as a whole. Re-run whenever either
     /// selection level changes (see SetActiveTopLevelItem and the groupTab.PropertyChanged
     /// subscription above) so both stay in sync with what's actually on screen.
+    ///
+    /// Also keeps SelectedBot itself pointed at whichever bot is genuinely visible — this used
+    /// to be MainWindow.axaml.cs's job alone (OnTopLevelTabSelectionChanged), but that only ever
+    /// fires for a plain top-level bot tab, never for switching sub-tabs *inside* a group's own
+    /// nested TabControl. A grouped bot's own click only ever reached this method (via the
+    /// groupTab.PropertyChanged subscription below), so SelectedBot — what "Edit/Remove Selected
+    /// Bot" actually reads — stayed frozen on whichever bot last selected it directly (e.g. the
+    /// last-added bot), regardless of which grouped sub-tab was actually showing. Skipped when
+    /// active is null (e.g. the Whispers tab is showing) so the existing "last real bot you were
+    /// looking at" fallback for those menu actions is preserved.
     /// </summary>
     private void RecomputeActiveBot()
     {
-        var active = _selectedTopLevelItem switch
+        var active = SelectedTopLevelItem switch
         {
             BotTabViewModel bot => bot,
             BotGroupTabViewModel group => group.SelectedBot,
@@ -168,6 +233,11 @@ public partial class MainWindowViewModel : ViewModelBase
         foreach (var bot in Bots)
         {
             bot.IsActive = bot == active;
+        }
+
+        if (active is not null)
+        {
+            SelectedBot = active;
         }
     }
 

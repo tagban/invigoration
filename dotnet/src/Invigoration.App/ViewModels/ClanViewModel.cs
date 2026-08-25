@@ -157,6 +157,9 @@ public partial class ClanMemberViewModel : ObservableObject
         ? null
         : GameIconLoader.Get(ChatIcon.GetProductIconKey(Member.LastSeenProduct));
 
+    /// <summary>Null (no tooltip at all, rather than an empty box) when there's nothing to show — bound to the collapsed row's own ToolTip.Tip so hovering a member with notes surfaces them without needing to expand the row.</summary>
+    public string? NotesTooltip => string.IsNullOrWhiteSpace(Notes) ? null : Notes;
+
     public ClanMemberViewModel(ClanMember member)
     {
         Member = member;
@@ -179,7 +182,11 @@ public partial class ClanMemberViewModel : ObservableObject
     partial void OnAliasesTextChanged(string value) =>
         Member.Aliases = value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
 
-    partial void OnNotesChanged(string value) => Member.Notes = value;
+    partial void OnNotesChanged(string value)
+    {
+        Member.Notes = value;
+        OnPropertyChanged(nameof(NotesTooltip));
+    }
 
     partial void OnTriviaScoreChanged(decimal value) => Member.TriviaScore = (double)value;
 

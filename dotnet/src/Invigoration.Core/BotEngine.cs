@@ -54,6 +54,17 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     public BotConfig Config { get; set; }
 
+    /// <summary>
+    /// The account's actual chat/profile identity as the server itself reports it in
+    /// SID_ENTERCHAT's uniqueName field — not necessarily Config.Username verbatim. Diablo II
+    /// (Open vs. Closed/realm play) prefixes this with "*" for the same underlying account, and
+    /// profile lookups (SID_READUSERDATA/WRITEUSERDATA) key off this exact string, star included —
+    /// confirmed live: comparing against bare Config.Username made the bot's own profile look like
+    /// someone else's (read-only) on a D2 connection where chat shows "*BNETcc" but Config.Username
+    /// is "BNETcc". Null until SID_ENTERCHAT arrives (i.e., before the bot is actually in a channel).
+    /// </summary>
+    public string? OwnChatIdentity { get; private set; }
+
     /// <summary>When on, logs every raw BNCS/BNLS packet sent and received as a hex dump.</summary>
     public bool DebugMode
     {
@@ -65,6 +76,18 @@ public sealed partial class BotEngine : IAsyncDisposable
     public ChatPalette Palette => ChatPalette.ForScheme(Config);
 
     public event Action<IReadOnlyList<ChatLogSegment>>? Log;
+
+    /// <summary>
+    /// A non-command message this bot itself just sent, echoed locally since Battle.net never
+    /// echoes a client's own outgoing channel messages back as a real chat event — see
+    /// SendChatCommandAsync. Deliberately its own event rather than folded into the generic Log
+    /// above: the one existing Log subscriber (BotTabViewModel.OnLog) always writes into the flat
+    /// ChatLines collection, which is hidden entirely for a SupportsMultiChannel (SC2/SC:R/WC3:R)
+    /// bot — a self-sent message routed that way was invisible on those bots, not just missing
+    /// the same speaker icon a real Talk event gets. This lets the App layer route it to wherever
+    /// the message actually went (the active sub-tab) and resolve an icon for it the same way.
+    /// </summary>
+    public event Action<IReadOnlyList<ChatLogSegment>>? SelfChatSent;
     public event Action? BnlsConnected;
     public event Action? BncsConnected;
     public event Action<Exception?>? BncsDisconnected;
@@ -100,13 +123,13 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Disconnected += ex =>
         {
             StopKeepAlive();
+            StopIdleWatcher();
             _friends.Clear();
             LogError($"Battle.net disconnected{(ex is null ? "." : $": {ex.Message}")}");
             BncsDisconnected?.Invoke(ex);
             MaybeScheduleAutoReconnect();
         };
 
-        WireChatTelnet();
         WireDiscordBridge();
     }
 
@@ -185,13 +208,7 @@ public sealed partial class BotEngine : IAsyncDisposable
         _isIntentionalDisconnect = false;
         StartDiscordBridgeIfEnabled();
 
-        if (Config.ConnectionMode == ConnectionMode.Chat)
-        {
-            await ConnectChatTelnetAsync(cancellationToken).ConfigureAwait(false);
-            return;
-        }
-
-        if (Config.Product == BncsProduct.Sc2)
+        if (BncsProduct.IsStimpakBacked(Config.Product))
         {
             await ConnectSc2Async(cancellationToken).ConfigureAwait(false);
             return;
@@ -225,7 +242,6 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
-        _chatTelnet.Close();
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
         LogInfo("Disconnected.");
@@ -251,6 +267,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     public async Task SendChatCommandAsync(string text, byte? sc2ChannelOverride = null)
     {
+        NoteChatActivity();
         await ChatSendGate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -264,12 +281,9 @@ public sealed partial class BotEngine : IAsyncDisposable
 
             var isSlashCommand = text.Length > 0 && text[0] == '/';
             var outgoing = isSlashCommand ? text : ApplyTextEffects(text);
+            outgoing = RewriteWhisperTargetForDiabloII(outgoing);
 
-            if (Config.ConnectionMode == ConnectionMode.Chat)
-            {
-                await _chatTelnet.SendLineAsync(outgoing).ConfigureAwait(false);
-            }
-            else if (Config.Product == BncsProduct.Sc2)
+            if (BncsProduct.IsStimpakBacked(Config.Product))
             {
                 await SendSc2Async(outgoing, sc2ChannelOverride).ConfigureAwait(false);
             }
@@ -279,17 +293,59 @@ public sealed partial class BotEngine : IAsyncDisposable
                     .ConfigureAwait(false);
             }
 
-            if (!isSlashCommand)
+            // Stimpak-backed (SC2/SC:R/WC3:R) products don't need this local echo at all — unlike
+            // classic BNCS, Stimpak's own protocol genuinely echoes a sent channel message back
+            // through the normal event stream (MessageReceived), the same way it already does for
+            // a sent whisper (WhisperReceived{Outgoing:true} — see BotEngine.Sc2.cs). Echoing it
+            // here too doubled every SC2 message: once here (with no real BattleTag to show, since
+            // Config.Username is a classic-BNCS-only field — Stimpak logs in via OAuth, not a
+            // username/password Config ever populates), and once for real once the server's own
+            // echo arrived with the correct name and clan tag.
+            if (!isSlashCommand && !BncsProduct.IsStimpakBacked(Config.Product))
             {
                 var segments = new List<ChatLogSegment> { new(Palette.SelfUserName, $"{Config.Username}: ") };
                 segments.AddRange(ChatColorFormatter.Parse(outgoing, Palette.White, Palette));
-                LogLine(segments.ToArray());
+                SelfChatSent?.Invoke(segments);
             }
         }
         finally
         {
             ChatSendGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Diablo II (Classic and LoD) shows a "*" prefix on the Battle.net account identity in chat
+    /// (see BotEngine.Bncs.cs's OwnChatIdentity remarks) but NOT on the friends list or the
+    /// classic Users list, which instead show whatever character name that account last used —
+    /// confirmed live: whispering the bare name from either of this app's own quick-whisper UIs
+    /// silently reached nobody (or the wrong person, if some other account's character happens to
+    /// share that name) since it targeted a character name rather than the account. Every "/w "
+    /// this app ever constructs funnels through SendChatCommandAsync, so rewriting it here once —
+    /// rather than in each UI call site — covers all of them (Friends list quick-whisper, classic
+    /// Users list Whisper, the Whispers tab's own reply box, and auto-whisper). A target that
+    /// already starts with "*" (the operator typed the account form directly, or a reply is
+    /// echoing a peer name the bot already recorded starred) is left alone.
+    /// </summary>
+    private string RewriteWhisperTargetForDiabloII(string outgoing)
+    {
+        if (Config.Product is not (BncsProduct.DiabloII or BncsProduct.DiabloIILoD))
+        {
+            return outgoing;
+        }
+
+        if (!outgoing.StartsWith("/w ", StringComparison.OrdinalIgnoreCase))
+        {
+            return outgoing;
+        }
+
+        var rest = outgoing[3..];
+        if (rest.Length == 0 || rest[0] == '*')
+        {
+            return outgoing;
+        }
+
+        return "/w *" + rest;
     }
 
     /// <summary>
@@ -315,12 +371,6 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     public async Task JoinHomeAsync()
     {
-        if (Config.ConnectionMode == ConnectionMode.Chat)
-        {
-            await _chatTelnet.SendLineAsync($"/join {Config.HomeChannel}").ConfigureAwait(false);
-            return;
-        }
-
         await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_LEAVECHAT).ConfigureAwait(false);
         await SendBncsAsync(
             new PacketWriter().WriteDword(2).WriteNTString(Config.HomeChannel),
@@ -376,6 +426,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             LogInfo("Battle.net Connected!");
             BncsConnected?.Invoke();
             StartKeepAlive();
+            StartIdleWatcher();
             await _bncs.SendAsync([0x01]).ConfigureAwait(false); // BNCS binary-protocol byte
             await SendAuthInfoAsync().ConfigureAwait(false);
         }
@@ -479,7 +530,6 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
-        _chatTelnet.Close();
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
     }

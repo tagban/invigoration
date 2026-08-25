@@ -16,9 +16,6 @@ public sealed class BotSessionState
     public bool DebugMode { get; set; }
     public bool AcceptClanInvites { get; set; }
 
-    public string IdleMessage { get; set; } = "";
-    public int IdleTimeSetMinutes { get; set; }
-
     public string PrependText { get; set; } = "";
     public string PostpendText { get; set; } = "";
 

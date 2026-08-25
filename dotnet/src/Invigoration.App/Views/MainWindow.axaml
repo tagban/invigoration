@@ -1,6 +1,7 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:Invigoration.App.ViewModels"
+        xmlns:views="using:Invigoration.App.Views"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         mc:Ignorable="d" d:DesignWidth="1000" d:DesignHeight="650"
@@ -39,6 +40,9 @@
                         <NativeMenuItem Header="Manage Icons..." Click="OnManageIconsNativeClick" />
                         <NativeMenuItem Header="Manage Colors..." Click="OnManageColorsNativeClick" />
                         <NativeMenuItem Header="Manage Battle.net Profiles..." Click="OnManageBattlenetProfilesNativeClick" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
+                        <NativeMenuItem Header="Music Bar (bottom)" ToggleType="CheckBox" IsChecked="{Binding IsMusicBarEnabled, Mode=TwoWay}" />
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>
@@ -75,37 +79,97 @@
                 <MenuItem Header="Manage _Icons..." Click="OnManageIconsClick" />
                 <MenuItem Header="Manage _Colors..." Click="OnManageColorsClick" />
                 <MenuItem Header="Manage _Battle.net Profiles..." Click="OnManageBattlenetProfilesClick" />
+                <Separator />
+                <MenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
+                <MenuItem Header="Music Bar (bottom)" ToggleType="CheckBox" IsChecked="{Binding IsMusicBarEnabled, Mode=TwoWay}" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="OnAboutClick" />
             </MenuItem>
         </Menu>
 
-        <TabControl Name="TopLevelTabControl" ItemsSource="{Binding TopLevelTabs}" SelectionChanged="OnTopLevelTabSelectionChanged">
-            <TabControl.Styles>
-                <!-- Underlines the active tab in that bot's own scheme Highlight color, so which bot is open stays obvious even with several tabs open. -->
-                <Style Selector="TabItem:selected Border.tabHighlight">
-                    <Setter Property="BorderThickness" Value="0,0,0,3" />
-                </Style>
-            </TabControl.Styles>
-            <TabControl.ItemTemplate>
-                <!-- x:CompileBindings=False: TopLevelTabs is `object` (mixing BotTabViewModel,
-                     BotGroupTabViewModel, and GlobalWhispersTabViewModel) specifically so this
-                     template resolves Title/HighlightBrush/HeaderFontSize/HeaderForeground/
-                     HasUnread by reflection against whichever type is actually bound, rather
-                     than requiring one shared base type to declare all five. -->
-                <DataTemplate x:CompileBindings="False">
-                    <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
-                        <StackPanel Orientation="Horizontal" Spacing="4">
-                            <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
-                            <!-- Subtle "something happened while you weren't looking" dot — see
-                                 BotTabViewModel/BotGroupTabViewModel/GlobalWhispersTabViewModel's
-                                 HasUnread. -->
-                            <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
-                        </StackPanel>
-                    </Border>
-                </DataTemplate>
-            </TabControl.ItemTemplate>
-        </TabControl>
+        <!-- Optional persistent playback bar, docked below everything else regardless of which
+             top-level tab is showing — the whole point (explicit request, 2026-08-24) is
+             controlling music without needing to switch to the Music tab. Off by default
+             (IsMusicBarEnabled); driven by MusicBarViewModel, refreshed by the same timer that
+             already polls MusicPlayerRegistry.Controller for the title bar (see
+             MainWindow.axaml.cs's UpdateTitleAsync). x:CompileBindings="False" here for the same
+             reason the TabStrip header template above needs it: the inner DataContext (MusicBar)
+             is a different runtime type than this Window's own x:DataType. -->
+        <Border DockPanel.Dock="Bottom" Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="0,1,0,0"
+                Padding="10,6" IsVisible="{Binding IsMusicBarEnabled}">
+            <Grid DataContext="{Binding MusicBar}" x:CompileBindings="False"
+                  ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                <Image Grid.Column="0" Source="{Binding ServiceIcon}" MaxWidth="24" MaxHeight="24"
+                       Stretch="Uniform" VerticalAlignment="Center" />
+                <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0">
+                    <TextBlock Text="{Binding Title}" Foreground="White" FontSize="12" FontWeight="Bold"
+                               TextTrimming="CharacterEllipsis" IsVisible="{Binding HasNowPlaying}" />
+                    <TextBlock Text="{Binding Artist}" Foreground="White" Opacity="0.6" FontSize="11"
+                               TextTrimming="CharacterEllipsis" IsVisible="{Binding HasNowPlaying}" />
+                    <TextBlock Text="Nothing playing" Foreground="White" Opacity="0.5" FontSize="11"
+                               IsVisible="{Binding !HasNowPlaying}" />
+                </StackPanel>
+                <Button Grid.Column="2" Content="👍" Padding="8,4" Command="{Binding ThumbsUpCommand}"
+                        IsVisible="{Binding SupportsThumbsUp}" ToolTip.Tip="Thumbs up" />
+                <Button Grid.Column="3" Content="👎" Padding="8,4" Command="{Binding ThumbsDownCommand}"
+                        IsVisible="{Binding SupportsThumbsDown}" ToolTip.Tip="Thumbs down" />
+                <Button Grid.Column="4" Content="⏭" Padding="8,4" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
+            </Grid>
+        </Border>
+
+        <!-- TabStrip (headers only) + a separate content Grid below, rather than a plain
+             TabControl (headers+content combined) — see the content Grid's remarks for why:
+             a TabControl-hosted overlay ends up covering the header strip too, hiding every
+             other tab whenever Music is selected. Splitting them means the header row is
+             always its own, always-visible element regardless of what's showing below it. -->
+        <Grid RowDefinitions="Auto,*">
+            <TabStrip Grid.Row="0" Name="TopLevelTabControl" ItemsSource="{Binding TopLevelTabs}" SelectionChanged="OnTopLevelTabSelectionChanged">
+                <TabStrip.Styles>
+                    <!-- Underlines the active tab in that bot's own scheme Highlight color, so which bot is open stays obvious even with several tabs open. -->
+                    <Style Selector="TabStripItem:selected Border.tabHighlight">
+                        <Setter Property="BorderThickness" Value="0,0,0,3" />
+                    </Style>
+                </TabStrip.Styles>
+                <TabStrip.ItemTemplate>
+                    <!-- x:CompileBindings=False: TopLevelTabs is `object` (mixing BotTabViewModel,
+                         BotGroupTabViewModel, and GlobalWhispersTabViewModel) specifically so this
+                         template resolves Title/HighlightBrush/HeaderFontSize/HeaderForeground/
+                         HasUnread by reflection against whichever type is actually bound, rather
+                         than requiring one shared base type to declare all five. -->
+                    <DataTemplate x:CompileBindings="False">
+                        <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
+                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                <!-- Tiny game/client icon — null on a group/Whispers tab with no single game of its own, in which case Image just renders nothing. -->
+                                <Image Source="{Binding TabIconImage}" MaxWidth="20" MaxHeight="20" Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
+                                <!-- Subtle "something happened while you weren't looking" dot — see
+                                     BotTabViewModel/BotGroupTabViewModel/GlobalWhispersTabViewModel's
+                                     HasUnread. -->
+                                <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </TabStrip.ItemTemplate>
+            </TabStrip>
+
+            <Grid Grid.Row="1">
+                <!-- Whichever non-Music tab is selected — a plain ContentControl now that
+                     TabStrip no longer manages content itself; ViewLocator resolves the right
+                     view the same way it always did. -->
+                <ContentControl Content="{Binding SelectedTopLevelItem}" IsVisible="{Binding !IsMusicTabSelected}" />
+
+                <!-- Permanent overlay, not tab content — see MusicPlayerPanel's remarks for why:
+                     Avalonia's TabControl (and, if bound as normal content here, this
+                     ContentControl too) destroys/detaches non-selected content by default, which
+                     killed music playback the instant you switched away. This is created once and
+                     shown/hidden purely via IsVisible, so the underlying WebView — and playback —
+                     never stops, and (now that it only shares the content row, not the header
+                     row) never covers the other tabs either. -->
+                <ContentControl IsVisible="{Binding IsMusicTabSelected}">
+                    <views:MusicPlayerPanel DataContext="{Binding MusicTab}" />
+                </ContentControl>
+            </Grid>
+        </Grid>
     </DockPanel>
 </Window>

@@ -6,24 +6,26 @@ using Stimpak;
 namespace Invigoration.Core;
 
 /// <summary>
-/// StarCraft II chat, backed by ncarrillo/superiority's Stimpak native
-/// library (see native/superiority/stimpak — vendored as a git submodule,
-/// built by native/build.sh) rather than a hand-rolled port of the native
-/// ("Sunken") protocol. Stimpak already implements the full protocol —
-/// including startup records this project's own earlier hand-decoding
-/// effort in Invigoration.Sc2 never finished reverse-engineering — behind a
-/// small, stable event stream, so this file is mostly translation: Stimpak's
-/// <see cref="SC2Event"/>s in, the same shared <see cref="BotEngine.HandleChatEvent"/>
-/// pipeline the classic BNCS and Chat/Telnet connections use out, so roster
-/// tracking, clan tracking, trivia, and command dispatch all work unmodified
-/// for an SC2 bot too (see BotEngine.Chat.cs's remarks on that pattern).
+/// StarCraft II/SC:Remastered/WC3:Reforged chat, backed by ncarrillo/superiority's Stimpak
+/// native library — consumed as the <c>Stimpak</c> NuGet package (see
+/// dotnet/src/StimpakPackage.props for the packaging story) rather than a hand-rolled port of
+/// the native ("Sunken") protocol. Stimpak already implements the full protocol — including
+/// startup records this project's own earlier hand-decoding effort in Invigoration.Sc2 never
+/// finished reverse-engineering — behind a small, stable event stream, so this file is mostly
+/// translation: Stimpak's <see cref="SC2Event"/>s in, the same shared
+/// <see cref="BotEngine.HandleChatEvent"/> pipeline the classic BNCS and Chat/Telnet
+/// connections use out, so roster tracking, clan tracking, trivia, and command dispatch all
+/// work unmodified for an SC2 bot too (see BotEngine.Chat.cs's remarks on that pattern).
+/// SC2/SC:R/WC3:R all connect identically — Stimpak's C# API has no per-game selector at all,
+/// "supporting" one is purely a matter of its own protocol decoder correctly handling that
+/// game's toon/presence data, not something this layer needs to branch on.
 ///
-/// Toon selection happens inside Stimpak itself once connected. Unlike
-/// classic BNCS (protocol-level single-channel), Stimpak supports being
-/// joined to multiple channels at once — see <see cref="MaxJoinedSc2Channels"/>
-/// and the Sc2Channel* members below — so this layer joins "General" by
-/// default on connect and otherwise leaves channel membership entirely to
-/// explicit Join/Leave calls from the UI layer.
+/// Toon selection happens inside Stimpak itself once connected. Unlike classic BNCS
+/// (protocol-level single-channel), Stimpak supports being joined to multiple channels at once
+/// — see <see cref="MaxJoinedSc2Channels"/> and the Sc2Channel* members below. Which channels
+/// to restore on connect (empty means just the default "General") is Stimpak's own native
+/// <see cref="StimpakConnectOptions.Channels"/> option, not something replayed by hand after
+/// the fact — see ConnectSc2Async/PersistSc2ChannelList.
 /// </summary>
 public sealed partial class BotEngine
 {
@@ -31,15 +33,11 @@ public sealed partial class BotEngine
     public const int MaxJoinedSc2Channels = 6;
 
     /// <summary>
-    /// Set by the App layer before Connect is called on an SC2 bot — pops a
-    /// Battle.net login dialog and returns the resulting web-auth credential.
-    /// Only used as a fallback: Stimpak ships its own native sign-in window
-    /// (see <see cref="StimpakClient.HasAuthWindow"/>) and uses it
-    /// automatically whenever the stimpak-auth-window helper is deployed
-    /// alongside the app, which is the normal case. This only gets called if
-    /// that helper is missing (e.g. an unusual Linux install without the
-    /// system webview libraries wry needs) and Stimpak falls back to
-    /// surfacing <see cref="AuthenticationRequired"/> instead.
+    /// Set by the App layer before Connect is called on an SC2 bot — pops a Battle.net login
+    /// dialog and returns the resulting web-auth credential. Stimpak's base package always
+    /// surfaces <see cref="AuthenticationRequired"/> and leaves answering it entirely to the
+    /// caller (an optional Stimpak.Auth package offers an in-process native WebView instead,
+    /// but this app doesn't reference it — this handler is the only sign-in path).
     /// </summary>
     public Func<Uri, CancellationToken, Task<byte[]>>? Sc2ChallengeHandler { get; set; }
 
@@ -72,21 +70,8 @@ public sealed partial class BotEngine
 
     private readonly Dictionary<string, FriendEntry> _sc2Friends = new();
 
-    /// <summary>The account's public-channel catalog, cached from the last PublicChannelsReceived so a channel name (from the "join" command or a remembered/replayed channel) can be resolved to the id JoinPublic needs.</summary>
+    /// <summary>The account's public-channel catalog, cached from the last PublicChannelsReceived so a channel name (from the "join" bot-command) can be resolved to the id JoinPublic needs.</summary>
     private IReadOnlyList<ChatChannel> _sc2PublicChannelCatalog = [];
-
-    /// <summary>Whether PublicChannelsReceived has arrived yet this connection — see MaybeRejoinRememberedSc2Channels.</summary>
-    private bool _sc2CatalogReceived;
-
-    /// <summary>
-    /// One-shot guard so RejoinRememberedSc2Channels only ever runs once per connection, no
-    /// matter how many times its two trigger conditions (below) re-fire. Also closes a real
-    /// race: without waiting for the default channel's own Joined confirmation first, replay
-    /// can't yet see it in _sc2Channels and re-attempts joining it — the server (correctly)
-    /// rejects the duplicate, surfacing a confusing "Could not join General" error even though
-    /// the bot is, in fact, already in General.
-    /// </summary>
-    private bool _sc2RejoinAttempted;
 
     /// <summary>Whether another SC2 channel can be joined right now — false once MaxJoinedSc2Channels is reached, or if this isn't a connected SC2 bot at all.</summary>
     public bool CanJoinAnotherSc2Channel =>
@@ -262,62 +247,40 @@ public sealed partial class BotEngine
     }
 
     /// <summary>
-    /// Runs RejoinRememberedSc2Channels once both of its real preconditions are met: the
-    /// always-auto-joined default channel has actually been confirmed (so replay can see it
-    /// in _sc2Channels and skip it) and the public-channel catalog has arrived (so a
-    /// remembered public channel's name can be resolved to an id). Calling replay before the
-    /// default channel is confirmed is exactly what used to double-join it — see
-    /// _sc2RejoinAttempted's remarks.
+    /// Stimpak's own ChatChannel (what a Joined event carries) as the ChannelTarget its
+    /// Connect options want back (see ConnectSc2Async/StimpakConnectOptions.Channels) — null for
+    /// a PartyChannel, which is only ever joined by accepting an invitation and so isn't
+    /// something a later connect should try to restore.
     /// </summary>
-    private void MaybeRejoinRememberedSc2Channels()
+    private static ChannelTarget? ToChannelTarget(ChatChannel channel) => channel switch
     {
-        if (_sc2RejoinAttempted || _sc2Channels.Count == 0 || !_sc2CatalogReceived)
-        {
-            return;
-        }
-
-        _sc2RejoinAttempted = true;
-        RejoinRememberedSc2Channels();
-    }
+        PublicChannel pub => ChannelTarget.Public(pub.Id),
+        PrivateChannel priv => ChannelTarget.Private(priv.Name),
+        GroupChannel group => ChannelTarget.Group(group.ClubId),
+        _ => null,
+    };
 
     /// <summary>
-    /// Rejoins whatever channels Config.Sc2LastChannelNames remembers from this bot's last
-    /// session. Anything already joined (almost always the always-auto-joined default channel)
-    /// is skipped rather than double-joined — see MaybeRejoinRememberedSc2Channels for why this
-    /// alone isn't a sufficient guard on its own and needs its two preconditions gated first.
+    /// Keeps Config.Sc2LastChannels in sync with the channels actually joined right now, so a
+    /// later reconnect (or app restart) restores this same set — handed straight to Stimpak's
+    /// own StimpakConnectOptions.Channels on the next ConnectSc2Async, not replayed by hand:
+    /// Stimpak's native connect sequencing handles the always-auto-joined default channel
+    /// itself, so there's no "already joined, don't double-join it" race to guard against here
+    /// the way the old hand-rolled replay logic needed to.
     /// </summary>
-    private void RejoinRememberedSc2Channels()
-    {
-        foreach (var name in Config.Sc2LastChannelNames)
-        {
-            if (_sc2Channels.Values.Any(s => string.Equals(s.Channel.Name, name, StringComparison.OrdinalIgnoreCase)))
-            {
-                continue;
-            }
-
-            if (!CanJoinAnotherSc2Channel)
-            {
-                break;
-            }
-
-            TryJoinSc2ChannelByName(name);
-        }
-    }
-
-    /// <summary>Keeps Config.Sc2LastChannelNames in sync with the channels actually joined right now, so a later reconnect (or app restart) can restore this same set — see RejoinRememberedSc2Channels.</summary>
     private void PersistSc2ChannelList()
     {
-        // Distinct as a defensive backstop, not the actual fix for the double-join-on-replay
-        // bug (see MaybeRejoinRememberedSc2Channels) — but a duplicate here costs nothing to
-        // guard against, and a list built from a Dictionary's Values should never legitimately
-        // contain one anyway (each channel index has exactly one name).
-        var names = _sc2Channels.Values.Select(s => s.Channel.Name).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-        if (names.SequenceEqual(Config.Sc2LastChannelNames))
+        var channels = _sc2Channels.Values
+            .Select(s => ToChannelTarget(s.Channel))
+            .OfType<ChannelTarget>()
+            .ToList();
+
+        if (channels.SequenceEqual(Config.Sc2LastChannels))
         {
             return;
         }
 
-        Config.Sc2LastChannelNames = names;
+        Config.Sc2LastChannels = channels;
         ConfigPersistNeeded?.Invoke();
     }
 
@@ -358,13 +321,17 @@ public sealed partial class BotEngine
 
     private Task ConnectSc2Async(CancellationToken cancellationToken)
     {
+        StimpakNativeResolver.Register();
         LogInfo("Connecting to Battle.net (StarCraft II)...");
         Directory.CreateDirectory(Path.GetDirectoryName(Sc2CredentialPath)!);
 
         StimpakClient client;
         try
         {
-            client = new StimpakClient(Sc2CredentialPath);
+            // ApplicationId is required but doesn't matter for us — CredentialPath overrides
+            // the per-user cache location it would otherwise derive, since credential storage
+            // is already fully owned by BattlenetCredentialProfileStore (see Sc2CredentialPath).
+            client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration") { CredentialPath = Sc2CredentialPath });
         }
         catch (Exception ex)
         {
@@ -378,8 +345,6 @@ public sealed partial class BotEngine
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
         _sc2PublicChannelCatalog = [];
-        _sc2CatalogReceived = false;
-        _sc2RejoinAttempted = false;
 
         _sc2ReceiveCts = new CancellationTokenSource();
         var token = _sc2ReceiveCts.Token;
@@ -387,7 +352,16 @@ public sealed partial class BotEngine
 
         try
         {
-            client.Connect(forceInteractive: false);
+            // Channels restores whatever this bot had joined last time — natively, on Stimpak's
+            // own side, rather than the hand-rolled post-connect replay this used to be (which
+            // had its own race with the always-auto-joined default channel — see the removed
+            // MaybeRejoinRememberedSc2Channels for the history). An empty list here just means
+            // "General", per StimpakConnectOptions.Channels' own doc comment.
+            client.Connect(new StimpakConnectOptions
+            {
+                ForceInteractive = false,
+                Channels = Config.Sc2LastChannels,
+            });
         }
         catch (StimpakException ex)
         {
@@ -424,8 +398,10 @@ public sealed partial class BotEngine
         switch (next)
         {
             case StageChanged { Stage: Stage.Connected }:
+                // No manual join here — StimpakConnectOptions.Channels (passed at Connect time,
+                // see ConnectSc2Async) already tells Stimpak natively which channels to restore,
+                // General included if that list is empty.
                 LogInfo("Connected — joining chat...");
-                client.JoinPublic(StimpakClient.DefaultPublicChannel);
                 break;
 
             case StageChanged stage:
@@ -434,6 +410,22 @@ public sealed partial class BotEngine
 
             case AuthenticationRequired auth:
                 await HandleSc2AuthenticationRequiredAsync(client, auth).ConfigureAwait(false);
+                break;
+
+            case AccountConnected connected:
+                // Ties this profile to the real signed-in BattleTag so it's identifiable if the
+                // user has more than one Battle.net account — see BattlenetCredentialProfile
+                // .DisplayLabel. Config.BattlenetCredentialProfileId is already guaranteed set by
+                // now (ConnectSc2Async resolves it via Sc2CredentialPath before Connect is called).
+                BattlenetCredentialProfileStore.UpdateBattleTag(Config.BattlenetCredentialProfileId, connected.Account.BattleTag);
+
+                // Account.Games is presumably which Blizzard products this account can actually
+                // play (so a future check could refuse connecting a WC3:Reforged bot to an
+                // account with no WC3:R license, matching what upstream's author described) — its
+                // real string values haven't been observed yet against a live account, so this is
+                // logged rather than acted on for now. Once a real value is seen here, wire an
+                // actual gate instead of guessing at the format.
+                LogDebug($"StarCraft II account: {connected.Account.BattleTag} — games: [{string.Join(", ", connected.Account.Games ?? [])}]");
                 break;
 
             case Joined joined:
@@ -448,7 +440,6 @@ public sealed partial class BotEngine
                     BncsConnected?.Invoke();
                 }
 
-                MaybeRejoinRememberedSc2Channels();
                 break;
 
             case JoinRejected rejected:
@@ -500,9 +491,7 @@ public sealed partial class BotEngine
 
             case PublicChannelsReceived catalog:
                 _sc2PublicChannelCatalog = catalog.Channels;
-                _sc2CatalogReceived = true;
                 Sc2PublicChannelsReceived?.Invoke(catalog.Channels);
-                MaybeRejoinRememberedSc2Channels();
                 break;
 
             case CommandFailed failed:
@@ -514,6 +503,18 @@ public sealed partial class BotEngine
                 break;
 
             case SessionEnded:
+                // Used to close every sub-tab silently and stop there — this bot then sat there
+                // looking "connected" (no error, no BncsDisconnected) with a dead client
+                // underneath: any further join/send just failed quietly. A real Battle.net
+                // account can only run one live chat session at a time, so this reliably fires
+                // whenever a second Stimpak-backed bot (SC2/SC:R/WC3:R) signs in with the *same*
+                // shared Battle.net credential profile while this one is still connected — the
+                // account's session gets handed to whichever client authenticated most recently,
+                // and every other client sharing that profile is silently dropped. Surfacing it
+                // properly (LogError + BncsDisconnected + the same auto-reconnect path a real
+                // connection loss uses) at least makes that visible instead of silent — running
+                // more than one Stimpak-backed bot on the *same* profile at the same time isn't
+                // really supported by Battle.net itself, not something fixable purely client-side.
                 foreach (var channelIndex in _sc2Channels.Keys.ToList())
                 {
                     Sc2ChannelLeft?.Invoke(channelIndex);
@@ -521,6 +522,9 @@ public sealed partial class BotEngine
 
                 _sc2Channels.Clear();
                 _sc2ActiveChannelIndex = null;
+                LogError("StarCraft II session ended — another bot may have signed in with the same Battle.net profile.");
+                BncsDisconnected?.Invoke(null);
+                MaybeScheduleAutoReconnect();
                 break;
 
             // Not surfaced anywhere yet: roster snapshots (the UI binds Stimpak's own
@@ -649,17 +653,47 @@ public sealed partial class BotEngine
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Used to tear down the Stimpak client without telling anyone: no BncsDisconnected, no
+    /// Sc2ChannelLeft for any open sub-tab. The underlying session genuinely did end (Dispose
+    /// closes it at the protocol level, same as SessionEnded's real trigger), but the UI never
+    /// found out — IsConnected stayed true, the status text stuck on "Connected", and every
+    /// channel sub-tab stayed open and stale. Now mirrors what a server-driven SessionEnded
+    /// already does: an explicit client.Disconnect() first (the native "end this session"
+    /// call, not just freeing our local handle), then the same BncsDisconnected/Sc2ChannelLeft
+    /// notifications DisconnectAsync's classic-BNCS path already fires via _bncs.Close().
+    /// </summary>
     private Task DisconnectSc2Async()
     {
         _sc2ReceiveCts?.Cancel();
         _sc2ReceiveCts = null;
+
+        var channelIndexes = _sc2Channels.Keys.ToList();
         _sc2Channels.Clear();
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
+
         if (_sc2Client is { } client)
         {
             _sc2Client = null;
+            try
+            {
+                client.Disconnect();
+            }
+            catch (StimpakException)
+            {
+                // Already disconnected, or never got past the auth handshake — Dispose below
+                // still releases the client either way.
+            }
+
             client.Dispose();
+
+            foreach (var channelIndex in channelIndexes)
+            {
+                Sc2ChannelLeft?.Invoke(channelIndex);
+            }
+
+            BncsDisconnected?.Invoke(null);
         }
 
         return Task.CompletedTask;

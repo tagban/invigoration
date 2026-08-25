@@ -16,6 +16,7 @@ public sealed partial class BotEngine
         return id switch
         {
             BncsPacketId.SID_PING => HandlePingAsync(),
+            BncsPacketId.SID_READUSERDATA => HandleReadUserData(frame),
             BncsPacketId.SID_AUTH_INFO => HandleAuthInfoAsync(frame),
             BncsPacketId.SID_AUTH_CHECK => HandleAuthCheckAsync(frame),
             BncsPacketId.SID_AUTH_ACCOUNTCREATE => HandleAuthAccountCreateAsync(frame),
@@ -136,12 +137,33 @@ public sealed partial class BotEngine
     private async Task HandleAuthAccountCreateAsync(byte[] frame)
     {
         var reader = BncsConnection.GetPayloadReader(frame);
-        if (reader.ReadWord() == 0)
+        // The status field is a DWORD, not a WORD — ReadWord() only consumed the low 2 of its 4
+        // bytes. Coincidentally read the same numeric value for every status seen so far (the
+        // high word is always zero), so this wasn't corrupting anything downstream, but it's the
+        // wrong width regardless and worth fixing outright.
+        var status = reader.ReadDword();
+        if (status == 0)
         {
             LogInfo("Account created! Connecting with your new account...");
             var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
+            return;
         }
+
+        // This branch never used to run at all — a failed create just silently went nowhere,
+        // looking indistinguishable from a hung connection. Known official codes per bnetdocs;
+        // anything else (this server returned 8, which isn't one of them) is very likely a
+        // PVPGN-specific extension — reported as-is rather than guessed at.
+        var reason = status switch
+        {
+            2 => "the name contains invalid characters",
+            3 => "the name contains a banned word",
+            4 => "an account with this name already exists",
+            6 => "the name doesn't contain enough alphanumeric characters",
+            7 => "the name contains too many characters of the same type in a row",
+            _ => $"server-specific reason (status {status})",
+        };
+        LogError($"Could not create account \"{Config.Username}\": {reason}.");
     }
 
     private async Task HandleAuthAccountLogonAsync(byte[] frame)
@@ -293,6 +315,7 @@ public sealed partial class BotEngine
         var reader = BncsConnection.GetPayloadReader(frame);
         var uniqueName = reader.ReadNTString();
         var statString = reader.ReadNTString();
+        OwnChatIdentity = uniqueName;
         LogInfo($"Logged on as: {uniqueName} using {BncsProduct.GetDisplayName(Config.Product)}.");
         return Task.CompletedTask;
     }
@@ -348,6 +371,11 @@ public sealed partial class BotEngine
 
     private async Task HandleChatEvent(ChatEvent chatEvent)
     {
+        if (chatEvent.Type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Whisper)
+        {
+            NoteChatActivity();
+        }
+
         // Display-only filter: everything below (roster, rank behaviors, counts, trivia,
         // commands) still runs exactly as normal regardless of this — only whether the
         // event also gets written to the visible chat log depends on it.
@@ -382,6 +410,7 @@ public sealed partial class BotEngine
             _session.KickCount = 0;
             _session.JoinCount = 0;
             _session.CurrentChannelName = chatEvent.Text;
+            await UpdateDiscordPresenceAsync().ConfigureAwait(false);
         }
 
         if (chatEvent.Type == ChatEventType.Join)
@@ -558,24 +587,17 @@ public sealed partial class BotEngine
     private Task HandleNewsInfo(byte[] frame) => Task.CompletedTask;
 
     /// <summary>
-    /// The server is asking for ExtraWork compliance — Blizzard's bot-
-    /// detection mechanism (see BncsPacketId.SID_REQUIREDWORK's remarks).
-    /// Deliberately not implemented: doing so means either running a
-    /// server-provided native DLL (a real security risk on its own) or
-    /// faking compliance, which is detection evasion against a real
-    /// anti-bot system on a live commercial service — not something this
-    /// project will do. Logged plainly rather than silently ignored, since
-    /// on official Battle.net this is usually followed by the server
-    /// dropping the connection some time later, and a silent, unexplained
-    /// disconnect is worse than an honest one. PVPGN servers essentially
-    /// never send this, since it's not part of core protocol compatibility.
+    /// The server sent SID_REQUIREDWORK — historically ExtraWork, Blizzard's old bot-detection
+    /// mechanism (see BncsPacketId.SID_REQUIREDWORK's remarks), but confirmed by the user
+    /// (2026-08-24, via a former Blizzard employee) as no longer actually enforced/relevant on
+    /// live official Battle.net today. Still deliberately not implemented on principle — running
+    /// a server-provided native DLL is a real security risk regardless of whether it's currently
+    /// live — but no longer worth surfacing as a warning every connection; logged at debug level
+    /// only, and without the "anti-bot"/dropped-connection framing that isn't accurate anymore.
     /// </summary>
     private Task HandleRequiredWork()
     {
-        LogWarning(
-            "Server requested ExtraWork compliance (Blizzard's anti-bot check) — not implemented by design. " +
-            "This connection may be dropped by the server after a while; that's expected on official Battle.net " +
-            "and isn't something this bot will work around.");
+        LogDebug("Server sent SID_REQUIREDWORK (not implemented by design).");
         return Task.CompletedTask;
     }
 

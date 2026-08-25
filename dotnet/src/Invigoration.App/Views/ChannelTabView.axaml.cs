@@ -1,6 +1,8 @@
 using System.Collections.Specialized;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Documents;
+using Avalonia.Layout;
 using Avalonia.Threading;
 using Invigoration.App.Models;
 using Invigoration.App.ViewModels;
@@ -85,6 +87,21 @@ public partial class ChannelTabView : UserControl
         if (inlines.Count > 0)
         {
             inlines.Add(new LineBreak());
+        }
+
+        if (line.Icon is not null)
+        {
+            // Same Viewbox-wrapping fix as BotTabView.axaml.cs's AppendLine — a plain Image's own
+            // Width/Height aren't reliably honored once embedded via InlineUIContainer.
+            inlines.Add(new InlineUIContainer(new Viewbox
+            {
+                Width = 20,
+                Height = 20,
+                Stretch = Avalonia.Media.Stretch.Uniform,
+                Margin = new Thickness(0, 0, 4, 0),
+                VerticalAlignment = VerticalAlignment.Center,
+                Child = new Image { Source = line.Icon },
+            }));
         }
 
         foreach (var segment in line.Segments)

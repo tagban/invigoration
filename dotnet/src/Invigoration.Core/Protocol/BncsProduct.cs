@@ -68,33 +68,20 @@ public static class BncsProduct
     public const string Diablo = "LTRD";
 
     /// <summary>
-    /// Not a real BNCS product — a pseudo-entry offered in the Game picker
-    /// for BotConfig.ConnectionMode.Chat (see BotEngine.Chat.cs): no CD-key,
-    /// no version-check, no official-server option, since the plain-text
-    /// Chat/Telnet connection type isn't tied to any specific game at all.
-    /// Deliberately kept out of <see cref="Catalog"/> itself (that's "legacy
-    /// BNCS products this engine speaks" — Chat is a different connection
-    /// type entirely, not a product), with the few methods below special-
-    /// cased instead so a real lookup miss doesn't accidentally happen to
-    /// behave correctly for it by coincidence. Value is "TAHC" (wire-reversed
-    /// "CHAT", matching every other constant here) rather than something
-    /// picker-only, since ChatIcon.GetProductIconKey already had a
-    /// "TAHC" → "chat" icon mapping from earlier work — using the same value
-    /// means the Game picker's icon just falls out of that existing lookup
-    /// for free.
-    /// </summary>
-    public const string Chat = "TAHC";
-
-    /// <summary>
-    /// Not a real BNCS product — a UI-only marker for StarCraft II, whose
-    /// modern Front/GameUtilities/Sunken login (Invigoration.Sc2, a separate
-    /// project) is an entirely different protocol with no classic-BNCS wire
-    /// form at all. Deliberately kept out of <see cref="Catalog"/>, same
-    /// reasoning as <see cref="Chat"/> — callers that reach the classic
-    /// BNCS/BNLS connect path (BotEngine.ConnectAsync) must check for this
-    /// and refuse instead of treating "SC2" as if it were a 4-char wire code.
+    /// Not a real BNCS product — a UI-only marker for StarCraft II, whose modern Battle.net
+    /// login (via the Stimpak native library — see BotEngine.Sc2.cs) is an entirely different
+    /// protocol with no classic-BNCS wire form at all. Deliberately kept out of
+    /// <see cref="Catalog"/>, same reasoning as <see cref="Chat"/> — callers that reach the
+    /// classic BNCS/BNLS connect path (BotEngine.ConnectAsync) must check for this and refuse
+    /// instead of treating "SC2" as if it were a 4-char wire code.
     /// </summary>
     public const string Sc2 = "SC2";
+
+    /// <summary>Same idea as <see cref="Sc2"/> — StarCraft: Remastered connects identically (Stimpak's own API has no per-game selector at all; see <see cref="IsStimpakBacked"/>).</summary>
+    public const string ScRemastered = "SCR";
+
+    /// <summary>Same idea as <see cref="Sc2"/> — Warcraft III: Reforged connects identically (Stimpak's own API has no per-game selector at all; see <see cref="IsStimpakBacked"/>).</summary>
+    public const string Wc3Reforged = "W3R";
 
     public static readonly IReadOnlyDictionary<string, BncsProductInfo> Catalog =
         new Dictionary<string, BncsProductInfo>
@@ -176,8 +163,13 @@ public static class BncsProduct
     public static byte? GetBnlsProductByte(string wireCode) =>
         Catalog.TryGetValue(wireCode, out var info) ? info.BnlsProductByte : null;
 
-    public static string GetDisplayName(string wireCode) =>
-        wireCode == Chat ? "Chat / Telnet" : Catalog.TryGetValue(wireCode, out var info) ? info.DisplayName : wireCode;
+    public static string GetDisplayName(string wireCode) => wireCode switch
+    {
+        Sc2 => "StarCraft II",
+        ScRemastered => "StarCraft: Remastered",
+        Wc3Reforged => "Warcraft III: Reforged",
+        _ => Catalog.TryGetValue(wireCode, out var info) ? info.DisplayName : wireCode,
+    };
 
     /// <summary>Products that use the NLS/SRP-based new login system instead of the old double-hash system.</summary>
     public static bool UsesNewLoginSystem(string wireCode) => wireCode is Warcraft3 or Warcraft3TFT;
@@ -185,13 +177,11 @@ public static class BncsProduct
     /// <summary>Expansion products that authenticate with a classic+expansion CD-key pair.</summary>
     public static bool RequiresExpansionCdKey(string wireCode) => wireCode is DiabloIILoD or Warcraft3TFT;
 
-    /// <summary>Whether this product needs a CD-key at all — Diablo (1) doesn't, and Chat/Telnet mode never does (see <see cref="Chat"/>).</summary>
-    public static bool RequiresCdKey(string wireCode) => wireCode != Diablo && wireCode != Chat;
+    /// <summary>Whether this product needs a CD-key at all — Diablo (1) is the sole exception.</summary>
+    public static bool RequiresCdKey(string wireCode) => wireCode != Diablo;
 
     public static ServerCompatibility GetServerCompatibility(string wireCode) =>
-        wireCode == Chat
-            ? ServerCompatibility.PrivateOnly
-            : Catalog.TryGetValue(wireCode, out var info) ? info.Compatibility : ServerCompatibility.Both;
+        Catalog.TryGetValue(wireCode, out var info) ? info.Compatibility : ServerCompatibility.Both;
 
     /// <summary>
     /// Whether this product's server pushes SID_FRIENDSLIST/UPDATE/ADD/REMOVE/POSITION
@@ -204,17 +194,34 @@ public static class BncsProduct
         Catalog.TryGetValue(wireCode, out var info) ? info.SupportsFriendsList : true;
 
     /// <summary>
-    /// Whether this product connects via ncarrillo/superiority's Stimpak
-    /// native library (modern web-auth login, multi-channel chat) rather
-    /// than the classic BNCS/Chat-Telnet path. Only SC2 today; StarCraft:
-    /// Remastered and WarCraft III: Reforged will also return true once
-    /// they exist as bot products, since the same Battle.net account and
-    /// connection mechanism covers all three — code that branches on this
-    /// (multi-channel UI, Battle.net credential profiles) should gate on
-    /// this helper rather than a literal "== Sc2" check, so adding those
-    /// products later doesn't mean hunting down every such check.
+    /// Whether this product connects via ncarrillo/superiority's Stimpak native library
+    /// (modern web-auth login, multi-channel chat) rather than the classic BNCS/Chat-Telnet
+    /// path. SC2, SC:Remastered, and WC3:Reforged all connect identically — the same Battle.net
+    /// account and connection mechanism covers all three, and Stimpak's own C# API has no
+    /// per-game selector at all — so code that branches on this (multi-channel UI, Battle.net
+    /// credential profiles) should gate on this helper rather than a literal "== Sc2" check.
     /// </summary>
-    public static bool IsStimpakBacked(string wireCode) => wireCode == Sc2;
+    public static bool IsStimpakBacked(string wireCode) => wireCode is Sc2 or ScRemastered or Wc3Reforged;
+
+    /// <summary>
+    /// Chat-icon key identifying this exact product — used anywhere a picker/tab needs to show
+    /// one specific product's icon rather than a roster entry's own (ambiguous) statstring-based
+    /// one. Stimpak-backed products get a dedicated case here since <see cref="Chat.ChatIcon"/>
+    /// .GetProductIconKey has no real notion of them at all — it's driven by BNCS statstrings,
+    /// not <c>BotConfig.Product</c>'s own 3-character "SC2"/"SCR"/"W3R" sentinels (its lone
+    /// Stimpak special-case matches lowercase "sc2" only, a friend-roster sentinel BotEngine.Sc2.cs
+    /// stamps — comparing this uppercase constant against it directly would silently miss).
+    /// Everything else resolves through Catalog's own IconKey (which already prefers a picker-only
+    /// IconKeyOverride over the plain statstring-based lookup), falling back to GetProductIconKey
+    /// directly for a wire code with no Catalog entry.
+    /// </summary>
+    public static string GetIconKey(string wireCode) => wireCode switch
+    {
+        Sc2 => "sc2",
+        ScRemastered => "sc",
+        Wc3Reforged => "war3",
+        _ => Catalog.TryGetValue(wireCode, out var info) ? info.IconKey : Invigoration.Core.Chat.ChatIcon.GetProductIconKey(wireCode),
+    };
 
     /// <summary>Heuristic check used to warn before connecting a PrivateOnly product to what looks like official Battle.net.</summary>
     public static bool LooksLikeOfficialBattlenetHost(string hostOrAddress) =>

@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Invigoration.App.Models;
+using Invigoration.Core;
 using Invigoration.Core.Config;
 using Stimpak;
 
@@ -71,16 +72,24 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
     [ObservableProperty]
     public partial bool IsSigningIn { get; set; }
 
+    [ObservableProperty]
+    public partial string? BattleTag { get; set; }
+
     public BattlenetCredentialProfileViewModel(BattlenetCredentialProfile profile)
     {
         Profile = profile;
         Name = profile.Name;
+        BattleTag = profile.BattleTag;
         RefreshIsSignedIn();
     }
 
     partial void OnNameChanged(string value) => Profile.Name = value;
 
-    private void RefreshIsSignedIn() => IsSignedIn = BattlenetCredentialProfileStore.HasCachedCredential(Profile.Id);
+    private void RefreshIsSignedIn()
+    {
+        IsSignedIn = BattlenetCredentialProfileStore.HasCachedCredential(Profile.Id);
+        BattleTag = Profile.BattleTag;
+    }
 
     /// <summary>
     /// Standalone verification/sign-in: spins up a throwaway StimpakClient
@@ -96,7 +105,11 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
         IsSigningIn = true;
         try
         {
-            using var client = new StimpakClient(BattlenetCredentialProfileStore.CredentialFilePath(Profile.Id));
+            StimpakNativeResolver.Register();
+            using var client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration")
+            {
+                CredentialPath = BattlenetCredentialProfileStore.CredentialFilePath(Profile.Id),
+            });
             var outcome = new TaskCompletionSource();
             client.EventReceived += next =>
             {
@@ -107,6 +120,10 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
                         break;
                     case AuthenticationRequired auth:
                         _ = SubmitChallengeAsync(client, auth, owner, outcome);
+                        break;
+                    case AccountConnected connected:
+                        BattlenetCredentialProfileStore.UpdateBattleTag(Profile.Id, connected.Account.BattleTag);
+                        BattleTag = connected.Account.BattleTag;
                         break;
                     case SessionFailed failed:
                         outcome.TrySetException(new InvalidOperationException(failed.Message));

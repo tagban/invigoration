@@ -2,6 +2,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Networking;
+using Stimpak;
 
 namespace Invigoration.Core.Config;
 
@@ -47,14 +48,16 @@ public sealed class BotConfig
     public string BattlenetCredentialProfileId { get; set; } = "";
 
     /// <summary>
-    /// Names of the channels joined last time this bot was connected (SC2/SC:R/WC3:R only —
-    /// classic BNCS/Chat-Telnet are single-channel and have nothing to remember here). Replayed
-    /// after connecting so the bot's set of open channels survives a reconnect or app restart;
-    /// the always-auto-joined default channel doesn't need special-casing since replay skips
-    /// any name already joined. Kept in sync automatically as channels are joined/left — not
-    /// meant to be hand-edited.
+    /// The channels joined last time this bot was connected (SC2/SC:R/WC3:R only — classic
+    /// BNCS/Chat-Telnet are single-channel and have nothing to remember here). Handed straight
+    /// to Stimpak's own StimpakConnectOptions.Channels on the next connect, which restores them
+    /// natively (an empty list just means the default "General") — not replayed by hand after
+    /// the fact. Kept in sync automatically as channels are joined/left — not meant to be
+    /// hand-edited. Stimpak's ChannelTarget is reused directly here (it already serializes via
+    /// the same JsonPolymorphic/JsonDerivedType attributes ConfigStore's plain
+    /// System.Text.Json options already understand) rather than re-deriving an equivalent type.
     /// </summary>
-    public List<string> Sc2LastChannelNames { get; set; } = new();
+    public List<ChannelTarget> Sc2LastChannels { get; set; } = new();
 
     /// <summary>
     /// Which named group this bot's top-level tab belongs to in MainWindow — "" means
@@ -219,23 +222,46 @@ public sealed class BotConfig
 
     public int HideJoinLeaveSpamWindowSeconds { get; set; } = 60;
 
+    /// <summary>
+    /// When on, a small game/client icon is shown next to a speaker's name on their chat/emote
+    /// lines — the same icon key the userlist/friends list already derive from a classic BNCS
+    /// user's statstring (Chat.ChatIcon.GetProductIconKey), or this bot's own product icon for
+    /// every speaker on a Stimpak-backed (SC2/SC:R/WC3:R) bot, since Stimpak's roster data has no
+    /// per-user product field to distinguish speakers by (same limitation noted on the friends
+    /// list). Off by default — some noise for a feature not everyone wants in a dense chat log.
+    /// </summary>
+    public bool ShowUserIconsInChat { get; set; }
+
+    /// <summary>
+    /// Off by default (always show the product/game icon, with any rank badge as a separate icon
+    /// alongside it — see ChannelUserViewModel.DisplayIconImage). On, the classic Users list
+    /// switches to real classic Battle.net behavior: a privileged user's (see
+    /// Chat.ChatIcon.IsPrivileged) rank badge (gavel/Blizzard logo/etc.) replaces their game icon
+    /// in that one slot instead of showing both side by side. Toggled via a right-click menu item
+    /// on the Users list itself (BotTabView.axaml's OnToggleClassicIconStyleClick), not the Config
+    /// window, per explicit request — a quick display preference, not a connection setting.
+    /// </summary>
+    public bool ClassicUserIconStyle { get; set; }
+
+    /// <summary>
+    /// Minutes of no chat activity before IdleMessage auto-sends once — 0 (default) turns the
+    /// feature off entirely. See BotEngine.Idle.cs. Also settable live via the "idle" chat
+    /// command ("idle 30 back in a bit" / "idle off"), which writes here directly.
+    /// </summary>
+    public int IdleMinutes { get; set; }
+
+    /// <summary>
+    /// Supports %Ver%/%Uptime%/%MusicPlaying%/%Username% placeholders, resolved fresh each time
+    /// the message actually sends — see BotEngine.Idle.cs's ResolveIdlePlaceholdersAsync.
+    /// </summary>
+    public string IdleMessage { get; set; } = "";
+
     /// <summary>4-character BNCS product code, e.g. "VD2D" = Diablo II, "PX2D" = Diablo II: LoD.</summary>
     public string Product { get; set; } = "VD2D";
 
     public string Realm { get; set; } = "";
     public bool ZeroPing { get; set; }
     public bool NegPing { get; set; }
-
-    /// <summary>
-    /// BncsBinary (default): the normal binary game protocol every other
-    /// part of this app assumes. Chat: Battle.net/PVPGN's older plain-text,
-    /// line-based "Chat" connection type (selected by sending byte 0x03
-    /// instead of 0x01 right after connecting) — no BNLS, CD-key, or
-    /// version-check involved at all, just a username/password prompt. Some
-    /// PVPGN networks (e.g. eurobattle.net) still run this alongside the
-    /// binary protocol; official Battle.net does not.
-    /// </summary>
-    public ConnectionMode ConnectionMode { get; set; } = ConnectionMode.BncsBinary;
 
     /// <summary>
     /// Which saved <see cref="Config.IconSetStore"/> set this bot's icons come
@@ -315,11 +341,5 @@ public sealed class DiscordBridgeConfig
     public bool RelayBattlenetToDiscord { get; set; } = true;
 
     public bool RelayDiscordToBattlenet { get; set; } = true;
-}
-
-public enum ConnectionMode
-{
-    BncsBinary,
-    Chat,
 }
 

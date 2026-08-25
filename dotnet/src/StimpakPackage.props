@@ -1,0 +1,75 @@
+<Project>
+  <!--
+    Stimpak (the native StarCraft II/SC:R/WC3:R Battle.net chat client, ncarrillo/superiority)
+    is consumed as a NuGet package as of 2026-08-24, replacing the git submodule + local Rust
+    build this project used before — the package now ships prebuilt native binaries for every
+    platform Invigoration targets (win-x64, linux-x64, osx-arm64, osx-x64), so building from
+    source no longer needs a Rust toolchain at all.
+
+    Getting this to actually load correctly at runtime took three attempts, empirically tested
+    (a scratch console project, three build shapes: `dotnet run`, self-contained loose-files
+    publish, self-contained single-file publish) rather than assumed — worth recording why the
+    final shape looks the way it does:
+
+    1. The package's own build (imported automatically as "buildTransitive") copies its native
+       library flatly into the output root, where it collides — on a case-insensitive
+       filesystem (Windows) — with its own managed Stimpak.dll: same name apart from casing, so
+       only one survives the copy, and it isn't the managed one. Every P/Invoke then fails with
+       FileNotFoundException trying to load the (now-missing) managed assembly.
+       Fix: ExcludeAssets="buildTransitive" turns off the package's own copy entirely.
+    2. That alone isn't enough for a *published* build: leaving the SDK's own standard native-
+       asset resolution enabled additionally throws NETSDK1152 ("found multiple publish output
+       files with the same relative path") during `dotnet publish` specifically — self-contained
+       publish intentionally flattens native assets that a plain `dotnet build` would otherwise
+       leave nested under runtimes/<rid>/native/, and that flattening is what re-collides it with
+       the managed assembly, this time as a hard build error instead of a silent runtime one.
+       Fix: ExcludeAssets="native" too, then stage the file ourselves — nested under
+       runtimes/<rid>/native/, never flat — via our own Copy targets that run strictly after
+       Build/Publish (earlier hooks like ResolvedFileToPublish or a plain None item were tried
+       and didn't reliably survive single-file publish's own file-list computation).
+    3. Even placed correctly and non-collidingly on disk, .NET's *default* native-library
+       resolver still checks the flat app directory first — where the managed Stimpak.dll still
+       sits — before it ever probes runtimes/<rid>/native/, so a bare P/Invoke call still finds
+       the wrong file and fails with EntryPointNotFoundException (a different exception than
+       problem 1's FileNotFoundException, but the same root cause: OS-level LoadLibrary doesn't
+       care that "stimpak" and "Stimpak" are different files to us).
+       Fix: bypass OS search order entirely with NativeLibrary.SetDllImportResolver, registered
+       once at app startup — see Invigoration.Core's StimpakNativeResolver.cs. That's real
+       application code (not something an MSBuild props file can do), so importing this file
+       alone isn't sufficient on its own; StimpakNativeResolver.Register() also needs to run
+       before the first StimpakClient is constructed.
+
+    All three fixes were verified together, not just individually, against all three build
+    shapes above before being folded back into this project.
+
+    Import this from any project whose own output needs to actually P/Invoke into Stimpak at
+    runtime — not just Invigoration.App, but also Invigoration.Core (which calls
+    StimpakNativeResolver.Register() — see BotEngine.Sc2.cs) and Invigoration.Core.Tests, since
+    some of its tests construct a real StimpakClient (see BotEngineSc2ChannelStateTests.cs).
+  -->
+  <ItemGroup>
+    <PackageReference Include="Stimpak" Version="0.1.0-preview.1" ExcludeAssets="buildTransitive;native" GeneratePathProperty="true" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <!-- $(RuntimeIdentifier) is only set for a RID-specific build (e.g. `dotnet publish -r
+         win-x64`); an ordinary `dotnet build`/`dotnet test` has no RID at all, so fall back to
+         whatever RID the current machine's SDK reports for itself. -->
+    <_StimpakRid Condition="'$(RuntimeIdentifier)' != ''">$(RuntimeIdentifier)</_StimpakRid>
+    <_StimpakRid Condition="'$(_StimpakRid)' == ''">$(NETCoreSdkRuntimeIdentifier)</_StimpakRid>
+    <_StimpakNativeFileName Condition="'$(_StimpakRid)' == 'win-x64'">stimpak.dll</_StimpakNativeFileName>
+    <_StimpakNativeFileName Condition="'$(_StimpakRid)' == 'linux-x64'">libstimpak.so</_StimpakNativeFileName>
+    <_StimpakNativeFileName Condition="'$(_StimpakRid)' == 'osx-arm64' or '$(_StimpakRid)' == 'osx-x64'">libstimpak.dylib</_StimpakNativeFileName>
+    <_StimpakNativeSource>$(PkgStimpak)\runtimes\$(_StimpakRid)\native\$(_StimpakNativeFileName)</_StimpakNativeSource>
+  </PropertyGroup>
+
+  <Target Name="CopyStimpakNativeAfterBuild" AfterTargets="Build"
+          Condition="'$(_StimpakNativeFileName)' != '' and Exists('$(_StimpakNativeSource)')">
+    <Copy SourceFiles="$(_StimpakNativeSource)" DestinationFolder="$(OutDir)runtimes\$(_StimpakRid)\native\" SkipUnchangedFiles="true" />
+  </Target>
+
+  <Target Name="CopyStimpakNativeAfterPublish" AfterTargets="Publish"
+          Condition="'$(_StimpakNativeFileName)' != '' and Exists('$(_StimpakNativeSource)')">
+    <Copy SourceFiles="$(_StimpakNativeSource)" DestinationFolder="$(PublishDir)runtimes\$(_StimpakRid)\native\" SkipUnchangedFiles="true" />
+  </Target>
+</Project>

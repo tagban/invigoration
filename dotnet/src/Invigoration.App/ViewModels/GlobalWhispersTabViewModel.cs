@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Collections.Specialized;
 using System.ComponentModel;
 using Avalonia.Media;
+using Avalonia.Media.Imaging;
 using Invigoration.App.Models;
 
 namespace Invigoration.App.ViewModels;
@@ -70,11 +71,14 @@ public sealed class GlobalWhispersTabViewModel : ViewModelBase
         }
     }
 
-    /// <summary>Placeholder label until a proper icon is picked — short, still reads as "whisper" via the classic BNCS "/w" command, and stays compact like a real icon would.</summary>
-    public string Title => "/w";
+    /// <summary>No text label needed now that TabIconImage carries the "whisper" icon (defaults to 🤫, editable via Manage Icons) — an empty title just leaves the icon on its own in the tab header.</summary>
+    public string Title => "";
 
     /// <summary>No bot-specific palette to draw from here — a fixed accent, distinct enough from the default Fluent accent to read as intentional.</summary>
     public IBrush HighlightBrush { get; } = new SolidColorBrush(Color.FromRgb(0x2C, 0xAC, 0xE8));
+
+    /// <summary>The global Whispers tab's own icon — see IconManagerViewModel's "Custom Icons" section.</summary>
+    public Bitmap? TabIconImage => GameIconLoader.Get("whisper");
 
     public double HeaderFontSize => 13;
 

@@ -29,9 +29,15 @@ public partial class ConfigViewModel : ObservableObject
             .OrderBy(p => p.DisplayName)
             .Concat(
             [
-                new ProductOption(BncsProduct.Chat, "Chat / Telnet (no game, PVPGN only)", GameIconLoader.Get("chat")),
                 new ProductOption(BncsProduct.Sc2, "StarCraft II", GameIconLoader.Get("sc2")),
-                new ProductOption("SCRM", "StarCraft: Remastered (coming soon)", null, IsSelectable: false),
+                // Dedicated SC:R/WC3:R icons are still pending (the user's own future-icon-work
+                // backlog item) — these borrow the closest existing classic icon for the picker
+                // specifically. The Friends-list/roster side is a separate, harder limitation:
+                // Stimpak's own data has no per-contact game field at all, so every Stimpak-
+                // backed contact there falls back to the plain "sc2" icon regardless — see
+                // ChatIcon.GetProductIconKey's "sc2" sentinel case.
+                new ProductOption(BncsProduct.ScRemastered, "StarCraft: Remastered", GameIconLoader.Get("sc")),
+                new ProductOption(BncsProduct.Wc3Reforged, "Warcraft III: Reforged", GameIconLoader.Get("war3")),
             ])
             .ToList();
 
@@ -41,14 +47,32 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(AllowsOfficialServers))]
     [NotifyPropertyChangedFor(nameof(ServerCompatibilityNote))]
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
-    [NotifyPropertyChangedFor(nameof(IsChatProtocol))]
-    [NotifyPropertyChangedFor(nameof(IsSc2Product))]
+    [NotifyPropertyChangedFor(nameof(IsStimpakBackedProduct))]
     public partial string Product { get; set; }
 
-    /// <summary>True when "Chat / Telnet" is the selected Game entry — hides the BNLS section (unused in that mode: no BNLS/CD-key/version-check at all, just a username/password prompt) and shows an explanatory note. Selecting this Product is the only way to turn on Config.ConnectionMode.Chat; see OnProductChanged.</summary>
-    public bool IsChatProtocol => Product == BncsProduct.Chat;
+    public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
 
-    public bool IsSc2Product => Product == BncsProduct.Sc2;
+    // --- Tab group icon: which icon (see IconCatalog) this bot's Tab Group shows on its
+    // collapsed top-level tab, once it has one — see TabGroupIconStore. Groups aren't a
+    // separate persisted entity, so this is keyed by the group name text itself; changing
+    // the name switches which assignment is being edited. ---
+
+    private static readonly IconOption NoGroupIconSentinel = new("", "(use first bot's icon)", null);
+
+    public IReadOnlyList<IconOption> AvailableGroupIcons { get; } =
+        new[] { NoGroupIconSentinel }
+            .Concat(IconCatalog.GameIcons.Concat(IconCatalog.CustomIcons).Concat(IconCatalog.Bnet2Icons)
+                .Select(s => new IconOption(s.Key, s.DisplayName, GameIconLoader.Get(s.Key))))
+            .ToList();
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsInTabGroup))]
+    public partial string TabGroup { get; set; }
+
+    [ObservableProperty]
+    public partial IconOption SelectedGroupIcon { get; set; } = NoGroupIconSentinel;
+
+    public bool IsInTabGroup => !string.IsNullOrWhiteSpace(TabGroup);
 
     // --- StarCraft II login: which saved Battle.net login (see "Manage Battle.net
     // Profiles..." under the Customize menu) this bot uses. The actual sign-in itself
@@ -150,18 +174,16 @@ public partial class ConfigViewModel : ObservableObject
 
     public ObservableCollection<string> ServerSuggestions { get; } = [];
 
-    public bool RequiresExpansionKey => !IsSc2Product && BncsProduct.RequiresExpansionCdKey(Product);
+    public bool RequiresExpansionKey => !IsStimpakBackedProduct && BncsProduct.RequiresExpansionCdKey(Product);
 
-    public bool RequiresCdKey => !IsSc2Product && BncsProduct.RequiresCdKey(Product);
+    public bool RequiresCdKey => !IsStimpakBackedProduct && BncsProduct.RequiresCdKey(Product);
 
     public bool AllowsOfficialServers => BncsProduct.GetServerCompatibility(Product) == ServerCompatibility.Both;
 
     public string? ServerCompatibilityNote =>
         BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.Notes : null;
 
-    public Bitmap? ProductIconImage => GameIconLoader.Get(
-        IsSc2Product ? "sc2" :
-        BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.IconKey : ChatIcon.GetProductIconKey(Product));
+    public Bitmap? ProductIconImage => GameIconLoader.Get(BncsProduct.GetIconKey(Product));
 
     // --- Official server picker (4 fixed choices + "Other...") ---
 
@@ -251,6 +273,8 @@ public partial class ConfigViewModel : ObservableObject
     {
         Config = config;
         Product = config.Product;
+        TabGroup = config.TabGroup;
+        SelectedGroupIcon = AvailableGroupIcons.FirstOrDefault(o => o.Key == TabGroupIconStore.GetIconKey(TabGroup)) ?? NoGroupIconSentinel;
         ProxyEnabled = config.ProxyEnabled;
         ProxyProtocol = config.ProxyProtocol;
         SelectedOfficialServer = BncsProduct.OfficialBattlenetServers.Contains(config.BattlenetServer)
@@ -338,14 +362,25 @@ public partial class ConfigViewModel : ObservableObject
     partial void OnProductChanged(string value)
     {
         Config.Product = value;
-        // Selecting "Chat / Telnet" is the only way to turn on Config.ConnectionMode.Chat — there's
-        // no separate connection-protocol picker, since Chat mode isn't tied to any game at all and
-        // just replaces the product choice instead of sitting alongside it.
-        Config.ConnectionMode = value == BncsProduct.Chat ? ConnectionMode.Chat : ConnectionMode.BncsBinary;
         RefreshServerSuggestions();
     }
 
     partial void OnProxyProtocolChanged(ProxyProtocol value) => Config.ProxyProtocol = value;
+
+    partial void OnTabGroupChanged(string value)
+    {
+        Config.TabGroup = value;
+        SelectedGroupIcon = AvailableGroupIcons.FirstOrDefault(o => o.Key == TabGroupIconStore.GetIconKey(value)) ?? NoGroupIconSentinel;
+    }
+
+    /// <summary>Applied immediately (not batched into Save) since a group's icon is shared state keyed by name, not part of this one bot's own Config.</summary>
+    partial void OnSelectedGroupIconChanged(IconOption value)
+    {
+        if (!string.IsNullOrWhiteSpace(TabGroup))
+        {
+            TabGroupIconStore.SetIconKey(TabGroup, value.Key);
+        }
+    }
 
     partial void OnProxyEnabledChanged(bool value) => Config.ProxyEnabled = value;
 
@@ -385,6 +420,9 @@ public sealed record ProductOption(string WireCode, string DisplayName, Bitmap? 
 {
     public double DisplayOpacity => IsSelectable ? 1.0 : 0.4;
 }
+
+/// <summary>One pickable entry in a "choose an icon" list — see ConfigViewModel.AvailableGroupIcons.</summary>
+public sealed record IconOption(string Key, string DisplayName, Bitmap? Icon);
 
 public sealed record ColorSchemeOption(ChatColorScheme Value, string DisplayName);
 
