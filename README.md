@@ -9,7 +9,7 @@ A complete rewrite of the classic Battle.net bot, brought to the .NET era — 15
 ## Features
 
 - Multi-bot, multi-server: run several bots side-by-side in tabs, each on its own server, game, and account
-- **StarCraft II connectivity** (limited but working) over Blizzard's real modern protocol — login, multi-channel chat, whispers, and friends, plus SC:Remastered/WC3:Reforged support built on the same connection
+- **StarCraft II connectivity** (limited but working) over Blizzard's real modern protocol — login, multi-channel chat, whispers, and friends. SC:Remastered and Warcraft III: Reforged are selectable as products on the same connection but not yet actually working — coming soon
 - Shared clan roster with configurable ranks — per-rank command access, auto-whisper/auto-kick/auto-ban
 - Trivia across 6 categories (Diablo, Warcraft, StarCraft, Blizzard, Pop Culture, Music), with editable question packs
 - Per-bot custom chat color schemes, plus a full icon manager for game/status icons
@@ -64,11 +64,11 @@ An embedded YouTube Music, Spotify, or Pandora player, controllable from chat (`
   <img src="screenshots/music-tab-spotify.png" width="380" alt="Music tab with an embedded Spotify player">
 </p>
 
-### StarCraft II / SC:Remastered / WC3:Reforged
+### StarCraft II (SC:Remastered / WC3:Reforged coming soon)
 
-Set a bot's **Product** to StarCraft II, StarCraft: Remastered, or Warcraft III: Reforged in its Configuration window and Connect — these products log in through Blizzard's modern Battle.net service instead of the classic protocol the rest of this app uses, so a few things work differently:
+Set a bot's **Product** to StarCraft II in its Configuration window and Connect — it logs in through Blizzard's modern Battle.net service instead of the classic protocol the rest of this app uses, so a few things work differently. StarCraft: Remastered and Warcraft III: Reforged are already selectable in that same list (they share the underlying connection), but aren't actually working yet — that's coming in a future release.
 
-- **Battle.net credential profiles**: instead of each bot having its own implicit login, a bot picks a named **Battle.net Profile** from a dropdown in its Configuration window. Point two bots at the same profile to share one signed-in login (handy for running an SC2 and a WC3:R bot on the same account); give a bot its own profile for a separate login. Manage profiles — rename, sign in, remove — from **Customize → Manage Battle.net Profiles...**.
+- **Battle.net credential profiles**: instead of each bot having its own implicit login, a bot picks a named **Battle.net Profile** from a dropdown in its Configuration window. Point two bots at the same profile to share one signed-in login (handy for running multiple bots on the same account); give a bot its own profile for a separate login. Manage profiles — rename, sign in, remove — from **Customize → Manage Battle.net Profiles...**.
 - **Multi-channel chat**: unlike classic Battle.net's single-channel chat, these products can be joined to several channels at once (up to 6). Each joined channel gets its own sub-tab with its own chat log and user list; use the **+** button above the sub-tabs to join another public or private channel, and the **×** on a sub-tab to leave it. The bot remembers which channels it had open and rejoins them on reconnect.
 - Trivia, when running in one of these channels, only accepts answers from that same channel — not from a different one the bot also happens to be in.
 
@@ -134,6 +134,8 @@ macOS releases are built, signed with a Developer ID certificate, and notarized 
 ## Acknowledgments
 
 StarCraft II, StarCraft: Remastered, and Warcraft III: Reforged connectivity is powered by [Stimpak](https://github.com/ncarrillo/superiority), ncarrillo's native Battle.net client library.
+
+The classic Battle.net 1.0 (BNCS) protocol implementation wouldn't have been possible without [BNETDocs.org](https://bnetdocs.org) and [github.com/BNETDocs](https://github.com/BNETDocs) — their continued effort to document and maintain Battle.net 1.0's protocol, long after Blizzard stopped supporting it, is what this whole side of the app is built on.
 
 ## Status
 
