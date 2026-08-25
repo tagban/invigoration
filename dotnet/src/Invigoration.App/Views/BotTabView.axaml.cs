@@ -140,6 +140,154 @@ public partial class BotTabView : UserControl
         }
     }
 
+    private void OnFriendProfileInfoClick(object? sender, RoutedEventArgs e) => OpenProfileAndCloseFlyout(sender);
+
+    private void OnFriendClanRankClick(object? sender, RoutedEventArgs e) => CloseFriendFlyoutAndRun(sender, friend => $"/claninfo {friend.Account}");
+
+    private void OnFriendSquelchClick(object? sender, RoutedEventArgs e) => CloseFriendFlyoutAndRun(sender, friend => $"/squelch {friend.Account}");
+
+    /// <summary>Populates the friend flyout's rank ComboBox straight from the global ClanRankStore on Loaded — no ancestor-DataContext walk needed since the store is a plain static list, sidestepping the "bindings through Popups are unreliable" issue noted elsewhere in this file.</summary>
+    private void OnClanRankComboLoaded(object? sender, RoutedEventArgs e)
+    {
+        if (sender is ComboBox combo)
+        {
+            combo.ItemsSource = Invigoration.Core.Clan.ClanRankStore.Ranks.Select(r => r.Name).ToList();
+        }
+    }
+
+    private void OnFriendSetClanRankClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Control { DataContext: Models.FriendEntryViewModel friend } control || DataContext is not BotTabViewModel vm)
+        {
+            return;
+        }
+
+        if (control.Parent is Panel panel && panel.Children.OfType<ComboBox>().FirstOrDefault() is { SelectedItem: string rank })
+        {
+            _ = vm.Engine.RunLocalCommandAsync($"/clanrank {friend.Account} {rank}");
+        }
+
+        if (control.FindAncestorOfType<Popup>() is { } popup)
+        {
+            popup.IsOpen = false;
+        }
+    }
+
+    private void OpenProfileAndCloseFlyout(object? sender)
+    {
+        if (sender is Control { DataContext: Models.FriendEntryViewModel friend } control && DataContext is BotTabViewModel vm)
+        {
+            OpenProfileWindow(vm, friend.Account);
+            if (control.FindAncestorOfType<Popup>() is { } popup)
+            {
+                popup.IsOpen = false;
+            }
+        }
+    }
+
+    private void CloseFriendFlyoutAndRun(object? sender, Func<Models.FriendEntryViewModel, string> buildCommand)
+    {
+        if (sender is Control { DataContext: Models.FriendEntryViewModel friend } control && DataContext is BotTabViewModel vm)
+        {
+            _ = vm.Engine.RunLocalCommandAsync(buildCommand(friend));
+            if (control.FindAncestorOfType<Popup>() is { } popup)
+            {
+                popup.IsOpen = false;
+            }
+        }
+    }
+
+    /// <summary>Right-click menu on the classic Users list — MenuItem.Click, no manual popup-closing needed (ContextMenu closes itself on click, unlike the Friends list's ContextFlyout above).</summary>
+    private void OnUserWhisperClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: Models.ChannelUserViewModel user } && DataContext is BotTabViewModel vm
+            && this.FindAncestorOfType<Window>()?.DataContext is MainWindowViewModel mainVm)
+        {
+            mainVm.FocusWhisperThread(vm, user.Username);
+        }
+    }
+
+    private void OnUserProfileInfoClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: Models.ChannelUserViewModel user } && DataContext is BotTabViewModel vm)
+        {
+            OpenProfileWindow(vm, user.Username);
+        }
+    }
+
+    private void OpenProfileWindow(BotTabViewModel vm, string account)
+    {
+        var owner = this.FindAncestorOfType<Window>();
+        var window = new ProfileWindow(vm.Engine, account);
+        if (owner is not null)
+        {
+            _ = window.ShowDialog(owner);
+        }
+        else
+        {
+            window.Show();
+        }
+    }
+
+    private void OnUserClanRankClick(object? sender, RoutedEventArgs e) => RunUserCommand(sender, user => $"/claninfo {user.Username}");
+
+    private void OnUserSquelchClick(object? sender, RoutedEventArgs e) => RunUserCommand(sender, user => $"/squelch {user.Username}");
+
+    private void OnUserAddFriendClick(object? sender, RoutedEventArgs e) => RunUserCommand(sender, user => $"/f add {user.Username}");
+
+    /// <summary>
+    /// Fired when the classic Users list's right-click menu opens — (re)populates the "Clan Rank"
+    /// submenu's per-rank "Set: X" entries straight from ClanRankStore, after the two static items
+    /// ("View Info" + a Separator) it starts with in XAML, and syncs "Classic Icon Style"'s
+    /// checkmark to the bot's current Config.ClassicUserIconStyle (there's no reachable binding
+    /// path from this row's own DataContext back up to Config — same reasoning as everywhere else
+    /// in this file — so it's set here in code-behind instead, each time the menu opens).
+    /// </summary>
+    private void OnUserContextMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu { PlacementTarget: Control { DataContext: Models.ChannelUserViewModel user } } menu
+            || DataContext is not BotTabViewModel vm)
+        {
+            return;
+        }
+
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "UserClanRankMenu") is { } clanRankMenu)
+        {
+            while (clanRankMenu.Items.Count > 2)
+            {
+                clanRankMenu.Items.RemoveAt(clanRankMenu.Items.Count - 1);
+            }
+
+            foreach (var rank in Invigoration.Core.Clan.ClanRankStore.Ranks)
+            {
+                var item = new MenuItem { Header = $"Set: {rank.Name}" };
+                item.Click += (_, _) => _ = vm.Engine.RunLocalCommandAsync($"/clanrank {user.Username} {rank.Name}");
+                clanRankMenu.Items.Add(item);
+            }
+        }
+
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "ClassicIconStyleMenuItem") is { } classicIconStyleItem)
+        {
+            classicIconStyleItem.IsChecked = vm.Config.ClassicUserIconStyle;
+        }
+    }
+
+    private void OnToggleClassicIconStyleClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is BotTabViewModel vm)
+        {
+            vm.ToggleClassicUserIconStyle();
+        }
+    }
+
+    private void RunUserCommand(object? sender, Func<Models.ChannelUserViewModel, string> buildCommand)
+    {
+        if (sender is Control { DataContext: Models.ChannelUserViewModel user } && DataContext is BotTabViewModel vm)
+        {
+            _ = vm.Engine.RunLocalCommandAsync(buildCommand(user));
+        }
+    }
+
     private void OnLeaveChannelClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Control { DataContext: ChannelTabViewModel tab } && DataContext is BotTabViewModel vm)
@@ -174,15 +322,28 @@ public partial class BotTabView : UserControl
             // A plain Image's own Width/Height aren't reliably honored once embedded via
             // InlineUIContainer inside a text flow — wrapping in a Viewbox forces the exact
             // rendered size regardless of how the surrounding line measures its inline content.
+            // VerticalAlignment on that inner Viewbox does nothing for inline text-flow
+            // positioning, though (confirmed live — the icon hung low, overlapping the line
+            // below): text flow positions an InlineUIContainer via its own BaselineAlignment
+            // property instead, which defaults to Top (the box's top pinned to the line's top,
+            // so a too-tall icon spills downward past the baseline) — Center fixes that. But
+            // BaselineAlignment alone wasn't enough either (confirmed live, still overlapping):
+            // ChatText's LineHeight is now explicitly 20 (BotTabView.axaml), so a 20px icon was
+            // still exactly as tall as the whole line with zero room to spare — any sub-pixel
+            // rounding pushed it into the next line. 16px comfortably fits within that 20px line
+            // box with margin either side, while still meeting "at least the height of the text"
+            // (13px FontSize) that this size was originally bumped up from.
             inlines.Add(new InlineUIContainer(new Viewbox
             {
                 Width = 16,
                 Height = 16,
                 Stretch = Avalonia.Media.Stretch.Uniform,
                 Margin = new Thickness(0, 0, 4, 0),
-                VerticalAlignment = VerticalAlignment.Center,
                 Child = new Image { Source = line.Icon },
-            }));
+            })
+            {
+                BaselineAlignment = Avalonia.Media.BaselineAlignment.Center,
+            });
         }
 
         foreach (var segment in line.Segments)

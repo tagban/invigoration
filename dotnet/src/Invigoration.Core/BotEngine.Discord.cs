@@ -48,6 +48,33 @@ public sealed partial class BotEngine
         await bridge.StartAsync(Config.Discord.BotToken, Config.Discord.ChannelId).ConfigureAwait(false);
         _discordBridge = bridge;
         LogInfo("Discord bridge connected.");
+        await UpdateDiscordPresenceAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Refreshes the bridge bot's Discord activity to reflect where this bot actually is right
+    /// now — called once the bridge connects, and again from BotEngine.Bncs.cs whenever a
+    /// ChatEventType.Channel event updates _session.CurrentChannelName (join/rejoin/channel
+    /// change), so the presence text doesn't go stale. A no-op if the bridge isn't connected.
+    /// </summary>
+    private async Task UpdateDiscordPresenceAsync()
+    {
+        if (_discordBridge is not { } bridge)
+        {
+            return;
+        }
+
+        var activityText = string.IsNullOrEmpty(_session.CurrentChannelName)
+            ? $"Invigoration on {Config.BattlenetServer}"
+            : $"Invigoration in {_session.CurrentChannelName} on {Config.BattlenetServer}";
+        try
+        {
+            await bridge.SetPresenceAsync(activityText).ConfigureAwait(false);
+        }
+        catch (Exception ex)
+        {
+            LogDebug($"Discord presence update failed: {ex.Message}");
+        }
     }
 
     private async Task StopDiscordBridgeAsync()

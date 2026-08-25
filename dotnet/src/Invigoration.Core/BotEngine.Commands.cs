@@ -2,6 +2,7 @@ using System.Runtime.InteropServices;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Clan;
 using Invigoration.Core.Crypto;
+using Invigoration.Core.Music;
 using Invigoration.Core.Protocol;
 using Invigoration.Core.Text;
 
@@ -315,12 +316,46 @@ public sealed partial class BotEngine
                 await HandleTriviaCommandAsync(rest, username, Reply).ConfigureAwait(false);
                 break;
 
+            case "skip":
+            case "next":
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.SkipAsync(), "Skipped.", "Couldn't skip — is a track playing?").ConfigureAwait(false);
+                break;
+
+            case "thumbsup":
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.ThumbsUpAsync(), "Liked it.", "Couldn't like the current track — make sure you're signed in to the music player.", c => c.SupportsThumbsUp).ConfigureAwait(false);
+                break;
+
+            case "thumbsdown":
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.ThumbsDownAsync(), "Disliked it.", "Couldn't dislike the current track — make sure you're signed in to the music player.", c => c.SupportsThumbsDown).ConfigureAwait(false);
+                break;
+
+            case "nowplaying":
+            case "np":
+            case "music":
+                await HandleNowPlayingCommandAsync(Reply).ConfigureAwait(false);
+                break;
+
+            case "help":
+            case "?":
+                await HandleHelpCommandAsync(rest, isLocal, Reply).ConfigureAwait(false);
+                break;
+
             default:
                 // Everything else (whois, /w, /friends, etc.) is a raw server
                 // command only relayed when typed locally by the operator,
                 // matching the original's Inbot-only passthrough.
                 if (isLocal)
                 {
+                    // A close-but-not-exact match to a real bot command (e.g. "/idel" for
+                    // "/idle") is very likely a typo, not an intentional raw server command —
+                    // hint at it locally without suppressing the actual relay below, in case it
+                    // really was meant as a raw command (a real BNCS command like "whois"/"f"
+                    // is never close enough to trigger a false positive here).
+                    if (Commands.CommandCatalog.SuggestClosestAlias(command) is { } suggestion)
+                    {
+                        LogInfo($"(Did you mean \"/{suggestion}\"? Sending \"/{command}\" to Battle.net as typed.)");
+                    }
+
                     await SendChatCommandAsync("/" + message).ConfigureAwait(false);
                 }
 
@@ -377,6 +412,13 @@ public sealed partial class BotEngine
             (rest.Equals("score", StringComparison.OrdinalIgnoreCase) ||
              rest.Equals("join", StringComparison.OrdinalIgnoreCase) ||
              rest.Equals("categories", StringComparison.OrdinalIgnoreCase)))
+        {
+            return true;
+        }
+
+        // Read-only, no side effects — gating discoverability itself behind a grant nobody has
+        // yet would make it useless for exactly the people who need it most.
+        if (typedCommand.Equals("help", StringComparison.OrdinalIgnoreCase) || typedCommand == "?")
         {
             return true;
         }
@@ -575,30 +617,146 @@ public sealed partial class BotEngine
         return reply(string.Join(", ", members.Select(m => m.Rank.Length > 0 ? $"{m.Name} ({m.Rank})" : m.Name)));
     }
 
+    /// <summary>
+    /// Writes directly to Config (persisted, same fields the Config window's Idle section edits
+    /// and BotEngine.Idle.cs's timer reads) rather than a session-only field — before
+    /// placeholders existed (%Ver%/%Uptime%/%MusicPlaying%/%Username%, see
+    /// ResolveIdlePlaceholdersAsync), this baked in "uptime"/"ver" shortcuts by immediately
+    /// substituting whatever the value was *right now*; typing %uptime%/%ver% directly does the
+    /// same thing but resolved fresh every time the message actually sends instead of once here.
+    /// </summary>
     private Task HandleIdleCommandAsync(string rest, Func<string, Task> reply)
     {
         if (rest.Equals("off", StringComparison.OrdinalIgnoreCase))
         {
-            _session.IdleTimeSetMinutes = 0;
-            _session.IdleMessage = "";
+            Config.IdleMinutes = 0;
+            Config.IdleMessage = "";
             return reply("Idle message turned off.");
         }
 
         var parts = rest.Split(' ', 2);
         if (!int.TryParse(parts[0], out var minutes) || parts.Length < 2)
         {
-            return Task.CompletedTask;
+            return reply(Commands.CommandCatalog.GetUsage("idle")!);
         }
 
-        _session.IdleTimeSetMinutes = minutes;
-        _session.IdleMessage = parts[1].ToLowerInvariant() switch
-        {
-            "uptime" => $"/me has been online for: {FormatUptime()}.",
-            "ver" => VersionLine,
-            _ => parts[1],
-        };
+        Config.IdleMinutes = minutes;
+        Config.IdleMessage = parts[1];
 
         return reply("Idle message set.");
+    }
+
+    /// <summary>
+    /// "help" (bare) points at itself; "help &lt;command&gt;" (any alias, e.g. "help np" works the
+    /// same as "help nowplaying") looks up that command's Usage text from CommandCatalog. Only
+    /// the first word of rest is treated as the command name — "help idle 5 back in a bit" (a
+    /// natural thing to type if you're both asking for help AND trying to invoke it in one go)
+    /// looks up "idle", not the literal string "idle 5 back in a bit". Not every command has
+    /// Usage defined yet (see CommandCatalogEntry's remarks) — those reply with just the
+    /// command's DisplayName as a fallback rather than a bare "not found."
+    /// </summary>
+    private Task HandleHelpCommandAsync(string rest, bool isLocal, Func<string, Task> reply)
+    {
+        // Bot-side only when the operator typed "/help" themselves (LogInfo, never sent over
+        // chat) — same local/remote split as HandleMusicCommandAsync's Respond, per explicit
+        // request: someone in the channel typing "!help" genuinely wants a visible reply, but the
+        // operator checking their own command syntax doesn't want it echoed to everyone.
+        Task Respond(string text)
+        {
+            if (isLocal)
+            {
+                LogInfo(text);
+                return Task.CompletedTask;
+            }
+
+            return reply(text);
+        }
+
+        var typed = rest.Trim().Split(' ', 2)[0];
+        if (typed.Length == 0)
+        {
+            return Respond($"Type \"{Config.Trigger}help <command>\" for details on a specific command — e.g. \"{Config.Trigger}help idle\".");
+        }
+
+        var usage = Commands.CommandCatalog.GetUsage(typed);
+        if (usage is not null)
+        {
+            return Respond(usage);
+        }
+
+        var entry = Commands.CommandCatalog.Entries.FirstOrDefault(e =>
+            e.CanonicalName.Equals(typed, StringComparison.OrdinalIgnoreCase) ||
+            e.Aliases.Any(a => a.Equals(typed, StringComparison.OrdinalIgnoreCase)));
+        return Respond(entry is null
+            ? $"No such command: \"{typed}\"."
+            : $"{entry.DisplayName} — no detailed usage written for this one yet.");
+    }
+
+    /// <summary>
+    /// Shared shape for "skip"/"thumbsup"/"thumbsdown". Replies over chat only when the command
+    /// itself came from chat (isLocal false) — someone in the channel asking the bot to skip
+    /// probably wants to see it acknowledged; the operator clicking through their own player
+    /// locally doesn't need every click echoed to the whole channel (see the 2026-08-24 live test
+    /// where that's exactly what happened, sent as a real SID_CHATCOMMAND, before this
+    /// local/remote distinction existed). !nowplaying/!music are the deliberate exception — see
+    /// HandleNowPlayingCommandAsync, which always replies over chat regardless of origin, since
+    /// that's genuinely shareable info rather than a personal control confirmation.
+    ///
+    /// isSupported lets a command quietly no-op instead of showing a misleading failure message
+    /// when the current service just doesn't have the concept at all (e.g. Spotify has no
+    /// "dislike," only a Save-to-Library heart) — see IMusicPlayerController.SupportsThumbsDown.
+    /// </summary>
+    private async Task HandleMusicCommandAsync(
+        bool isLocal,
+        Func<string, Task> reply,
+        Func<IMusicPlayerController, Task<bool>> action,
+        string successText,
+        string failureText,
+        Func<IMusicPlayerController, bool>? isSupported = null)
+    {
+        Task Respond(string text)
+        {
+            if (isLocal)
+            {
+                LogInfo(text);
+                return Task.CompletedTask;
+            }
+
+            return reply(text);
+        }
+
+        if (MusicPlayerRegistry.Controller is not { } controller)
+        {
+            await Respond("Music player isn't open.").ConfigureAwait(false);
+            return;
+        }
+
+        if (isSupported is not null && !isSupported(controller))
+        {
+            return;
+        }
+
+        await Respond(await action(controller).ConfigureAwait(false) ? successText : failureText).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Unlike HandleMusicCommandAsync's local-only LogInfo (skip/thumbsup/thumbsdown — see its
+    /// remarks on why those stay local), !nowplaying replies over chat like any other
+    /// informational command (uptime, ver, about) — it's genuinely useful, shareable info for
+    /// the channel, not just a personal control confirmation.
+    /// </summary>
+    private async Task HandleNowPlayingCommandAsync(Func<string, Task> reply)
+    {
+        if (MusicPlayerRegistry.Controller is not { } controller)
+        {
+            await reply("Music player isn't open.").ConfigureAwait(false);
+            return;
+        }
+
+        var nowPlaying = await controller.GetNowPlayingAsync().ConfigureAwait(false);
+        await reply(nowPlaying is null
+            ? "Nothing seems to be playing."
+            : $"/me is now playing {nowPlaying.Title} - by {nowPlaying.Artist}{(string.IsNullOrEmpty(nowPlaying.Service) ? "" : $" on {nowPlaying.Service}")}.").ConfigureAwait(false);
     }
 
     private Task ReplyAsync(string text, string username, bool asWhisper, byte? originChannelIndex) =>

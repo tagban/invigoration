@@ -17,22 +17,24 @@
         <TextBlock Grid.Row="0" TextWrapping="Wrap" Opacity="0.7" FontSize="11" Margin="0,0,0,10"
                    Text="Replace any chat icon with your own image (PNG/GIF/JPG/BMP) — larger images just render bigger everywhere (up to a cap), no fixed size required. A change takes effect the next time that icon is drawn, e.g. after reconnecting a bot tab." />
 
-        <!-- Whole-collection actions: swap in the bundled 64x64 set, revert everything, or save/apply/delete a named
-             set of your own. Each named set is just a folder under the config directory, so it's plain-folder backup/portable. -->
+        <!-- Whole-collection actions: pick any icon set — the three bundled ones (Battle.net 1.0
+             Classic/Warcraft III Classic/Battle.net 2.0) or any of your own saved ones — from one
+             combined dropdown, revert everything, or save/apply/delete a named set of your own.
+             Each named set is just a folder under the config directory, so it's plain-folder
+             backup/portable. -->
         <Border Grid.Row="1" Background="#161616" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="4" Padding="10" Margin="0,0,0,12">
             <StackPanel Spacing="8">
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <Button Content="Apply Bundled 64x64 Set" Command="{Binding ApplyHighResolutionSetCommand}" />
-                    <Button Content="Apply Battle.net 2.0 Icon Set" Command="{Binding ApplyBnet2IconSetCommand}" />
-                    <Button Content="Reset All to Defaults" Command="{Binding ResetAllIconsCommand}" />
-                    <Button Content="Open Icon Sets Folder" Command="{Binding OpenIconSetsFolderCommand}" />
+                    <ComboBox ItemsSource="{Binding AvailableIconSets}" SelectedItem="{Binding SelectedSet}"
+                              PlaceholderText="Choose an icon set..." Width="220" />
+                    <Button Content="Apply" Command="{Binding ApplySelectedSetCommand}" IsEnabled="{Binding SelectedSet, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <Button Content="Delete" Command="{Binding DeleteSelectedSetCommand}" IsEnabled="{Binding SelectedSet, Converter={x:Static ObjectConverters.IsNotNull}}"
+                            ToolTip.Tip="Only removes a saved set of your own — no effect on the three bundled sets." />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">
-                    <ComboBox ItemsSource="{Binding SavedSets}" SelectedItem="{Binding SelectedSet}"
-                              PlaceholderText="Saved icon sets..." Width="180" />
-                    <Button Content="Apply" Command="{Binding ApplySelectedSetCommand}" IsEnabled="{Binding SelectedSet, Converter={x:Static ObjectConverters.IsNotNull}}" />
-                    <Button Content="Delete" Command="{Binding DeleteSelectedSetCommand}" IsEnabled="{Binding SelectedSet, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <Button Content="Reset All to Defaults" Command="{Binding ResetAllIconsCommand}" />
+                    <Button Content="Open Icon Sets Folder" Command="{Binding OpenIconSetsFolderCommand}" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" Spacing="8">

@@ -69,6 +69,21 @@ public sealed class DiscordBridgeClient : IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Sets the bridge bot's own Discord activity/status (e.g. "Playing Invigoration in bnetcc
+    /// on useast.battle.net") — the bot's own presence, which Discord.Net's gateway API supports
+    /// directly. Deliberately not "set my personal Discord status": automating a real user
+    /// account's presence needs a user token and is a Discord self-bot ToS violation regardless
+    /// of whose account it is, so that was never on the table here.
+    /// </summary>
+    public async Task SetPresenceAsync(string activityText)
+    {
+        if (_client is not null)
+        {
+            await _client.SetGameAsync(activityText, type: ActivityType.Playing).ConfigureAwait(false);
+        }
+    }
+
     public async ValueTask DisposeAsync()
     {
         var client = _client;

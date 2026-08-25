@@ -10,7 +10,9 @@ namespace Invigoration.Core.Chat;
 /// SID_FRIENDSUPDATE (0x66, S&gt;C — one entry's status changed),
 /// SID_FRIENDSADD (0x67), SID_FRIENDSREMOVE (0x68), SID_FRIENDSPOSITION (0x69).
 /// Adding/removing/reordering friends themselves is done via plain
-/// "/friend add|remove|promote|demote &lt;name&gt;" chat text handled server-side —
+/// "/f add|remove|promote|demote &lt;name&gt;" chat text handled server-side (the short
+/// "/f" alias, not "/friend" — the full word isn't recognized on real Battle.net, confirmed live:
+/// "/friend add X" got "That is not a valid command" from useast.battle.net) —
 /// there's no dedicated outbound packet for it, unlike these five replies.
 /// </summary>
 public static class FriendsListParser

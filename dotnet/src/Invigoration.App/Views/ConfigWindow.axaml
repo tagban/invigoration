@@ -159,6 +159,15 @@
                     <CheckBox Content="Show game icons next to usernames in chat" IsChecked="{Binding Config.ShowUserIconsInChat}" Margin="0,8,0,0" />
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="A small icon before each chat/emote line, from the speaker's own tracked game (classic BNCS) — a Stimpak-backed bot (SC2/SC:R/WC3:R) shows this bot's own product icon for every speaker instead, since that protocol doesn't report which game each person is actually using." />
+
+                    <TextBlock Text="Idle Message" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,10,0,0" />
+                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">
+                        <TextBlock Grid.Column="0" Text="Send after this many idle minutes (0 = off):" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
+                        <TextBox Grid.Column="1" Width="70" Text="{Binding Config.IdleMinutes}" />
+                    </Grid>
+                    <TextBox Text="{Binding Config.IdleMessage}" PlaceholderText="e.g. /me is away — currently playing %MusicPlaying%" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                               Text="Sent once after the channel's gone quiet for this long, not repeated until real activity resumes. Placeholders (resolved fresh each time it actually sends): %Ver%, %Uptime%, %MusicPlaying% (blank if nothing's playing), %Username%." />
                 </StackPanel>
             </Expander>
 

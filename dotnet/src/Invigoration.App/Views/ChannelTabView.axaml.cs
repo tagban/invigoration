@@ -95,8 +95,8 @@ public partial class ChannelTabView : UserControl
             // Width/Height aren't reliably honored once embedded via InlineUIContainer.
             inlines.Add(new InlineUIContainer(new Viewbox
             {
-                Width = 16,
-                Height = 16,
+                Width = 20,
+                Height = 20,
                 Stretch = Avalonia.Media.Stretch.Uniform,
                 Margin = new Thickness(0, 0, 4, 0),
                 VerticalAlignment = VerticalAlignment.Center,

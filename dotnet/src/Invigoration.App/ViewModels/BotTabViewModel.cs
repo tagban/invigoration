@@ -178,6 +178,12 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// FriendEntryViewModel rows on screen won't re-pull it unless something
     /// tells them to — otherwise a swapped icon only shows up after a
     /// reconnect rebuilds the list from scratch. This makes it immediate.
+    /// Also re-raises TabIconImage itself — this bot's own tab-strip icon uses
+    /// the exact same key (e.g. applying the Battle.net 2.0 icon set
+    /// overrides "sc"/"war3", the same keys BncsProduct.GetIconKey resolves
+    /// SC:Remastered/WC3:Reforged to) and was missing this notification
+    /// entirely, so a SC:R/WC3:R bot's tab kept showing the classic icon
+    /// until the app restarted even though the override had actually applied.
     /// </summary>
     private void OnIconOverrideChanged(string key) => Dispatcher.UIThread.Post(() =>
     {
@@ -189,6 +195,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         foreach (var friend in Friends)
         {
             friend.RefreshIcon();
+        }
+
+        if (key.Equals(BncsProduct.GetIconKey(Config.Product), StringComparison.OrdinalIgnoreCase))
+        {
+            OnPropertyChanged(nameof(TabIconImage));
         }
     });
 
@@ -396,6 +407,19 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// <summary>Battle.net's own system account for account-notification whispers (e.g. "you have unread mail") — not a real user, pure noise for a bot. Ignored only for incoming whispers; a deliberately-sent outgoing one (unlikely, but conceivable) isn't suppressed.</summary>
     private const string IgnoredWhisperSender = "# Email Service #";
 
+    /// <summary>Finds or creates an empty thread for a peer with no message appended — for the right-click "Whisper" action (BotTabView.axaml.cs/MainWindowViewModel.FocusWhisperThread), which just needs somewhere to open a compose box, not a logged message.</summary>
+    public WhisperThreadViewModel GetOrCreateWhisperThread(string peer)
+    {
+        var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
+        if (thread is null)
+        {
+            thread = new WhisperThreadViewModel(this, peer);
+            WhisperThreads.Insert(0, thread);
+        }
+
+        return thread;
+    }
+
     /// <summary>Finds or creates the thread for a peer, appends the message, and bumps it to the top of WhisperThreads (most-recently-active first) — the single entry point both incoming Whisper and outgoing WhisperSent events go through, see HandleChatEvent.</summary>
     private WhisperThreadViewModel? UpsertWhisper(string peer, string text, bool incoming, ChatPalette palette)
     {
@@ -570,13 +594,23 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
+    /// <summary>
+    /// Adds a newly-seen user, or updates an already-tracked one's flags/ping/statstring —
+    /// either way, (re)positions them via InsertUserSorted so a promotion/demotion (this same
+    /// method handles ChatEventType.UserFlags too) actually moves them in the list, matching
+    /// classic Battle.net's own "moderators float to the top" behavior instead of leaving
+    /// everyone frozen in original join order regardless of rank changes.
+    /// </summary>
     private void UpsertUser(ChatEvent e)
     {
         var user = ChannelUsers.FirstOrDefault(u => u.Username == e.Username);
-        if (user is null)
+        if (user is not null)
         {
-            user = new ChannelUserViewModel(e.Username);
-            ChannelUsers.Add(user);
+            ChannelUsers.Remove(user);
+        }
+        else
+        {
+            user = new ChannelUserViewModel(e.Username) { UseClassicIconStyle = Config.ClassicUserIconStyle };
         }
 
         user.Flags = e.Flags;
@@ -584,6 +618,42 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         if (e.Text.Length > 0)
         {
             user.StatString = e.Text;
+        }
+
+        InsertUserSorted(user);
+    }
+
+    /// <summary>Privileged users (see ChatIcon.IsPrivileged — Blizzard/Admin/Operator/Speaker) sort to the top, in their own arrival order; everyone else keeps arriving at the bottom, in theirs — the classic Battle.net "moderators, then users, each by join time" ordering.</summary>
+    private void InsertUserSorted(ChannelUserViewModel user)
+    {
+        if (!ChatIcon.IsPrivileged(user.Flags))
+        {
+            ChannelUsers.Add(user);
+            return;
+        }
+
+        var insertIndex = 0;
+        while (insertIndex < ChannelUsers.Count && ChatIcon.IsPrivileged(ChannelUsers[insertIndex].Flags))
+        {
+            insertIndex++;
+        }
+
+        ChannelUsers.Insert(insertIndex, user);
+    }
+
+    /// <summary>
+    /// Flips Config.ClassicUserIconStyle and pushes the new value into every already-tracked row
+    /// so the Users list updates immediately — called from the right-click "Classic Icon Style"
+    /// menu item (BotTabView.axaml.cs), not the Config window, per explicit request. Persisted
+    /// the same way every other BotConfig field is: whenever SaveAll next runs (window close, or
+    /// after the Config window itself is saved), not immediately here.
+    /// </summary>
+    public void ToggleClassicUserIconStyle()
+    {
+        Config.ClassicUserIconStyle = !Config.ClassicUserIconStyle;
+        foreach (var user in ChannelUsers)
+        {
+            user.UseClassicIconStyle = Config.ClassicUserIconStyle;
         }
     }
 

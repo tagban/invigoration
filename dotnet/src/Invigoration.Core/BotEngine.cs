@@ -54,6 +54,17 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     public BotConfig Config { get; set; }
 
+    /// <summary>
+    /// The account's actual chat/profile identity as the server itself reports it in
+    /// SID_ENTERCHAT's uniqueName field — not necessarily Config.Username verbatim. Diablo II
+    /// (Open vs. Closed/realm play) prefixes this with "*" for the same underlying account, and
+    /// profile lookups (SID_READUSERDATA/WRITEUSERDATA) key off this exact string, star included —
+    /// confirmed live: comparing against bare Config.Username made the bot's own profile look like
+    /// someone else's (read-only) on a D2 connection where chat shows "*BNETcc" but Config.Username
+    /// is "BNETcc". Null until SID_ENTERCHAT arrives (i.e., before the bot is actually in a channel).
+    /// </summary>
+    public string? OwnChatIdentity { get; private set; }
+
     /// <summary>When on, logs every raw BNCS/BNLS packet sent and received as a hex dump.</summary>
     public bool DebugMode
     {
@@ -112,6 +123,7 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Disconnected += ex =>
         {
             StopKeepAlive();
+            StopIdleWatcher();
             _friends.Clear();
             LogError($"Battle.net disconnected{(ex is null ? "." : $": {ex.Message}")}");
             BncsDisconnected?.Invoke(ex);
@@ -255,6 +267,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     public async Task SendChatCommandAsync(string text, byte? sc2ChannelOverride = null)
     {
+        NoteChatActivity();
         await ChatSendGate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -268,6 +281,7 @@ public sealed partial class BotEngine : IAsyncDisposable
 
             var isSlashCommand = text.Length > 0 && text[0] == '/';
             var outgoing = isSlashCommand ? text : ApplyTextEffects(text);
+            outgoing = RewriteWhisperTargetForDiabloII(outgoing);
 
             if (BncsProduct.IsStimpakBacked(Config.Product))
             {
@@ -298,6 +312,40 @@ public sealed partial class BotEngine : IAsyncDisposable
         {
             ChatSendGate.Release();
         }
+    }
+
+    /// <summary>
+    /// Diablo II (Classic and LoD) shows a "*" prefix on the Battle.net account identity in chat
+    /// (see BotEngine.Bncs.cs's OwnChatIdentity remarks) but NOT on the friends list or the
+    /// classic Users list, which instead show whatever character name that account last used —
+    /// confirmed live: whispering the bare name from either of this app's own quick-whisper UIs
+    /// silently reached nobody (or the wrong person, if some other account's character happens to
+    /// share that name) since it targeted a character name rather than the account. Every "/w "
+    /// this app ever constructs funnels through SendChatCommandAsync, so rewriting it here once —
+    /// rather than in each UI call site — covers all of them (Friends list quick-whisper, classic
+    /// Users list Whisper, the Whispers tab's own reply box, and auto-whisper). A target that
+    /// already starts with "*" (the operator typed the account form directly, or a reply is
+    /// echoing a peer name the bot already recorded starred) is left alone.
+    /// </summary>
+    private string RewriteWhisperTargetForDiabloII(string outgoing)
+    {
+        if (Config.Product is not (BncsProduct.DiabloII or BncsProduct.DiabloIILoD))
+        {
+            return outgoing;
+        }
+
+        if (!outgoing.StartsWith("/w ", StringComparison.OrdinalIgnoreCase))
+        {
+            return outgoing;
+        }
+
+        var rest = outgoing[3..];
+        if (rest.Length == 0 || rest[0] == '*')
+        {
+            return outgoing;
+        }
+
+        return "/w *" + rest;
     }
 
     /// <summary>
@@ -378,6 +426,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             LogInfo("Battle.net Connected!");
             BncsConnected?.Invoke();
             StartKeepAlive();
+            StartIdleWatcher();
             await _bncs.SendAsync([0x01]).ConfigureAwait(false); // BNCS binary-protocol byte
             await SendAuthInfoAsync().ConfigureAwait(false);
         }

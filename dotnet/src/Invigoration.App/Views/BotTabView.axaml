@@ -35,7 +35,13 @@
              uses the per-channel sub-tabs below instead. -->
         <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll" Background="{Binding BackgroundBrush}"
                       IsVisible="{Binding !SupportsMultiChannel}">
-            <SelectableTextBlock Name="ChatText" Margin="8" TextWrapping="Wrap" />
+            <!-- Explicit FontSize/LineHeight (not left to the theme default) so AppendLine's inline
+                 icon has a known, controllable line box to center inside — a 20px icon on an
+                 unspecified ~13px-line default line height stuck out past the line regardless of
+                 BaselineAlignment, just because it was taller than the line itself; that's
+                 fixed here (LineHeight 20, icon reduced to 16 in AppendLine) rather than by
+                 alignment alone. -->
+            <SelectableTextBlock Name="ChatText" Margin="8" TextWrapping="Wrap" FontSize="13" LineHeight="20" />
         </ScrollViewer>
 
         <!-- Per-channel sub-tabs for a bot that can be joined to several channels at once
@@ -145,7 +151,39 @@
                                  between a single compact line and username/ping stacked, so a 32px-tall icon isn't
                                  left towering over one thin line of text. -->
                             <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                                <Image Grid.Column="0" Source="{Binding ProductIconImage}" MaxWidth="32" MaxHeight="32"
+                                <!-- Whisper switches to the global Whispers tab with a thread open for this user
+                                     (MainWindowViewModel.FocusWhisperThread) rather than silently setting
+                                     whisper-focus with no visible feedback. Profile Info opens a real BNCS 1.0
+                                     profile window (SID_READUSERDATA/WRITEUSERDATA — ProfileWindow). Clan Rank is
+                                     a submenu: "View Info" (/claninfo) plus one "Set: <rank>" entry per
+                                     ClanRankStore rank, built in code-behind (OnUserContextMenuOpened) rather than
+                                     bound from XAML — this row's own (ChannelUserViewModel) DataContext binding up
+                                     to the enclosing BotTabViewModel via a $parent[views:BotTabView] ancestor-walk
+                                     crashed the published build outright (type resolution failed at runtime
+                                     despite compiling fine in Debug), and this codebase already has a standing
+                                     warning (see OnSendInlineWhisperClick's remarks) that this class of binding
+                                     fails silently through TabControls/Popups even when it doesn't crash. Squelch
+                                     and Add Friend are real BNCS chat commands, sent straight through. Everything
+                                     here shows unconditionally (no SupportsClan gating) since /claninfo and
+                                     /clanrank already reply gracefully when clan tracking isn't set up. -->
+                                <Grid.ContextMenu>
+                                    <ContextMenu Opened="OnUserContextMenuOpened">
+                                        <MenuItem Header="Whisper" Click="OnUserWhisperClick" />
+                                        <MenuItem Header="Profile Info" Click="OnUserProfileInfoClick" />
+                                        <MenuItem Name="UserClanRankMenu" Header="Clan Rank">
+                                            <MenuItem Header="View Info" Click="OnUserClanRankClick" />
+                                            <Separator />
+                                        </MenuItem>
+                                        <Separator />
+                                        <MenuItem Header="Squelch" Click="OnUserSquelchClick" />
+                                        <MenuItem Header="Add Friend" Click="OnUserAddFriendClick" />
+                                        <Separator />
+                                        <MenuItem Name="ClassicIconStyleMenuItem" Header="Classic Icon Style"
+                                                  ToggleType="CheckBox" Click="OnToggleClassicIconStyleClick"
+                                                  ToolTip.Tip="When on, a moderator/Blizzard Rep/etc.'s rank badge replaces their game icon (real classic Battle.net behavior) instead of showing both side by side." />
+                                    </ContextMenu>
+                                </Grid.ContextMenu>
+                                <Image Grid.Column="0" Source="{Binding DisplayIconImage}" MaxWidth="32" MaxHeight="32"
                                        Stretch="Uniform" VerticalAlignment="Center" />
 
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="6,0"
@@ -162,7 +200,7 @@
 
                                 <Image Grid.Column="2" Source="{Binding StatusIconImage}" MaxWidth="32" MaxHeight="32"
                                        Stretch="Uniform" VerticalAlignment="Center"
-                                       IsVisible="{Binding StatusIconImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                       IsVisible="{Binding ShowSeparateStatusIcon}" />
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -217,7 +255,14 @@
                                 <Grid ColumnDefinitions="Auto,Auto,*" RowDefinitions="Auto,Auto">
                                     <!-- Right-click anywhere on a friend's row for a small inline "Whisper" compose
                                          popup — ContextFlyout (not ContextMenu) shows arbitrary content, not just
-                                         menu items, so this skips a separate right-click-menu step entirely. -->
+                                         menu items, so this skips a separate right-click-menu step entirely. Profile
+                                         Info opens the real BNCS profile window (ProfileWindow), Clan Rank/Squelch
+                                         are real chat commands, and the rank ComboBox at the bottom lets you set
+                                         this friend's clan rank directly — its ItemsSource is populated in
+                                         code-behind straight from the static ClanRankStore (OnClanRankComboLoaded),
+                                         not bound from XAML, for the same reason noted in the classic Users list's
+                                         ContextMenu remarks (ancestor-DataContext bindings through Popups/Flyouts
+                                         are unreliable in this codebase — one crashed a published build outright). -->
                                     <Grid.ContextFlyout>
                                         <Flyout Placement="Pointer">
                                             <StackPanel Width="220" Spacing="6" Margin="4">
@@ -225,6 +270,19 @@
                                                 <TextBox PlaceholderText="Message..." Text="{Binding WhisperDraft}" />
                                                 <Button Content="Send" HorizontalAlignment="Right" Padding="10,3"
                                                         Click="OnSendInlineWhisperClick" />
+                                                <Separator />
+                                                <Button Content="Profile Info" HorizontalAlignment="Stretch" Padding="10,3"
+                                                        Click="OnFriendProfileInfoClick" />
+                                                <Button Content="Clan Rank" HorizontalAlignment="Stretch" Padding="10,3"
+                                                        Click="OnFriendClanRankClick" />
+                                                <Button Content="Squelch" HorizontalAlignment="Stretch" Padding="10,3"
+                                                        Click="OnFriendSquelchClick" />
+                                                <Separator />
+                                                <TextBlock Text="Set clan rank:" FontSize="11" Opacity="0.7" />
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                                    <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" Loaded="OnClanRankComboLoaded" />
+                                                    <Button Grid.Column="1" Content="Set" Click="OnFriendSetClanRankClick" />
+                                                </Grid>
                                             </StackPanel>
                                         </Flyout>
                                     </Grid.ContextFlyout>

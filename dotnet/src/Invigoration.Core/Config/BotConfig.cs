@@ -232,6 +232,30 @@ public sealed class BotConfig
     /// </summary>
     public bool ShowUserIconsInChat { get; set; }
 
+    /// <summary>
+    /// Off by default (always show the product/game icon, with any rank badge as a separate icon
+    /// alongside it — see ChannelUserViewModel.DisplayIconImage). On, the classic Users list
+    /// switches to real classic Battle.net behavior: a privileged user's (see
+    /// Chat.ChatIcon.IsPrivileged) rank badge (gavel/Blizzard logo/etc.) replaces their game icon
+    /// in that one slot instead of showing both side by side. Toggled via a right-click menu item
+    /// on the Users list itself (BotTabView.axaml's OnToggleClassicIconStyleClick), not the Config
+    /// window, per explicit request — a quick display preference, not a connection setting.
+    /// </summary>
+    public bool ClassicUserIconStyle { get; set; }
+
+    /// <summary>
+    /// Minutes of no chat activity before IdleMessage auto-sends once — 0 (default) turns the
+    /// feature off entirely. See BotEngine.Idle.cs. Also settable live via the "idle" chat
+    /// command ("idle 30 back in a bit" / "idle off"), which writes here directly.
+    /// </summary>
+    public int IdleMinutes { get; set; }
+
+    /// <summary>
+    /// Supports %Ver%/%Uptime%/%MusicPlaying%/%Username% placeholders, resolved fresh each time
+    /// the message actually sends — see BotEngine.Idle.cs's ResolveIdlePlaceholdersAsync.
+    /// </summary>
+    public string IdleMessage { get; set; } = "";
+
     /// <summary>4-character BNCS product code, e.g. "VD2D" = Diablo II, "PX2D" = Diablo II: LoD.</summary>
     public string Product { get; set; } = "VD2D";
 

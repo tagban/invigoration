@@ -1,0 +1,9 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="Invigoration.App.Views.MusicTabView">
+
+    <!-- Deliberately empty — see MusicPlayerPanel's remarks. ViewLocator resolves this for
+         MusicTabViewModel because Avalonia's TabControl always instantiates SOME content for the
+         selected item's DataTemplate, but the real, always-alive player lives as a permanent
+         overlay in MainWindow.axaml instead, so this is never actually what the user sees. -->
+</UserControl>

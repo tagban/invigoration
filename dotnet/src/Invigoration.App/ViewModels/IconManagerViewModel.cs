@@ -31,53 +31,107 @@ public partial class IconSlotViewModel(string key, string displayName) : Observa
 /// <summary>Lets a user replace any bundled chat icon with their own image, stored via <see cref="IconOverrideStore"/>.</summary>
 public partial class IconManagerViewModel : ViewModelBase
 {
-    /// <summary>
-    /// Keys with a bundled 64x64 alternate available under Assets/GameIconsHD — the classic
-    /// Battle.net "bnet-*" chat icon set (originally served from WC3 ladder pages); war3/w3tft
-    /// specifically are Bnet-war3.png/Bnet-war3x.png pulled from warcraft.wiki.gg's chat-icon
-    /// reference page (64x42, same source family as the rest of this set).
-    /// </summary>
-    private static readonly string[] HighResolutionKeys =
-        ["blizz", "sysop", "mega", "ignore", "chat", "diablo", "diablo2", "d2exp", "sc", "scbw", "war2", "war3", "w3tft"];
+    public const string Bnet1ClassicSetName = "Battle.net 1.0 Classic";
+    public const string Wc3ClassicSetName = "Warcraft III Classic";
+    public const string Bnet2SetName = "Battle.net 2.0";
+
+    /// <summary>The three bundled (not user-saved) icon sets offered in the same apply dropdown as SavedSets — see AvailableIconSets.</summary>
+    private static readonly string[] BundledSetNames = [Bnet1ClassicSetName, Wc3ClassicSetName, Bnet2SetName];
 
     /// <summary>
-    /// Keys with no distinct HD chat icon of their own upstream — rather than leaving these at
-    /// the default 28x14 art (the only ones "Apply Bundled 64x64 Set" would otherwise skip),
-    /// each borrows its closest relative's HD asset: same underlying game (StarCraft) for the
-    /// Japanese release and the shareware trial, same idea for Diablo's shareware trial.
+    /// "Battle.net 1.0 Classic" — the original classic.battle.net chat-icon set
+    /// (classic.battle.net/info/icons.shtml), 28x14, sourced 2026-08-24. This is also what
+    /// GameIconLoader's own bundled defaults are for every key here except blizz/sysop/mod-gavel/
+    /// mega/ignore (which default to the sharper Warcraft III Classic art instead — see
+    /// GameIconLoader's remarks) — selecting this set explicitly is how to get the small original
+    /// look back for those five specifically. scbw ("W2sexp.png", the real StarCraft: Brood War
+    /// badge — classic.battle.net's own /info/icons.shtml never actually distinguished it from
+    /// plain StarCraft, a real bug fixed 2026-08-24 alongside Chat.ChatIcon.GetProductIconKey's
+    /// matching PXES-mapping fix) and w3tft ("W2w3xp.png") both come from
+    /// warcraft.wiki.gg/wiki/Warcraft_II_chat_icons instead — confirmed classic.battle.net
+    /// itself never shipped one at all (its own site "never fully updated before it went down,"
+    /// per the user); this wiki apparently caught a copy before that happened, filed oddly under
+    /// the Warcraft II chat-icons page rather than Warcraft III's own. sc2 has no official
+    /// classic-era icon at all (StarCraft II postdates this whole art style) — this one is
+    /// user-made (2026-08-24, hand-drawn to match the aesthetic, dropped straight in at the same
+    /// 28x14 size as the rest of this set) rather than sourced from anywhere. Not in Wc3ClassicSet
+    /// below: that set is 64x64, and this icon is 28x14 — forcing it in would look inconsistently
+    /// tiny/blurry next to the rest of that set.
     /// </summary>
-    private static readonly (string Key, string FallbackFrom)[] HighResolutionFallbacks =
+    private static readonly (string Key, string Folder, string SourceKey)[] Bnet1ClassicSet =
     [
-        ("jsc", "sc"),
-        ("sware", "sc"),
-        ("dshr", "diablo"),
+        ("sc", "GameIconsClassic", "sc"), ("scbw", "GameIconsClassic", "scbw"), ("jsc", "GameIconsClassic", "jsc"),
+        ("sware", "GameIconsClassic", "sware"), ("war2", "GameIconsClassic", "war2"),
+        ("war3", "GameIconsClassic", "war3"), ("w3tft", "GameIconsClassic", "w3tft"),
+        ("diablo", "GameIconsClassic", "diablo"), ("dshr", "GameIconsClassic", "dshr"),
+        ("diablo2", "GameIconsClassic", "diablo2"), ("d2exp", "GameIconsClassic", "d2exp"),
+        ("chat", "GameIconsClassic", "chat"), ("blizz", "GameIconsClassic", "blizz"),
+        ("sysop", "GameIconsClassic", "sysop"), ("mod-gavel", "GameIconsClassic", "mod-gavel"),
+        ("mega", "GameIconsClassic", "mega"), ("ignore", "GameIconsClassic", "ignore"),
+        ("sc2", "GameIconsClassic", "sc2"),
     ];
 
     /// <summary>
-    /// The optional modern-Battle.net alternate for every classic key that has a real official
-    /// account.battle.net game icon — a separate opt-in set from the default 28x14 classic art,
-    /// same idea as HighResolutionKeys/GameIconsHD but sourced from account.battle.net's own SVGs
-    /// (rasterized under Assets/GameIconsBnet2, since nothing here renders SVG directly). Several
+    /// "Warcraft III Classic" — the 64x64 set under Assets/GameIconsHD, sourced directly from
+    /// classic.battle.net/war3/images/battle.net/icons/ (the WC3 ladder site's own icon folder —
+    /// true Blizzard-hosted originals, not a third-party re-host, confirmed 2026-08-24 per the
+    /// WC3 ladder icons.shtml page listing every file in that folder). sysop uses
+    /// "bnet-battlenet.gif" (the real Admin icon, not a fallback), mega uses "bnet-speaker.gif"
+    /// (the real Speaker icon) — both explicit user corrections replacing an earlier
+    /// Battle.net-1.0-Classic-borrowed placeholder. jsc/sware/dshr still have no distinct HD art
+    /// upstream, so they borrow their closest relative (StarCraft/StarCraft/Diablo); war3/w3tft
+    /// aren't in that same folder either (it's a ladder-status icon set, not per-product game
+    /// icons) and stay sourced from wowpedia.fandom.com/wiki/Warcraft_III_chat_icons instead. sc2
+    /// is user-made (2026-08-24, "bnet-sc2_war3_style.png") — StarCraft II postdates this whole
+    /// art style, so there's no official upstream icon.
+    /// </summary>
+    private static readonly (string Key, string Folder, string SourceKey)[] Wc3ClassicSet =
+    [
+        ("sc", "GameIconsHD", "sc"), ("scbw", "GameIconsHD", "scbw"), ("jsc", "GameIconsHD", "sc"),
+        ("sware", "GameIconsHD", "sc"), ("war2", "GameIconsHD", "war2"), ("war3", "GameIconsHD", "war3"),
+        ("w3tft", "GameIconsHD", "w3tft"), ("diablo", "GameIconsHD", "diablo"), ("dshr", "GameIconsHD", "diablo"),
+        ("diablo2", "GameIconsHD", "diablo2"), ("d2exp", "GameIconsHD", "d2exp"), ("chat", "GameIconsHD", "chat"),
+        ("blizz", "GameIconsHD", "blizz"), ("sysop", "GameIconsHD", "sysop"),
+        ("mod-gavel", "GameIconsHD", "mod-gavel"), ("mega", "GameIconsHD", "mega"),
+        ("ignore", "GameIconsHD", "ignore"), ("sc2", "GameIconsHD", "sc2"),
+    ];
+
+    /// <summary>
+    /// "Battle.net 2.0" — the official account.battle.net game-icon set (rasterized SVGs under
+    /// Assets/GameIconsBnet2), plus the Warcraft III Classic set's status badges per explicit
+    /// request ("for Battle.net 2.0 we'll want to use the status badges from War3 set") — with one
+    /// exception: mod-gavel uses "mod-gavel-glow.png", a green-glow variant of the same War3
+    /// hammer (generated 2026-08-24 via a blurred green-tinted copy of the icon's own silhouette
+    /// drawn behind the crisp original — "a gentle green glow around it," per request) rather than
+    /// the plain one, to read as more at-home next to Bnet2's brighter modern art. sc2 uses the
+    /// real official account.battle.net StarCraft II SVG (account.battle.net/static/images/
+    /// game-icons/starcraft-ii.svg) — fixes a real bug where it had no entry in this set at all,
+    /// so switching to Battle.net 2.0 after Battle.net 1.0 Classic/Warcraft III Classic left
+    /// whichever classic-style sc2 icon was applied stuck in place instead of reverting. Several
     /// keys intentionally share one source image, matching how Blizzard's own modern branding
     /// doesn't distinguish them: StarCraft/Brood War/the Japanese release/the shareware trial all
-    /// point at one "StarCraft: Remastered" icon, and the same is true for Warcraft III/TFT and
-    /// Diablo II/Lord of Destruction. sc2 and the new Bnet2Icons keys aren't here at all — they
-    /// have no classic default worth preserving as an opt-in, so they use these images as their
-    /// one and only default already (see Assets/GameIcons/sc2.png etc.)
+    /// point at one "StarCraft: Remastered" icon, same idea for Warcraft III/TFT and Diablo II/
+    /// Lord of Destruction.
     /// </summary>
-    private static readonly (string Key, string SourceAssetKey)[] Bnet2ModernKeys =
+    private static readonly (string Key, string Folder, string SourceKey)[] Bnet2Set =
     [
-        ("diablo2", "diablo-ii"),
-        ("d2exp", "diablo-ii"),
-        ("war3", "warcraft-iii"),
-        ("w3tft", "warcraft-iii"),
-        ("war2", "warcraft-ii-remastered"),
-        ("sc", "starcraft-remastered"),
-        ("scbw", "starcraft-remastered"),
-        ("jsc", "starcraft-remastered"),
-        ("sware", "starcraft-remastered"),
-        ("diablo", "diablo"),
-        ("dshr", "diablo"),
+        ("diablo2", "GameIconsBnet2", "diablo-ii"),
+        ("d2exp", "GameIconsBnet2", "diablo-ii"),
+        ("war3", "GameIconsBnet2", "warcraft-iii"),
+        ("w3tft", "GameIconsBnet2", "warcraft-iii"),
+        ("war2", "GameIconsBnet2", "warcraft-ii-remastered"),
+        ("sc", "GameIconsBnet2", "starcraft-remastered"),
+        ("scbw", "GameIconsBnet2", "starcraft-remastered"),
+        ("jsc", "GameIconsBnet2", "starcraft-remastered"),
+        ("sware", "GameIconsBnet2", "starcraft-remastered"),
+        ("sc2", "GameIconsBnet2", "starcraft-ii"),
+        ("blizz", "GameIconsHD", "blizz"),
+        ("sysop", "GameIconsHD", "sysop"),
+        ("mod-gavel", "GameIconsBnet2", "mod-gavel-glow"),
+        ("mega", "GameIconsHD", "mega"),
+        ("ignore", "GameIconsHD", "ignore"),
+        ("diablo", "GameIconsBnet2", "diablo"),
+        ("dshr", "GameIconsBnet2", "diablo"),
     ];
 
     public ObservableCollection<IconSlotViewModel> GameIcons { get; } = [];
@@ -92,6 +146,9 @@ public partial class IconManagerViewModel : ViewModelBase
 
     /// <summary>Names of user-saved icon sets, each an ordinary folder under IconSetStore.Directory (inside the app's config folder, so it travels with any config backup).</summary>
     public ObservableCollection<string> SavedSets { get; } = [];
+
+    /// <summary>The three bundled sets (BundledSetNames) plus every user-saved one (SavedSets), in that order — one combined Apply dropdown per explicit request, instead of two separate UI areas for "pick a bundled set" vs "pick a saved set".</summary>
+    public ObservableCollection<string> AvailableIconSets { get; } = [];
 
     [ObservableProperty]
     public partial string? SelectedSet { get; set; }
@@ -143,48 +200,27 @@ public partial class IconManagerViewModel : ViewModelBase
         slot.Refresh();
     }
 
-    /// <summary>Applies the bundled 64x64 icon set to every key that has one (plus HighResolutionFallbacks for the handful that don't) — a concrete, one-click example of swapping in a larger icon set, using real Blizzard-hosted assets rather than a hypothetical.</summary>
-    [RelayCommand]
-    private void ApplyHighResolutionSet()
+    private static void ApplyIconSetAsset(string targetKey, string folder, string sourceKey)
     {
-        foreach (var key in HighResolutionKeys)
-        {
-            ApplyHighResolutionAsset(targetKey: key, sourceAssetKey: key);
-        }
-
-        foreach (var (key, fallbackFrom) in HighResolutionFallbacks)
-        {
-            ApplyHighResolutionAsset(targetKey: key, sourceAssetKey: fallbackFrom);
-        }
-
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
-        {
-            slot.Refresh();
-        }
-    }
-
-    private static void ApplyHighResolutionAsset(string targetKey, string sourceAssetKey)
-    {
-        var uri = new Uri($"avares://Invigoration.App/Assets/GameIconsHD/{sourceAssetKey}.gif");
+        var uri = new Uri($"avares://Invigoration.App/Assets/{folder}/{sourceKey}.png");
         using var stream = AssetLoader.Open(uri);
         using var buffer = new MemoryStream();
         stream.CopyTo(buffer);
-        IconOverrideStore.SetOverrideBytes(targetKey, buffer.ToArray(), ".gif");
+        IconOverrideStore.SetOverrideBytes(targetKey, buffer.ToArray(), ".png");
     }
 
-    /// <summary>Applies the official account.battle.net modern icon set to every classic key that has one — see Bnet2ModernKeys.</summary>
-    [RelayCommand]
-    private void ApplyBnet2IconSet()
+    private void ApplyBundledSet((string Key, string Folder, string SourceKey)[] mapping)
     {
-        foreach (var (key, sourceAssetKey) in Bnet2ModernKeys)
+        foreach (var (key, folder, sourceKey) in mapping)
         {
-            var uri = new Uri($"avares://Invigoration.App/Assets/GameIconsBnet2/{sourceAssetKey}.png");
-            using var stream = AssetLoader.Open(uri);
-            using var buffer = new MemoryStream();
-            stream.CopyTo(buffer);
-            IconOverrideStore.SetOverrideBytes(key, buffer.ToArray(), ".png");
+            ApplyIconSetAsset(key, folder, sourceKey);
         }
 
+        RefreshAllSlots();
+    }
+
+    private void RefreshAllSlots()
+    {
         foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
         {
             slot.Refresh();
@@ -198,8 +234,9 @@ public partial class IconManagerViewModel : ViewModelBase
         foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
         {
             IconOverrideStore.ClearOverride(slot.Key);
-            slot.Refresh();
         }
+
+        RefreshAllSlots();
     }
 
     /// <summary>Snapshots the current set of overrides (whatever mix of custom/HD/default icons is active) under a name, so it can be swapped back to later or backed up as a folder.</summary>
@@ -216,25 +253,40 @@ public partial class IconManagerViewModel : ViewModelBase
         RefreshSavedSets();
     }
 
+    /// <summary>
+    /// One Apply command for the whole combined dropdown (AvailableIconSets) — dispatches to the
+    /// three bundled sets or, for anything else, a user-saved one via IconSetStore. Replaces the
+    /// old separate "Apply Bundled 64x64 Set"/"Apply Battle.net 2.0 Icon Set" buttons plus a
+    /// second saved-sets-only dropdown, per explicit request for one unified list.
+    /// </summary>
     [RelayCommand]
     private void ApplySelectedSet()
     {
-        if (SelectedSet is null)
+        switch (SelectedSet)
         {
-            return;
-        }
-
-        IconSetStore.ApplySet(SelectedSet);
-        foreach (var slot in GameIcons.Concat(StatusIcons).Concat(FriendIcons).Concat(CustomIcons).Concat(Bnet2Icons))
-        {
-            slot.Refresh();
+            case null:
+                return;
+            case Bnet1ClassicSetName:
+                ApplyBundledSet(Bnet1ClassicSet);
+                return;
+            case Wc3ClassicSetName:
+                ApplyBundledSet(Wc3ClassicSet);
+                return;
+            case Bnet2SetName:
+                ApplyBundledSet(Bnet2Set);
+                return;
+            default:
+                IconSetStore.ApplySet(SelectedSet);
+                RefreshAllSlots();
+                return;
         }
     }
 
+    /// <summary>Only meaningful for a user-saved set — a no-op if a bundled set (BundledSetNames) is selected, since those aren't files to delete.</summary>
     [RelayCommand]
     private void DeleteSelectedSet()
     {
-        if (SelectedSet is null)
+        if (SelectedSet is null || BundledSetNames.Contains(SelectedSet))
         {
             return;
         }
@@ -261,7 +313,13 @@ public partial class IconManagerViewModel : ViewModelBase
             SavedSets.Add(name);
         }
 
-        SelectedSet = selected is not null && SavedSets.Contains(selected) ? selected : null;
+        AvailableIconSets.Clear();
+        foreach (var name in BundledSetNames.Concat(SavedSets))
+        {
+            AvailableIconSets.Add(name);
+        }
+
+        SelectedSet = selected is not null && AvailableIconSets.Contains(selected) ? selected : null;
     }
 
     private static IconSlotViewModel CreateSlot(string key, string displayName)

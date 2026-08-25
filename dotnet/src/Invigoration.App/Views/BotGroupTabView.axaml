@@ -23,8 +23,8 @@
             <DataTemplate x:DataType="vm:BotTabViewModel">
                 <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
                     <StackPanel Orientation="Horizontal" Spacing="4">
-                        <Image Source="{Binding TabIconImage}" MaxHeight="20" Stretch="Uniform" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding Title}" />
+                        <Image Source="{Binding TabIconImage}" MaxWidth="20" MaxHeight="20" Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
                         <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
                     </StackPanel>
                 </Border>

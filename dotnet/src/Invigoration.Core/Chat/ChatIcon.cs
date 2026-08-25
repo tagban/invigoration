@@ -14,11 +14,12 @@ namespace Invigoration.Core.Chat;
 public static class ChatIcon
 {
     /// <summary>
-    /// The product/game icon key. StarCraft: Brood War (PXES/"SEXP") is
-    /// mapped to the plain StarCraft icon for now — SC:R self-identifies on
-    /// the wire as plain Brood War with no distinct product code, and there's
-    /// no dedicated icon to distinguish it, so it defaults to the standard
-    /// StarCraft icon rather than a custom badge.
+    /// The product/game icon key. StarCraft: Brood War (PXES/"SEXP", wire-order reversed) now
+    /// gets its own "scbw" badge — fixed 2026-08-24, was previously folded into plain "sc" (that
+    /// was wrong: bnetdocs confirms PXES is Brood War's real product code, not a StarCraft one;
+    /// SC:R self-identifying on the wire as plain Brood War, with no distinct product code of its
+    /// own, correctly picks up the same Brood War badge here too — not a bug, since it really is
+    /// Brood War-based).
     /// </summary>
     public static string GetProductIconKey(string statString)
     {
@@ -39,7 +40,8 @@ public static class ChatIcon
             "VD2D" => "diablo2",
             "LTRD" => "diablo",
             "RHSD" => "dshr",
-            "RATS" or "PXES" => "sc",
+            "RATS" => "sc",
+            "PXES" => "scbw",
             "RHSS" => "sware",
             "RTSJ" => "jsc",
             "NB2W" => "war2",
@@ -78,5 +80,18 @@ public static class ChatIcon
         }
 
         return "";
+    }
+
+    /// <summary>
+    /// True for any rank badge that should sort to the top of a channel's user list — Blizzard
+    /// rep, Admin, Operator ("has a gavel"), or Speaker/VIP — matching classic Battle.net's own
+    /// "moderators, then everyone else" ordering per user request. Squelched deliberately isn't
+    /// included: it's a punishment marker, not a rank, and shouldn't float someone to the top.
+    /// </summary>
+    public static bool IsPrivileged(uint flags)
+    {
+        var uflags = (UserFlags)flags;
+        return uflags.HasFlag(UserFlags.Blizzard) || uflags.HasFlag(UserFlags.Admin) ||
+               uflags.HasFlag(UserFlags.Operator) || uflags.HasFlag(UserFlags.Speaker);
     }
 }
