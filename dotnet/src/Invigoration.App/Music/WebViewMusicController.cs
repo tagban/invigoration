@@ -18,6 +18,8 @@ public sealed class WebViewMusicController(NativeWebView webView) : IMusicPlayer
 
     public Task<bool> SkipAsync() => ClickAsync(Profile.NextScript);
 
+    public Task<bool> PlayPauseAsync() => ClickAsync(Profile.PlayPauseScript);
+
     public Task<bool> ThumbsUpAsync() => ClickAsync(Profile.LikeScript);
 
     public Task<bool> ThumbsDownAsync() => ClickAsync(Profile.DislikeScript);

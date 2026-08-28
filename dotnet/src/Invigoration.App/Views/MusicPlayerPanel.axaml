@@ -32,5 +32,26 @@
         </Border>
 
         <NativeWebView Name="WebView" Grid.Row="1" />
+
+        <!-- Pandora has no stable DOM to script the way YouTube Music/Spotify do (see
+             PandoraPlayerController's remarks) — it gets its own native-Avalonia UI instead of
+             the WebView, toggled via IsVisible the same way the WebView itself is show/hidden
+             elsewhere in this app rather than destroyed/recreated. -->
+        <Grid Name="PandoraPanel" Grid.Row="1" IsVisible="False" Margin="16">
+            <StackPanel Name="PandoraSignInPanel" Spacing="10" VerticalAlignment="Center">
+                <TextBlock Text="Sign in to Pandora" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" />
+                <TextBox Name="PandoraUsernameBox" PlaceholderText="Email or username" />
+                <TextBox Name="PandoraPasswordBox" PlaceholderText="Password" PasswordChar="*" />
+                <Button Name="PandoraSignInButton" Content="Sign In" Click="OnPandoraSignInClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
+                <TextBlock Name="PandoraStatusText" Foreground="#E8827A" TextWrapping="Wrap" IsVisible="False" />
+            </StackPanel>
+
+            <StackPanel Name="PandoraStationPanel" Spacing="10" VerticalAlignment="Top" IsVisible="False">
+                <TextBlock Text="Stations" FontSize="14" FontWeight="Bold" Opacity="0.8" />
+                <ComboBox Name="PandoraStationCombo" HorizontalAlignment="Stretch" SelectionChanged="OnPandoraStationSelected"
+                          DisplayMemberBinding="{Binding StationName}" x:CompileBindings="False" />
+                <TextBlock Name="PandoraNowPlayingText" Text="Pick a station to start listening." Opacity="0.7" TextWrapping="Wrap" Margin="0,20,0,0" HorizontalAlignment="Center" />
+            </StackPanel>
+        </Grid>
     </Grid>
 </UserControl>

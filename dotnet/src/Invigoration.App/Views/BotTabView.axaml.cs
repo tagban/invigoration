@@ -207,6 +207,11 @@ public partial class BotTabView : UserControl
         }
     }
 
+    /// <summary>"Focus for Reply"/"Clear Focus" — right-click convenience for the "user"/"useroff" commands (set/clear _session.TargetUser), added 2026-08-26 per explicit request rather than requiring them to be typed out.</summary>
+    private void OnUserFocusClick(object? sender, RoutedEventArgs e) => RunUserCommand(sender, user => $"/user {user.Username}");
+
+    private void OnUserUnfocusClick(object? sender, RoutedEventArgs e) => RunUserCommand(sender, _ => "/useroff");
+
     private void OnUserProfileInfoClick(object? sender, RoutedEventArgs e)
     {
         if (sender is Control { DataContext: Models.ChannelUserViewModel user } && DataContext is BotTabViewModel vm)

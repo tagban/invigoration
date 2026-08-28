@@ -16,6 +16,7 @@ public sealed record MusicServiceProfile(
     string IconKey,
     string HomeUrl,
     string NextScript,
+    string PlayPauseScript,
     string? LikeScript,
     string? DislikeScript,
     string NowPlayingScript,
@@ -33,6 +34,11 @@ public sealed record MusicServiceProfile(
         "youtube-music",
         "https://music.youtube.com",
         NextScript: """document.querySelector('ytmusic-player-bar .next-button')""",
+        // Not separately confirmed live like the other selectors on this profile (added
+        // 2026-08-26 for the pause/play command) — #play-pause-button is YouTube Music's
+        // well-known, stable player-bar element id, same one youtube-music-desktop-app and
+        // similar community wrappers already rely on.
+        PlayPauseScript: """document.querySelector('ytmusic-player-bar #play-pause-button')""",
         LikeScript: """document.querySelector('ytmusic-player-bar #like-button-renderer button[aria-label="Like"]')""",
         DislikeScript: """document.querySelector('ytmusic-player-bar #like-button-renderer button[aria-label="Dislike"]')""",
         NowPlayingScript: """
@@ -62,6 +68,10 @@ public sealed record MusicServiceProfile(
         "spotify",
         "https://open.spotify.com",
         NextScript: """document.querySelector('[data-testid="control-button-skip-forward"]')""",
+        // "control-button-playpause" is one of Spotify's long-stable data-testids (same family
+        // as skip-forward above, widely relied on by community tools like spicetify) — not
+        // separately live-confirmed here, but a much safer bet than most of Spotify's markup.
+        PlayPauseScript: """document.querySelector('[data-testid="control-button-playpause"]')""",
         LikeScript: """document.querySelector('[data-testid="add-button"]')""",
         DislikeScript: null,
         NowPlayingScript: """
@@ -89,6 +99,10 @@ public sealed record MusicServiceProfile(
         "pandora",
         "https://www.pandora.com",
         NextScript: """document.querySelector('[aria-label="Skip forwards"]')""",
+        // Not separately confirmed live (added 2026-08-26) — Pandora's play/pause button's
+        // aria-label flips between "Pause" and "Play" depending on state, matching the same
+        // aria-label convention as the confirmed Skip/Thumb buttons above.
+        PlayPauseScript: """document.querySelector('[aria-label="Pause"]') ?? document.querySelector('[aria-label="Play"]')""",
         LikeScript: """document.querySelector('[aria-label="Thumb Up this song"]')""",
         DislikeScript: """document.querySelector('[aria-label="Thumb Down this song"]')""",
         NowPlayingScript: """

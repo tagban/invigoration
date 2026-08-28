@@ -354,20 +354,8 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// commands) while active, which is what makes turning them on visibly
     /// change the bot's own replies too.
     /// </summary>
-    private string ApplyTextEffects(string text)
-    {
-        if (_session.FuddMode)
-        {
-            text = text.Replace('r', 'w').Replace('R', 'W');
-        }
-
-        if (_session.CanadaMode)
-        {
-            text += ", eh?";
-        }
-
-        return text;
-    }
+    private string ApplyTextEffects(string text) =>
+        Chat.ChatTextEffects.Apply(text, _session.FuddMode, _session.CanadaMode, _session.PrependText, _session.PostpendText);
 
     public async Task JoinHomeAsync()
     {

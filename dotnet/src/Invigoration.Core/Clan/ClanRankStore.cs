@@ -62,10 +62,10 @@ public static class ClanRankStore
             Name = "Leader",
             AllowedCommands =
             [
-                "kick", "ban", "join", "home", "accept", "clanadd", "clanremove", "clanrank", "clanalias",
+                "kick", "ban", "join", "home", "clanadd", "clanremove", "clanrank", "clanalias",
                 "clanunalias", "claninfo", "clanlist", "clanscore", "trivia", "idle", "disconnect", "reconnect",
-                "user", "useroff", "prepend", "postpend", "trigger", "colors", "sysinfo", "ver", "uptime", "about",
-                "bancount", "kickcount", "joincount", "canada", "debug", "leetspeak", "fudd", "moo",
+                "user", "useroff", "trigger", "sysinfo", "ver", "uptime", "about",
+                "bancount", "kickcount", "joincount",
             ],
         },
         new ClanRank
@@ -73,15 +73,15 @@ public static class ClanRankStore
             Name = "Officer",
             AllowedCommands =
             [
-                "kick", "ban", "join", "home", "accept", "clanadd", "clanrank", "clanalias", "clanunalias",
-                "claninfo", "clanlist", "clanscore", "trivia", "user", "useroff", "colors", "sysinfo", "ver",
+                "kick", "ban", "join", "home", "clanadd", "clanrank", "clanalias", "clanunalias",
+                "claninfo", "clanlist", "clanscore", "trivia", "user", "useroff", "sysinfo", "ver",
                 "uptime", "about", "bancount", "kickcount", "joincount",
             ],
         },
         new ClanRank
         {
             Name = "Member",
-            AllowedCommands = ["claninfo", "clanlist", "colors", "sysinfo", "ver", "uptime", "about"],
+            AllowedCommands = ["claninfo", "clanlist", "sysinfo", "ver", "uptime", "about"],
         },
         // Trivia score/join are already unconditionally open to everyone (see BotEngine.Commands.IsAuthorized),
         // so this rank needs no AllowedCommands of its own — it exists mainly so auto-tracked chatters have

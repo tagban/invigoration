@@ -20,6 +20,8 @@
                         <NativeMenuItem Header="Edit Selected Bot..." Click="OnEditBotNativeClick" />
                         <NativeMenuItem Header="Remove Selected Bot" Click="OnRemoveBotNativeClick" />
                         <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Add Hotline Tracker" Click="OnAddHotlineTrackerNativeClick" />
+                        <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Open Config Folder..." Click="OnOpenConfigFolderNativeClick" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Exit" Click="OnExitNativeClick" />
@@ -67,6 +69,8 @@
                 <MenuItem Header="_Edit Selected Bot..." Click="OnEditBotClick" />
                 <MenuItem Header="_Remove Selected Bot" Click="OnRemoveBotClick" />
                 <Separator />
+                <MenuItem Header="Add _Hotline Tracker" Click="OnAddHotlineTrackerClick" />
+                <Separator />
                 <MenuItem Header="Open Config _Folder..." Click="OnOpenConfigFolderClick" />
                 <Separator />
                 <MenuItem Header="E_xit" Click="OnExitClick" />
@@ -99,7 +103,7 @@
         <Border DockPanel.Dock="Bottom" Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="0,1,0,0"
                 Padding="10,6" IsVisible="{Binding IsMusicBarEnabled}">
             <Grid DataContext="{Binding MusicBar}" x:CompileBindings="False"
-                  ColumnDefinitions="Auto,*,Auto,Auto,Auto" ColumnSpacing="8">
+                  ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto" ColumnSpacing="8">
                 <Image Grid.Column="0" Source="{Binding ServiceIcon}" MaxWidth="24" MaxHeight="24"
                        Stretch="Uniform" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" VerticalAlignment="Center" Margin="8,0">
@@ -110,11 +114,19 @@
                     <TextBlock Text="Nothing playing" Foreground="White" Opacity="0.5" FontSize="11"
                                IsVisible="{Binding !HasNowPlaying}" />
                 </StackPanel>
-                <Button Grid.Column="2" Content="👍" Padding="8,4" Command="{Binding ThumbsUpCommand}"
+                <!-- Pandora is a real API now, not a WebView with its own baked-in UI — so unlike
+                     YouTube Music/Spotify, station selection can happen right here instead of
+                     requiring a trip to the Music tab. Mirrors MusicPlayerPanel's own station
+                     ComboBox (DisplayMemberBinding on the same PandoraStation.StationName). -->
+                <ComboBox Grid.Column="2" ItemsSource="{Binding Stations}" SelectedItem="{Binding SelectedStation}"
+                          DisplayMemberBinding="{Binding StationName}" IsVisible="{Binding IsPandora}"
+                          PlaceholderText="Station" MaxWidth="160" VerticalAlignment="Center" />
+                <Button Grid.Column="3" Content="⏯" Padding="8,4" Command="{Binding PlayPauseCommand}" ToolTip.Tip="Play/Pause" />
+                <Button Grid.Column="4" Content="👍" Padding="8,4" Command="{Binding ThumbsUpCommand}"
                         IsVisible="{Binding SupportsThumbsUp}" ToolTip.Tip="Thumbs up" />
-                <Button Grid.Column="3" Content="👎" Padding="8,4" Command="{Binding ThumbsDownCommand}"
+                <Button Grid.Column="5" Content="👎" Padding="8,4" Command="{Binding ThumbsDownCommand}"
                         IsVisible="{Binding SupportsThumbsDown}" ToolTip.Tip="Thumbs down" />
-                <Button Grid.Column="4" Content="⏭" Padding="8,4" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
+                <Button Grid.Column="6" Content="⏭" Padding="8,4" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
             </Grid>
         </Border>
 

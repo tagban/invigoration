@@ -1,0 +1,167 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="980" d:DesignHeight="600"
+             x:Class="Invigoration.App.Views.HotlineTrackerView"
+             x:DataType="vm:HotlineTrackerViewModel">
+
+    <ScrollViewer Padding="16">
+        <Grid ColumnDefinitions="*,16,320" HorizontalAlignment="Stretch">
+
+            <!-- Left column: tracker identity, behavior, chat colors (collapsed once the tracker's
+                 proven to work — see SettingsExpanded's remarks), and the tracker's own server
+                 browser, which stays visible always. -->
+            <StackPanel Grid.Column="0" Spacing="16" MaxWidth="640" HorizontalAlignment="Stretch">
+
+                <Expander IsExpanded="{Binding SettingsExpanded, Mode=TwoWay}">
+                    <Expander.Header>
+                        <TextBlock Text="{Binding DisplayName}" FontSize="16" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                    </Expander.Header>
+                    <StackPanel Spacing="16" Margin="0,12,0,0">
+                        <StackPanel Spacing="8">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Remove Tracker" Command="{Binding RemoveTrackerCommand}" />
+                                <TextBox Text="{Binding DisplayName}" PlaceholderText="Tracker name" />
+                            </DockPanel>
+                        </StackPanel>
+
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="Connection" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                            <TextBox Text="{Binding TrackerHost}" PlaceholderText="hltracker.com" />
+                            <TextBlock Text="Identity (used on every server from this tracker):" FontSize="12" Opacity="0.7" Margin="0,4,0,0" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBox Grid.Column="0" Text="{Binding DefaultNickname}" PlaceholderText="Nickname" />
+                                <NumericUpDown Grid.Column="1" Value="{Binding DefaultIconId}" Minimum="0" Maximum="65535" Width="130" FormatString="0" ToolTip.Tip="Icon number" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Chat Colors" FontWeight="Bold" FontSize="11" Opacity="0.8" />
+                            <TextBlock Text="The protocol only tells us who's an Admin — not a separate Mod rank." FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+                            <Grid ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                                <TextBlock Grid.Column="0" Text="Admin usernames" FontSize="12" VerticalAlignment="Center" />
+                                <ColorPicker Grid.Column="1" Color="{Binding AdminColor, Mode=TwoWay}" Width="130" />
+                            </Grid>
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="Everyone else's usernames" FontSize="12" VerticalAlignment="Center" />
+                                <ColorPicker Grid.Column="1" Color="{Binding DefaultColor, Mode=TwoWay}" Width="130" />
+                            </Grid>
+                        </StackPanel>
+
+                        <Expander Header="Advanced" IsExpanded="False">
+                            <StackPanel Spacing="8" Margin="0,8,0,0">
+                                <CheckBox Content="Debug (log every message a server sends to the chat log — for diagnosing unexplained disconnects)" IsChecked="{Binding Debug}" />
+                                <CheckBox Content="Show a &quot;Copy Log&quot; button on every session (most people never need it)" IsChecked="{Binding ShowCopyLogButton}" />
+                            </StackPanel>
+                        </Expander>
+                    </StackPanel>
+                </Expander>
+
+                <StackPanel Spacing="8">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshTrackerCommand}"
+                                IsEnabled="{Binding !IsRefreshing}" Margin="8,0,0,0" />
+                        <TextBox Text="{Binding SearchText}" PlaceholderText="Search servers by name or description..." />
+                    </DockPanel>
+                    <TextBlock Text="{Binding StatusText}" Foreground="#E8827A" IsVisible="{Binding StatusText, Converter={x:Static conv:StringConverters.IsNotNullOrEmpty}}" TextWrapping="Wrap" />
+
+                    <ListBox Name="TrackerServersList" ItemsSource="{Binding TrackerServers}" MaxHeight="400"
+                             x:CompileBindings="False">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                                    <StackPanel Grid.Column="0">
+                                        <TextBlock Text="{Binding Name}" FontWeight="Bold" />
+                                        <TextBlock Text="{Binding Description}" Opacity="0.7" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Opacity="0.5" FontSize="11">
+                                            <Run Text="{Binding Address}" /><Run Text=":" /><Run Text="{Binding Port}" /><Run Text=" - " /><Run Text="{Binding UserCount}" /><Run Text=" users" />
+                                        </TextBlock>
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Content="Connect" VerticalAlignment="Center"
+                                            Command="{Binding $parent[ListBox].DataContext.ConnectToTrackerServerCommand}" CommandParameter="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                </StackPanel>
+            </StackPanel>
+
+            <!-- Right column: saved server profiles, each collapsed down to just its name by default. -->
+            <StackPanel Grid.Column="2" Spacing="8">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Add Server" Command="{Binding AddProfileCommand}" />
+                    <TextBlock Text="Saved Servers" FontSize="16" FontWeight="Bold" VerticalAlignment="Center" />
+                </DockPanel>
+
+                <ItemsControl Name="ProfilesList" ItemsSource="{Binding SavedProfiles}" x:CompileBindings="False">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Border BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="0,6">
+                                <Expander IsExpanded="False">
+                                    <Expander.Header>
+                                        <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8" VerticalAlignment="Center">
+                                            <Ellipse Grid.Column="0" Width="8" Height="8" Fill="#4CAF50" VerticalAlignment="Center"
+                                                     IsVisible="{Binding IsConnected}" ToolTip.Tip="Connected" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Profile.Name}" FontWeight="Bold" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                            <!-- Quick action right on the collapsed row — "Connect" when idle, "Open" (switches to the
+                                                 existing session tab) when already connected, so re-connecting to the same server twice
+                                                 isn't the only option once you can see it's already live. Click is consumed by the
+                                                 Button itself, same as the Delete/Connect buttons already inside other row templates in
+                                                 this file — it doesn't also toggle the Expander open/closed. -->
+                                            <Button Grid.Column="2" Content="Open" Padding="8,2" IsVisible="{Binding IsConnected}"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.OpenConnectedSessionCommand}" CommandParameter="{Binding Profile}" />
+                                            <Button Grid.Column="2" Content="Connect" Padding="8,2" IsVisible="{Binding !IsConnected}"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.ConnectToProfileCommand}" CommandParameter="{Binding Profile}" />
+                                        </Grid>
+                                    </Expander.Header>
+                                    <StackPanel Spacing="6" Margin="0,8,0,0">
+                                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                            <TextBox Grid.Column="0" Text="{Binding Profile.Name}" PlaceholderText="Name" />
+                                            <Button Grid.Column="1" Content="Delete"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.DeleteProfileCommand}" CommandParameter="{Binding Profile}" />
+                                        </Grid>
+                                        <Grid ColumnDefinitions="2*,Auto" ColumnSpacing="8">
+                                            <TextBox Grid.Column="0" Text="{Binding Profile.Host}" PlaceholderText="Host" />
+                                            <NumericUpDown Grid.Column="1" Value="{Binding Profile.Port}" Minimum="1" Maximum="65535" Width="110" FormatString="0" />
+                                        </Grid>
+                                        <TextBox Text="{Binding Profile.Nickname}" PlaceholderText="Nickname" />
+                                        <TextBox Text="{Binding Profile.Login}" PlaceholderText="Login (optional)" />
+                                        <TextBox Text="{Binding Profile.Password}" PlaceholderText="Password (optional)" PasswordChar="*" />
+                                        <CheckBox Content="Auto-connect" IsChecked="{Binding Profile.AutoConnect}" />
+
+                                        <Expander Header="Advanced" IsExpanded="False">
+                                            <StackPanel Spacing="6" Margin="0,8,0,0">
+                                                <CheckBox Content="Auto-accept this server's agreement (skips the Agreement tab)" IsChecked="{Binding Profile.AutoAcceptAgreement}" />
+                                                <CheckBox Content="Enable /trivia on this server (off by default)" IsChecked="{Binding Profile.TriviaEnabled}" />
+                                                <TextBlock Text="Discord relay (if this server bridges a Discord channel into chat):" FontSize="11" Opacity="0.6" TextWrapping="Wrap" />
+                                                <TextBox Text="{Binding Profile.DiscordRelayUsername}" PlaceholderText="Relay's Hotline username (e.g. Relay, Discord) — blank disables" />
+                                                <TextBox Text="{Binding Profile.DiscordRelayPrefix}" PlaceholderText="Optional prefix (e.g. &quot;Discord | &quot;)" />
+                                                <TextBlock Text="Client version (some newer server builds expect it not to be sent at all):" FontSize="11" Opacity="0.6" TextWrapping="Wrap" Margin="0,4,0,0" />
+                                                <CheckBox Content="Send a client version" IsChecked="{Binding Profile.SendClientVersion}" />
+                                                <NumericUpDown Value="{Binding Profile.ClientVersion}" Minimum="0" Maximum="65535" FormatString="0"
+                                                               IsEnabled="{Binding Profile.SendClientVersion}" HorizontalAlignment="Left" Width="130" />
+                                                <CheckBox Content="Try server-side chat history on connect (experimental — a brand-new field most servers have never seen; may cause connection issues on some)"
+                                                          IsChecked="{Binding Profile.AdvertiseChatHistorySupport}" />
+                                            </StackPanel>
+                                        </Expander>
+
+                                        <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right" Margin="0,4,0,0">
+                                            <Button Content="Save" Command="{Binding $parent[ItemsControl].DataContext.SaveProfileCommand}" CommandParameter="{Binding Profile}" />
+                                            <Button Content="Open" IsVisible="{Binding IsConnected}"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.OpenConnectedSessionCommand}" CommandParameter="{Binding Profile}" />
+                                            <Button Content="Connect" IsVisible="{Binding !IsConnected}"
+                                                    Command="{Binding $parent[ItemsControl].DataContext.ConnectToProfileCommand}" CommandParameter="{Binding Profile}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </Grid>
+    </ScrollViewer>
+</UserControl>

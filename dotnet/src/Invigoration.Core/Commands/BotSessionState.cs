@@ -3,7 +3,7 @@ namespace Invigoration.Core.Commands;
 /// <summary>
 /// Runtime toggles and counters the chat commands read/mutate. Replaces the
 /// Public/Global variables scattered across modCommands.bas and globals.bas
-/// (Canada, leetspeak, fudd, moo, debugmode, acceptinvites, idleMessage,
+/// (Canada, leetspeak, fudd, moo, debugmode, idleMessage,
 /// BanCount/KickCount/JoinCount, LastW/LastM/LastSW/LastSM, beforetext,
 /// postpend, targetuser) — kept as one instance per <see cref="Invigoration.Core.BotEngine"/>.
 /// </summary>
@@ -14,7 +14,6 @@ public sealed class BotSessionState
     public bool FuddMode { get; set; }
     public bool MooMode { get; set; }
     public bool DebugMode { get; set; }
-    public bool AcceptClanInvites { get; set; }
 
     public string PrependText { get; set; } = "";
     public string PostpendText { get; set; } = "";

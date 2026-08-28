@@ -15,7 +15,7 @@ public static class TriviaPackDownloader
     /// <summary>File names under dotnet/TriviaPacks/ in the repo — must stay in sync with what's actually committed there.</summary>
     private static readonly string[] PackFiles =
     [
-        "Diablo.txt", "Warcraft.txt", "StarCraft.txt", "Blizzard.txt", "PopCulture.txt", "Music.txt",
+        "Diablo.txt", "Warcraft.txt", "StarCraft.txt", "Blizzard.txt", "PopCulture.txt", "Music.txt", "Apple.txt",
     ];
 
     /// <summary>

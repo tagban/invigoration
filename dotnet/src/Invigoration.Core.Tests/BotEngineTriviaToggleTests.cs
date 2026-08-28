@@ -5,10 +5,10 @@ namespace Invigoration.Core.Tests;
 
 public class BotEngineTriviaToggleTests
 {
-    private static Task InvokeHandleTriviaCommandAsync(BotEngine engine, string rest, string username, Func<string, Task> reply)
+    private static Task InvokeHandleTriviaCommandAsync(BotEngine engine, string rest, Func<string, Task> reply)
     {
         var method = typeof(BotEngine).GetMethod("HandleTriviaCommandAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Task)method.Invoke(engine, [rest, username, reply])!;
+        return (Task)method.Invoke(engine, [rest, reply])!;
     }
 
     [Fact]
@@ -23,8 +23,8 @@ public class BotEngineTriviaToggleTests
             return Task.CompletedTask;
         }
 
-        await InvokeHandleTriviaCommandAsync(engine, "on", "SomeUser", Reply);
-        await InvokeHandleTriviaCommandAsync(engine, "score", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "on", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "score", Reply);
 
         Assert.Equal(2, replies.Count);
         Assert.All(replies, r => Assert.Equal("Trivia isn't enabled for this bot.", r));
@@ -42,7 +42,7 @@ public class BotEngineTriviaToggleTests
             return Task.CompletedTask;
         }
 
-        await InvokeHandleTriviaCommandAsync(engine, "score", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "score", Reply);
 
         Assert.Single(replies);
         Assert.NotEqual("Trivia isn't enabled for this bot.", replies[0]);
@@ -60,7 +60,7 @@ public class BotEngineTriviaToggleTests
             return Task.CompletedTask;
         }
 
-        await InvokeHandleTriviaCommandAsync(engine, "categories", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "categories", Reply);
 
         Assert.Single(replies);
         Assert.Contains("Diablo", replies[0]);
@@ -80,7 +80,7 @@ public class BotEngineTriviaToggleTests
             return Task.CompletedTask;
         }
 
-        await InvokeHandleTriviaCommandAsync(engine, "NotARealCategory", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "NotARealCategory", Reply);
 
         Assert.Single(replies);
         Assert.Contains("No questions found", replies[0]);
@@ -99,14 +99,14 @@ public class BotEngineTriviaToggleTests
             return Task.CompletedTask;
         }
 
-        await InvokeHandleTriviaCommandAsync(engine, "Music", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "Music", Reply);
 
         Assert.Single(replies);
         Assert.Contains("Music", replies[0]);
         Assert.Contains("started", replies[0], StringComparison.OrdinalIgnoreCase);
 
         // Stop immediately so the background round loop this started doesn't keep running past the test.
-        await InvokeHandleTriviaCommandAsync(engine, "off", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "off", Reply);
     }
 
     [Fact]
@@ -121,13 +121,13 @@ public class BotEngineTriviaToggleTests
             return Task.CompletedTask;
         }
 
-        await InvokeHandleTriviaCommandAsync(engine, "all", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "all", Reply);
 
         Assert.Single(replies);
         Assert.Contains("started", replies[0], StringComparison.OrdinalIgnoreCase);
         // Unfiltered, like plain "on" — no "(category)" note in the started message.
         Assert.DoesNotContain("(", replies[0]);
 
-        await InvokeHandleTriviaCommandAsync(engine, "off", "SomeUser", Reply);
+        await InvokeHandleTriviaCommandAsync(engine, "off", Reply);
     }
 }

@@ -19,6 +19,18 @@ public sealed partial class BotEngine
     /// </summary>
     private const string VersionLine = $"/me is an Invigoration v{AppVersion.Current} - bnet.cc";
 
+    /// <summary>
+    /// Canonical names (see Commands.CommandCatalog) of commands that mutate the bot's own
+    /// configuration/identity or control a purely cosmetic text-transform toggle — these are
+    /// never triggerable via chat, regardless of rank grant or bot-master status, only locally
+    /// via "/" from this app's own input box. See HandleCommandAsync's remarks for why.
+    /// </summary>
+    private static readonly HashSet<string> LocalOnlyCommands = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "colors", "hex", "invigencrypt", "prepend", "postpend", "canada", "fudd", "moo", "leetspeak",
+        "setmaster", "sethome", "setusername", "setpass", "setserver", "settrigger", "debug",
+    };
+
     /// <summary>Runs a command typed locally in the bot's own UI — always trusted, no bot-master check. No origin channel: an operator-typed reply always goes to the active/focused sub-tab (see SendSc2Async), not a specific triggering message's channel.</summary>
     public Task RunLocalCommandAsync(string message) => HandleCommandAsync(Config.Username, message, isLocal: true, isWhisper: false, originChannelIndex: null);
 
@@ -55,6 +67,17 @@ public sealed partial class BotEngine
         var parts = message.Split(' ', 2);
         var command = parts[0];
         var rest = parts.Length > 1 ? parts[1].Trim() : "";
+
+        // Config-mutating commands and purely cosmetic text-transform toggles are
+        // operator-console-only, full stop — never triggerable from chat at all, not even by the
+        // bot master. Warcraft III (and everything since) didn't exist when the original VB6 bot
+        // was written; flagged 2026-08-26 as commands that were always meant to be typed locally,
+        // not remote-controlled. Checked before IsAuthorized so a rank grant (or the bot master
+        // check inside it) can't override this.
+        if (!isLocal && LocalOnlyCommands.Contains(Commands.CommandCatalog.ResolveCanonicalName(command)))
+        {
+            return;
+        }
 
         if (!isLocal && !IsAuthorized(username, command, rest))
         {
@@ -246,12 +269,6 @@ public sealed partial class BotEngine
                 await Reply($"Canada Mode {(_session.CanadaMode ? "enabled" : "disabled")}.").ConfigureAwait(false);
                 break;
 
-            case "accept":
-                _session.AcceptClanInvites = !_session.AcceptClanInvites;
-                await Reply($"Clan invite auto-accept {(_session.AcceptClanInvites ? "enabled" : "disabled")}.")
-                    .ConfigureAwait(false);
-                break;
-
             case "debug":
                 _session.DebugMode = !_session.DebugMode;
                 LogInfo($"Debug mode {(_session.DebugMode ? "enabled" : "disabled")}.");
@@ -313,12 +330,18 @@ public sealed partial class BotEngine
                 break;
 
             case "trivia":
-                await HandleTriviaCommandAsync(rest, username, Reply).ConfigureAwait(false);
+                await HandleTriviaCommandAsync(rest, Reply).ConfigureAwait(false);
                 break;
 
             case "skip":
             case "next":
                 await HandleMusicCommandAsync(isLocal, Reply, c => c.SkipAsync(), "Skipped.", "Couldn't skip — is a track playing?").ConfigureAwait(false);
+                break;
+
+            case "pause":
+            case "play":
+            case "stop":
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.PlayPauseAsync(), "Toggled play/pause.", "Couldn't toggle play/pause — is the music player open?").ConfigureAwait(false);
                 break;
 
             case "thumbsup":
@@ -366,10 +389,9 @@ public sealed partial class BotEngine
     /// <summary>
     /// The bot master always has full access. A member whose clan rank
     /// matches <see cref="Config"/>'s BannedRank is blocked from everything
-    /// else, including "trivia join"/"trivia score"/"trivia categories"
-    /// below, regardless of any other grant. Otherwise "trivia join"/
-    /// "trivia score"/"trivia categories" are always open — gating trivia's
-    /// own entry point (and the harmless, read-only category listing) behind
+    /// else, including "trivia score"/"trivia categories" below, regardless
+    /// of any other grant. Otherwise "trivia score"/"trivia categories" are
+    /// always open — gating the harmless, read-only score/category listing behind
     /// the same allowlist as admin commands like "kick"/"setpass" would make
     /// it unplayable for anyone the bot master hasn't individually granted
     /// access to ("trivia on"/"trivia off"/"trivia &lt;category&gt;", round
@@ -410,7 +432,6 @@ public sealed partial class BotEngine
 
         if (typedCommand.Equals("trivia", StringComparison.OrdinalIgnoreCase) &&
             (rest.Equals("score", StringComparison.OrdinalIgnoreCase) ||
-             rest.Equals("join", StringComparison.OrdinalIgnoreCase) ||
              rest.Equals("categories", StringComparison.OrdinalIgnoreCase)))
         {
             return true;

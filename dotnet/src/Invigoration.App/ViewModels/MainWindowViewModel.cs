@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Config;
+using Invigoration.Core.Hotline;
 using Invigoration.Core.Music;
 using Invigoration.Core.Trivia;
 
@@ -106,6 +107,11 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnIsMusicBarEnabledChanged(bool value) => MusicSettingsStore.ShowBottomBar = value;
 
+    private readonly HotlineTrackerConfigStore _hotlineStore = new();
+
+    /// <summary>"Add Bot"-style top-level Hotline entities, per the user's own framing ("each hotline connection is a 'tracker'") — one HotlineTabViewModel per HotlineTrackerConfig, persisted the same way Bots/BotConfig are.</summary>
+    public ObservableCollection<HotlineTabViewModel> HotlineTrackers { get; } = [];
+
     public MainWindowViewModel()
     {
         _whispersTab = new GlobalWhispersTabViewModel(this);
@@ -119,15 +125,54 @@ public partial class MainWindowViewModel : ViewModelBase
             WireGlobalWhispers(tab);
         }
 
+        foreach (var config in _hotlineStore.Load())
+        {
+            HotlineTrackers.Add(CreateHotlineTab(config));
+        }
+
         RefreshTopLevelTabs();
         SelectedBot = Bots.Count > 0 ? Bots[0] : null;
         RefreshAnyBotHasClanEnabled();
         _ = AutoConnectStartupBotsAsync();
+        foreach (var tracker in HotlineTrackers)
+        {
+            tracker.Tracker.AutoConnectStartupProfiles();
+        }
+
         // Fire-and-forget and best-effort: seeds the Trivia folder with the base packs from
         // GitHub the first time (see TriviaPackDownloader), never blocks startup, and is a
         // no-op on every later launch once those files already exist locally.
         _ = TriviaPackDownloader.EnsureDownloadedAsync(err => Debug.WriteLine(err));
     }
+
+    private HotlineTabViewModel CreateHotlineTab(HotlineTrackerConfig config)
+    {
+        var tab = new HotlineTabViewModel(config);
+        tab.ConfigChanged += SaveHotlineTrackers;
+        tab.RemoveRequested += () => RemoveHotlineTracker(tab);
+        return tab;
+    }
+
+    /// <summary>The Hotline equivalent of AddBot — creates a new tracker with sensible defaults (renamed/re-hosted in place afterward, same in-place-editing idiom as a saved server profile, rather than a separate dialog). Returns the new tab so MainWindow.axaml.cs can select it on the actual TabStrip control, same as AddBot/SelectTopLevelBot.</summary>
+    public HotlineTabViewModel AddHotlineTracker()
+    {
+        var name = HotlineTrackers.Count == 0 ? "Hotline" : $"Hotline {HotlineTrackers.Count + 1}";
+        var config = new HotlineTrackerConfig { DisplayName = name };
+        var tab = CreateHotlineTab(config);
+        HotlineTrackers.Add(tab);
+        SaveHotlineTrackers();
+        RefreshTopLevelTabs();
+        return tab;
+    }
+
+    public void RemoveHotlineTracker(HotlineTabViewModel tab)
+    {
+        HotlineTrackers.Remove(tab);
+        SaveHotlineTrackers();
+        RefreshTopLevelTabs();
+    }
+
+    private void SaveHotlineTrackers() => _hotlineStore.Save(HotlineTrackers.Select(t => t.Config).ToList());
 
     private void RefreshAnyBotHasClanEnabled() => AnyBotHasClanEnabled = Bots.Any(b => b.Config.ClanFeatureEnabled);
 
@@ -147,6 +192,11 @@ public partial class MainWindowViewModel : ViewModelBase
         if (IsMusicEnabled)
         {
             TopLevelTabs.Add(MusicTab);
+        }
+
+        foreach (var tracker in HotlineTrackers)
+        {
+            TopLevelTabs.Add(tracker);
         }
 
         foreach (var bot in Bots.Where(b => string.IsNullOrEmpty(b.Config.TabGroup)))

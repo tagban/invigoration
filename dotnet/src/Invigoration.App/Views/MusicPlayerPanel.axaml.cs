@@ -6,6 +6,7 @@ using Invigoration.App.Music;
 using Invigoration.App.ViewModels;
 using Invigoration.Core.Config;
 using Invigoration.Core.Music;
+using Invigoration.Core.Music.Pandora;
 
 namespace Invigoration.App.Views;
 
@@ -24,6 +25,7 @@ namespace Invigoration.App.Views;
 public partial class MusicPlayerPanel : UserControl
 {
     private WebViewMusicController? _controller;
+    private PandoraPlayerController? _pandoraController;
     private MusicTabViewModel? _viewModel;
 
     public MusicPlayerPanel()
@@ -103,6 +105,27 @@ public partial class MusicPlayerPanel : UserControl
 
     private void ApplyService(MusicService service)
     {
+        YouTubeMusicIcon.Source = GameIconLoader.Get("youtube-music");
+        SpotifyIcon.Source = GameIconLoader.Get("spotify");
+        PandoraIcon.Source = GameIconLoader.Get("pandora");
+        YouTubeMusicButton.Opacity = service == MusicService.YouTubeMusic ? 1.0 : 0.4;
+        SpotifyButton.Opacity = service == MusicService.Spotify ? 1.0 : 0.4;
+        PandoraButton.Opacity = service == MusicService.Pandora ? 1.0 : 0.4;
+
+        if (service == MusicService.Pandora)
+        {
+            WebView.IsVisible = false;
+            PandoraPanel.IsVisible = true;
+            _pandoraController ??= new PandoraPlayerController();
+            MusicPlayerRegistry.Controller = _pandoraController;
+            _ = InitializePandoraAsync();
+            return;
+        }
+
+        WebView.IsVisible = true;
+        PandoraPanel.IsVisible = false;
+        MusicPlayerRegistry.Controller = _controller;
+
         var profile = MusicServiceProfile.For(service);
         if (_controller is not null)
         {
@@ -120,17 +143,82 @@ public partial class MusicPlayerPanel : UserControl
         // blank header — so this is the correct way to un-spoof, not a fallback guess.
         WebView.UserAgent = profile.MobileUserAgent ?? "";
         WebView.Source = new Uri(profile.HomeUrl);
-        YouTubeMusicIcon.Source = GameIconLoader.Get("youtube-music");
-        SpotifyIcon.Source = GameIconLoader.Get("spotify");
-        PandoraIcon.Source = GameIconLoader.Get("pandora");
-        YouTubeMusicButton.Opacity = service == MusicService.YouTubeMusic ? 1.0 : 0.4;
-        SpotifyButton.Opacity = service == MusicService.Spotify ? 1.0 : 0.4;
-        PandoraButton.Opacity = service == MusicService.Pandora ? 1.0 : 0.4;
 
         if (service == MusicService.Spotify)
         {
             _ = ReapplySpotifyOnceSettledAsync();
         }
+    }
+
+    /// <summary>Shows the sign-in form or the station picker depending on whether we're already logged in — auto-attempting a login with previously-saved credentials first (PandoraCredentialsStore) so returning to this tab doesn't ask the user to retype their password every time.</summary>
+    private async Task InitializePandoraAsync()
+    {
+        if (_pandoraController is not { } controller)
+        {
+            return;
+        }
+
+        if (!controller.IsLoggedIn && PandoraCredentialsStore.HasCredentials)
+        {
+            await controller.LoginAsync(PandoraCredentialsStore.Username, PandoraCredentialsStore.Password).ConfigureAwait(true);
+        }
+
+        if (controller.IsLoggedIn)
+        {
+            await ShowStationPickerAsync(controller).ConfigureAwait(true);
+        }
+        else
+        {
+            PandoraSignInPanel.IsVisible = true;
+            PandoraStationPanel.IsVisible = false;
+        }
+    }
+
+    private async Task ShowStationPickerAsync(PandoraPlayerController controller)
+    {
+        PandoraSignInPanel.IsVisible = false;
+        PandoraStationPanel.IsVisible = true;
+        PandoraStationCombo.ItemsSource = await controller.GetStationsAsync().ConfigureAwait(true);
+    }
+
+    private async void OnPandoraSignInClick(object? sender, RoutedEventArgs e)
+    {
+        if (_pandoraController is not { } controller)
+        {
+            return;
+        }
+
+        PandoraStatusText.IsVisible = false;
+        PandoraSignInButton.IsEnabled = false;
+        try
+        {
+            var ok = await controller.LoginAsync(PandoraUsernameBox.Text ?? "", PandoraPasswordBox.Text ?? "").ConfigureAwait(true);
+            if (ok)
+            {
+                await ShowStationPickerAsync(controller).ConfigureAwait(true);
+            }
+            else
+            {
+                PandoraStatusText.Text = "Sign in failed — check your username and password.";
+                PandoraStatusText.IsVisible = true;
+            }
+        }
+        finally
+        {
+            PandoraSignInButton.IsEnabled = true;
+        }
+    }
+
+    private async void OnPandoraStationSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (_pandoraController is not { } controller || PandoraStationCombo.SelectedItem is not PandoraStation station)
+        {
+            return;
+        }
+
+        PandoraNowPlayingText.Text = $"Loading \"{station.StationName}\"...";
+        await controller.PlayStationAsync(station.StationToken).ConfigureAwait(true);
+        PandoraNowPlayingText.Text = $"Playing \"{station.StationName}\" — use the bar below to skip or rate a track.";
     }
 
     /// <summary>

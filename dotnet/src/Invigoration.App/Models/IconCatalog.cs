@@ -74,5 +74,7 @@ public static class IconCatalog
         ("youtube-music", "YouTube Music"),
         ("spotify", "Spotify"),
         ("pandora", "Pandora"),
+        ("hotline", "Hotline"),
+        ("discord-relay", "Discord (relay)"),
     ];
 }

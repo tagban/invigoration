@@ -169,6 +169,9 @@
                                 <Grid.ContextMenu>
                                     <ContextMenu Opened="OnUserContextMenuOpened">
                                         <MenuItem Header="Whisper" Click="OnUserWhisperClick" />
+                                        <MenuItem Header="Focus for Reply" Click="OnUserFocusClick"
+                                                  ToolTip.Tip="Your next typed line in this channel routes as a whisper to them instead — same as typing /user yourself. Right-click again and choose Clear Focus to go back to normal channel chat." />
+                                        <MenuItem Header="Clear Focus" Click="OnUserUnfocusClick" />
                                         <MenuItem Header="Profile Info" Click="OnUserProfileInfoClick" />
                                         <MenuItem Name="UserClanRankMenu" Header="Clan Rank">
                                             <MenuItem Header="View Info" Click="OnUserClanRankClick" />

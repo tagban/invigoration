@@ -38,13 +38,12 @@ public class BotEngineAuthorizationTests
     }
 
     [Fact]
-    public async Task IsAuthorized_BannedRank_BlocksEverythingIncludingTriviaJoin()
+    public async Task IsAuthorized_BannedRank_BlocksEverythingIncludingTriviaScore()
     {
         var (engine, name) = CreateEngineWithTrackedMember("Banned");
         await using var _ = engine;
         try
         {
-            Assert.False(InvokeIsAuthorized(engine, name, "trivia", "join"));
             Assert.False(InvokeIsAuthorized(engine, name, "trivia", "score"));
             Assert.False(InvokeIsAuthorized(engine, name, "kick"));
         }
@@ -55,13 +54,12 @@ public class BotEngineAuthorizationTests
     }
 
     [Fact]
-    public async Task IsAuthorized_UntrackedUser_TriviaJoinAndScoreAreOpen()
+    public async Task IsAuthorized_UntrackedUser_TriviaScoreAndCategoriesAreOpen()
     {
         var config = new BotConfig { BotMaster = "TheMaster" };
         await using var engine = new BotEngine(config);
         var name = $"untracked-{Guid.NewGuid():N}";
 
-        Assert.True(InvokeIsAuthorized(engine, name, "trivia", "join"));
         Assert.True(InvokeIsAuthorized(engine, name, "trivia", "score"));
         Assert.True(InvokeIsAuthorized(engine, name, "trivia", "categories"));
     }
@@ -88,8 +86,8 @@ public class BotEngineAuthorizationTests
         {
             // A rank with no AllowedCommands doesn't grant "trivia on"/"off" (round control).
             Assert.False(InvokeIsAuthorized(engine, name, "trivia", "on"));
-            // But join/score stay open regardless of rank, as long as they're not banned.
-            Assert.True(InvokeIsAuthorized(engine, name, "trivia", "join"));
+            // But score stays open regardless of rank, as long as they're not banned.
+            Assert.True(InvokeIsAuthorized(engine, name, "trivia", "score"));
         }
         finally
         {

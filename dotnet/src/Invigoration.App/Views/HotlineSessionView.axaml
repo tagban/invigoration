@@ -1,0 +1,206 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             xmlns:conv="using:Avalonia.Data.Converters"
+             mc:Ignorable="d" d:DesignWidth="700" d:DesignHeight="600"
+             x:Class="Invigoration.App.Views.HotlineSessionView"
+             x:DataType="vm:HotlineSessionViewModel">
+
+    <Grid ColumnDefinitions="*,232" RowDefinitions="Auto,Auto,*,Auto">
+        <Border Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="2" Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="10,6">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Disconnect" Command="{Binding DisconnectCommand}" />
+                <Button DockPanel.Dock="Right" Content="Copy Log" Click="OnCopyLogClick" Margin="0,0,8,0"
+                        IsVisible="{Binding ShowCopyLogButton}"
+                        ToolTip.Tip="Copies the whole chat/debug log to the clipboard" />
+                <TextBlock Text="{Binding Title}" VerticalAlignment="Center" FontWeight="Bold" />
+            </DockPanel>
+        </Border>
+
+        <!-- Never auto-sent (see HotlineTransactionClient.AutoAcceptAgreement's remarks) — the
+             user explicitly asked for an "Agreement" surface that "can be closed with an x" and
+             "should pop up if its prompted", not a silent auto-accept. This banner is a stand-in
+             for the fuller per-server Chat/Files/News/Agreement tab layout the user described;
+             upgrading to that is a follow-up, not done here. -->
+        <Border Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2" Background="#2A2410" BorderBrush="#5A4E1A" BorderThickness="0,0,0,1"
+                Padding="10,8" IsVisible="{Binding PendingAgreementText, Converter={x:Static conv:ObjectConverters.IsNotNull}}">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="x" Padding="8,2" Command="{Binding DismissAgreementCommand}" />
+                <Button DockPanel.Dock="Right" Content="Accept" Margin="0,0,8,0" Command="{Binding AcceptAgreementCommand}" />
+                <ScrollViewer MaxHeight="120">
+                    <TextBlock Text="{Binding PendingAgreementText}" TextWrapping="Wrap" />
+                </ScrollViewer>
+            </DockPanel>
+        </Border>
+
+        <!-- SelectableTextBlock (not plain TextBlock) so an individual line's text can be
+             click-dragged and copied directly — a ListBox only supports item selection, not text
+             selection, which is what made "Copy Log" above necessary in the first place. -->
+        <ListBox Name="MessagesList" Grid.Row="2" Grid.Column="0" ItemsSource="{Binding Messages}" Background="Transparent" Padding="4">
+            <!-- Same fix as the Users list — ListBoxItem's default theme padding/min-height was
+                 adding visible gaps between every chat line. -->
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="MinHeight" Value="0" />
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:HotlineChatLine">
+                    <Grid ColumnDefinitions="Auto,*">
+                        <Image Grid.Column="0" Source="{Binding UsernameIcon}" Height="18" Width="18" Margin="0,0,4,0"
+                               VerticalAlignment="Top" IsVisible="{Binding UsernameIcon, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
+                        <SelectableTextBlock Grid.Column="1" TextWrapping="Wrap">
+                            <Run Text="{Binding Username}" Foreground="{Binding UsernameColor}" FontWeight="Bold" />
+                            <Run Text="{Binding Text}" />
+                        </SelectableTextBlock>
+                    </Grid>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Lighter background (not this app's usual dark theme) — real Hotline clients render
+             names in black by default (admin/mod ranks get their own colors, a follow-up once
+             UserFlags' rank bits are confirmed), and black-on-dark is unreadable. -->
+        <Border Grid.Row="2" Grid.Column="1" Background="#D8D8D8" BorderBrush="#3A3A3A" BorderThickness="1,0,0,0">
+            <Grid Margin="6" RowDefinitions="Auto,*,Auto,Auto">
+                <TextBlock Grid.Row="0" Text="Users" FontWeight="Bold" Foreground="Black" Opacity="0.7" Margin="0,0,0,4" />
+                <!-- Real Hotline client convention, per the user's own spec: the icon is a
+                     background layer for the whole row, not something the name lays out around —
+                     the name always sits at a fixed 18px left offset regardless of icon width, so
+                     a wider icon just extends further behind the text instead of pushing it over.
+                     Rows are exactly 18px with zero padding/spacing so icons sit flush against
+                     each other — ListBoxItem's own default theme padding/min-height would
+                     otherwise add gaps between rows, so both are zeroed out below. -->
+                <ListBox Grid.Row="1" ItemsSource="{Binding Users}" Background="Transparent" Padding="0">
+                    <!-- This is a display list, not something clickable yet — a stray click was
+                         leaving a row stuck with the theme's selected-row highlight, which reads
+                         oddly against the flat panel background. Suppressed until right-click
+                         actions (per-user context menu) give selection an actual purpose. -->
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="MinHeight" Value="0" />
+                        </Style>
+                        <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HotlineUserRowViewModel">
+                            <Grid Height="18">
+                                <Grid.ContextMenu>
+                                    <!-- A preset palette rather than a full color-picker popup — simpler and more reliable inside a menu, and matches the classic IRC-client "highlight this person" idiom this was modeled on. -->
+                                    <ContextMenu>
+                                        <MenuItem Header="Highlight Color">
+                                            <MenuItem Header="Red" Command="{Binding SetHighlightColorCommand}" CommandParameter="#FF6B6B">
+                                                <MenuItem.Icon><Border Background="#FF6B6B" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Orange" Command="{Binding SetHighlightColorCommand}" CommandParameter="#FFA500">
+                                                <MenuItem.Icon><Border Background="#FFA500" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Yellow" Command="{Binding SetHighlightColorCommand}" CommandParameter="#D4AC00">
+                                                <MenuItem.Icon><Border Background="#D4AC00" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Green" Command="{Binding SetHighlightColorCommand}" CommandParameter="#2E9E4C">
+                                                <MenuItem.Icon><Border Background="#2E9E4C" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Cyan" Command="{Binding SetHighlightColorCommand}" CommandParameter="#1E9E96">
+                                                <MenuItem.Icon><Border Background="#1E9E96" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Blue" Command="{Binding SetHighlightColorCommand}" CommandParameter="#3A7BFF">
+                                                <MenuItem.Icon><Border Background="#3A7BFF" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Purple" Command="{Binding SetHighlightColorCommand}" CommandParameter="#8B3AFF">
+                                                <MenuItem.Icon><Border Background="#8B3AFF" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Pink" Command="{Binding SetHighlightColorCommand}" CommandParameter="#E0479E">
+                                                <MenuItem.Icon><Border Background="#E0479E" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator />
+                                            <MenuItem Header="Clear Highlight" Command="{Binding ClearHighlightColorCommand}" />
+                                        </MenuItem>
+                                    </ContextMenu>
+                                </Grid.ContextMenu>
+                                <Image Source="{Binding Icon}" Height="18" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Name}" Foreground="{Binding DisplayBrush}" Margin="20,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+
+                <!-- Discord users seen through this server's relay, kept visually separate from
+                     real connections (per explicit request) — see
+                     HotlineTrackerConfig.DiscordRelayUsername's remarks. Bounded height + its own
+                     scroll rather than sharing the Users list's flexible space, since this list can
+                     otherwise grow to dominate the panel on a busy relayed channel. -->
+                <TextBlock Grid.Row="2" Text="Discord" FontWeight="Bold" Foreground="Black" Opacity="0.7" Margin="0,8,0,4" />
+                <ListBox Grid.Row="3" ItemsSource="{Binding DiscordUsers}" Background="Transparent" Padding="0" MaxHeight="150">
+                    <ListBox.Styles>
+                        <Style Selector="ListBoxItem">
+                            <Setter Property="Padding" Value="0" />
+                            <Setter Property="MinHeight" Value="0" />
+                        </Style>
+                        <Style Selector="ListBoxItem:selected /template/ ContentPresenter">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                        <Style Selector="ListBoxItem:pointerover /template/ ContentPresenter">
+                            <Setter Property="Background" Value="Transparent" />
+                        </Style>
+                    </ListBox.Styles>
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="vm:HotlineGhostUserViewModel">
+                            <Grid Height="18">
+                                <Grid.ContextMenu>
+                                    <ContextMenu>
+                                        <MenuItem Header="Highlight Color">
+                                            <MenuItem Header="Red" Command="{Binding SetHighlightColorCommand}" CommandParameter="#FF6B6B">
+                                                <MenuItem.Icon><Border Background="#FF6B6B" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Orange" Command="{Binding SetHighlightColorCommand}" CommandParameter="#FFA500">
+                                                <MenuItem.Icon><Border Background="#FFA500" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Yellow" Command="{Binding SetHighlightColorCommand}" CommandParameter="#D4AC00">
+                                                <MenuItem.Icon><Border Background="#D4AC00" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Green" Command="{Binding SetHighlightColorCommand}" CommandParameter="#2E9E4C">
+                                                <MenuItem.Icon><Border Background="#2E9E4C" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Cyan" Command="{Binding SetHighlightColorCommand}" CommandParameter="#1E9E96">
+                                                <MenuItem.Icon><Border Background="#1E9E96" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Blue" Command="{Binding SetHighlightColorCommand}" CommandParameter="#3A7BFF">
+                                                <MenuItem.Icon><Border Background="#3A7BFF" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Purple" Command="{Binding SetHighlightColorCommand}" CommandParameter="#8B3AFF">
+                                                <MenuItem.Icon><Border Background="#8B3AFF" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <MenuItem Header="Pink" Command="{Binding SetHighlightColorCommand}" CommandParameter="#E0479E">
+                                                <MenuItem.Icon><Border Background="#E0479E" Width="12" Height="12" /></MenuItem.Icon>
+                                            </MenuItem>
+                                            <Separator />
+                                            <MenuItem Header="Clear Highlight" Command="{Binding ClearHighlightColorCommand}" />
+                                        </MenuItem>
+                                    </ContextMenu>
+                                </Grid.ContextMenu>
+                                <Image Source="{Binding Icon}" Height="18" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                <TextBlock Text="{Binding Name}" Foreground="{Binding DisplayBrush}" Margin="20,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </Grid>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Grid>
+        </Border>
+
+        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="8">
+            <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message..."
+                     IsEnabled="{Binding IsConnected}" />
+            <Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}" Margin="8,0,0,0" IsEnabled="{Binding IsConnected}" />
+        </Grid>
+    </Grid>
+</UserControl>

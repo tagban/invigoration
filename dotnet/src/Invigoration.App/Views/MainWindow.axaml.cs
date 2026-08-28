@@ -142,6 +142,26 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnAddHotlineTrackerClick(object? sender, RoutedEventArgs e) => AddHotlineTracker();
+    private void OnAddHotlineTrackerNativeClick(object? sender, EventArgs e) => AddHotlineTracker();
+
+    private void AddHotlineTracker()
+    {
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var tracker = vm.AddHotlineTracker();
+        // Same TabControl-selection-reset issue as AddBot — RefreshTopLevelTabs() rebuilding
+        // TopLevelTabs from scratch otherwise leaves the tab strip showing Whispers instead of
+        // the tracker that was just added.
+        if (this.FindControl<TabStrip>("TopLevelTabControl") is { } tabControl)
+        {
+            tabControl.SelectedItem = tracker;
+        }
+    }
+
     private async void OnEditBotClick(object? sender, RoutedEventArgs e) => await EditSelectedBot();
     private async void OnEditBotNativeClick(object? sender, EventArgs e) => await EditSelectedBot();
 

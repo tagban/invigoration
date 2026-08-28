@@ -1,0 +1,33 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="600"
+             x:Class="Invigoration.App.Views.HotlineTabView"
+             x:DataType="vm:HotlineTabViewModel">
+
+    <!-- Same nested-TabControl-of-sub-tabs idea as BotGroupTabView — Tracker first (permanent),
+         then one sub-tab per connected server. Items mixes two view-model types
+         (HotlineTrackerViewModel/HotlineSessionViewModel), so the header template is
+         x:CompileBindings="False" and duck-typed, same as MainWindow.axaml's own top-level
+         TabStrip; each sub-tab's actual content resolves automatically via the app-wide
+         ViewLocator (HotlineTrackerView/HotlineSessionView), no explicit DataTemplate needed. -->
+    <TabControl ItemsSource="{Binding Items}" SelectedItem="{Binding SelectedItem}">
+        <TabControl.Styles>
+            <Style Selector="TabItem:selected Border.tabHighlight">
+                <Setter Property="BorderThickness" Value="0,0,0,3" />
+            </Style>
+        </TabControl.Styles>
+        <TabControl.ItemTemplate>
+            <DataTemplate x:CompileBindings="False">
+                <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="6,2,6,4">
+                    <StackPanel Orientation="Horizontal" Spacing="4">
+                        <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
+                        <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />
+                    </StackPanel>
+                </Border>
+            </DataTemplate>
+        </TabControl.ItemTemplate>
+    </TabControl>
+</UserControl>

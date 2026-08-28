@@ -157,10 +157,10 @@ public sealed class BotConfig
     /// </summary>
     public string DefaultRank { get; set; } = "Trivia Participant";
 
-    /// <summary>A member whose Rank matches this (case-insensitive) is blocked from every bot command, including the otherwise-always-open trivia "join"/"score" — set a member's rank to this via "clanrank" to revoke access.</summary>
+    /// <summary>A member whose Rank matches this (case-insensitive) is blocked from every bot command, including the otherwise-always-open trivia "score"/"categories" — set a member's rank to this via "clanrank" to revoke access.</summary>
     public string BannedRank { get; set; } = "Banned";
 
-    /// <summary>Turns the trivia game on/off for this bot. When false, every "trivia" command (on/off/score/join) is unavailable — matches ClanFeatureEnabled's per-bot opt-in pattern. True by default since trivia has no other gate of its own.</summary>
+    /// <summary>Turns the trivia game on/off for this bot. When false, every "trivia" command (on/off/score/categories) is unavailable — matches ClanFeatureEnabled's per-bot opt-in pattern. True by default since trivia has no other gate of its own.</summary>
     public bool TriviaFeatureEnabled { get; set; } = true;
 
     /// <summary>

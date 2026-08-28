@@ -28,6 +28,12 @@ public class BotEngineMusicCommandTests
             return Task.FromResult(NextResult);
         }
 
+        public Task<bool> PlayPauseAsync()
+        {
+            LastCalled = "playpause";
+            return Task.FromResult(NextResult);
+        }
+
         public Task<bool> ThumbsUpAsync()
         {
             LastCalled = "thumbsup";
@@ -85,6 +91,42 @@ public class BotEngineMusicCommandTests
             await using var engine = CreateBotMasterEngine();
             await InvokeRemoteCommand(engine, "TheMaster", "!next");
             Assert.Equal("skip", fake.LastCalled);
+        }
+        finally
+        {
+            MusicPlayerRegistry.Controller = null;
+        }
+    }
+
+    [Fact]
+    public async Task Pause_WithControllerRegistered_CallsPlayPauseAsync()
+    {
+        var fake = new FakeMusicPlayerController();
+        MusicPlayerRegistry.Controller = fake;
+        try
+        {
+            await using var engine = CreateBotMasterEngine();
+            await InvokeRemoteCommand(engine, "TheMaster", "!pause");
+            Assert.Equal("playpause", fake.LastCalled);
+        }
+        finally
+        {
+            MusicPlayerRegistry.Controller = null;
+        }
+    }
+
+    [Theory]
+    [InlineData("!play")]
+    [InlineData("!stop")]
+    public async Task PlayAndStop_AreAliasesForPause(string command)
+    {
+        var fake = new FakeMusicPlayerController();
+        MusicPlayerRegistry.Controller = fake;
+        try
+        {
+            await using var engine = CreateBotMasterEngine();
+            await InvokeRemoteCommand(engine, "TheMaster", command);
+            Assert.Equal("playpause", fake.LastCalled);
         }
         finally
         {

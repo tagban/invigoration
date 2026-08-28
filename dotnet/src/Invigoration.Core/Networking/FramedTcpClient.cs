@@ -81,7 +81,21 @@ public abstract class FramedTcpClient : IAsyncDisposable
             return;
         }
 
-        await stream.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await stream.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is IOException or ObjectDisposedException or SocketException)
+        {
+            // The socket died between the null-check above and this write (or was already dead
+            // but Close() hadn't run yet) — treat it exactly like a failed read: tear the
+            // connection down via Close() (which drives the receive loop to its own natural exit
+            // and fires Disconnected) instead of letting the exception escape into caller code.
+            // Confirmed necessary live: an uncaught exception here crashed the whole app when a
+            // Hotline session tried to send a chat message on an already-broken connection — a
+            // real defect in this shared base class, not something specific to Hotline.
+            Close();
+        }
     }
 
     public void Close()

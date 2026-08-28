@@ -11,6 +11,9 @@ namespace Invigoration.Core.Music;
 public interface IMusicPlayerController
 {
     Task<bool> SkipAsync();
+
+    /// <summary>Toggles play/pause — every service's own player exposes exactly one button for this (it visually swaps between a play and a pause glyph), not separate play/pause/stop controls, so this app follows the same shape rather than inventing a "stop" concept none of these web players actually have.</summary>
+    Task<bool> PlayPauseAsync();
     Task<bool> ThumbsUpAsync();
     Task<bool> ThumbsDownAsync();
     Task<NowPlayingInfo?> GetNowPlayingAsync();

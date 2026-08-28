@@ -52,11 +52,22 @@ public class BotEngineLocalTriggerTests
     [Fact]
     public async Task HandleCommandAsync_TriggerPrefixedFromBotMaster_StillRunsRemotely()
     {
+        // "user" (sets _session.TargetUser), not "fudd" here — fudd is one of the commands
+        // BotEngine.Commands.cs's LocalOnlyCommands blocks from ever running remotely as of
+        // 2026-08-26 (regardless of who sends it, even the bot master), so it's no longer a valid
+        // "does the trigger character still work remotely at all" probe.
         var config = new BotConfig { Trigger = "!", BotMaster = "TheMaster" };
         await using var engine = new BotEngine(config);
 
-        await InvokeRemoteCommand(engine, "TheMaster", "!fudd");
+        await InvokeRemoteCommand(engine, "TheMaster", "!user SomeTarget");
 
-        Assert.True(GetFuddMode(engine));
+        Assert.Equal("SomeTarget", GetTargetUser(engine));
+    }
+
+    private static string GetTargetUser(BotEngine engine)
+    {
+        var field = typeof(BotEngine).GetField("_session", BindingFlags.NonPublic | BindingFlags.Instance)!;
+        var session = field.GetValue(engine)!;
+        return (string)session.GetType().GetProperty("TargetUser")!.GetValue(session)!;
     }
 }
