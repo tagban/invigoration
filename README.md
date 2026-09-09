@@ -57,11 +57,10 @@ Three switchable bundled icon sets — Battle.net 1.0 Classic, Warcraft III Clas
 
 ### Music player
 
-An embedded YouTube Music, Spotify, or Pandora player, controllable from chat (`skip`/`thumbsup`/`thumbsdown`/`nowplaying`) or an optional playback bar docked at the bottom of the whole window — visible no matter which bot tab you're looking at.
+An embedded YouTube Music player, controllable from chat (`skip`/`thumbsup`/`thumbsdown`/`nowplaying`) or an optional playback bar docked at the bottom of the whole window — visible no matter which bot tab you're looking at. (Spotify and Pandora were removed — Spotify's embedded web player was unreliably slow, and Pandora went with it to keep this to one well-supported service.)
 
 <p align="center">
   <img src="screenshots/music-tab.png" width="380" alt="Music tab with an embedded YouTube Music player, plus the bottom playback bar">
-  <img src="screenshots/music-tab-spotify.png" width="380" alt="Music tab with an embedded Spotify player">
 </p>
 
 ### StarCraft II (SC:Remastered / WC3:Reforged coming soon)

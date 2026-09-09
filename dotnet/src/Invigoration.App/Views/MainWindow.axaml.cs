@@ -43,8 +43,8 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// Shows what's currently playing in the title bar (e.g. "Invigoration v2.0.3b - Spotify:
-    /// Pink Pony Club") whenever the music player is open and something's playing, falling back
+    /// Shows what's currently playing in the title bar (e.g. "Invigoration v2.0.3b - YouTube
+    /// Music: Pink Pony Club") whenever the music player is open and something's playing, falling back
     /// to the plain BaseTitle otherwise. Polling (not event-driven) since GetNowPlayingAsync is
     /// pull-based — nothing raises an event when the track changes; DispatcherTimer (not a
     /// background Task/PeriodicTimer) since this only needs to run while the window exists and

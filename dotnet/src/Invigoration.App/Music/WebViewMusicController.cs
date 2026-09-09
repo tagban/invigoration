@@ -32,7 +32,8 @@ public sealed class WebViewMusicController(NativeWebView webView) : IMusicPlayer
     {
         if (elementExpression is null)
         {
-            // e.g. Spotify has no "dislike" concept — nothing to click, not a failure to retry.
+            // A service profile with no script for this action (e.g. no "dislike" concept) —
+            // nothing to click, not a failure to retry.
             return false;
         }
 

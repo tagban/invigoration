@@ -8,50 +8,9 @@
              x:DataType="vm:MusicTabViewModel">
 
     <!-- MaxWidth + centered: capping the WebView's own rendered width to roughly a mobile
-         viewport deliberately triggers each site's own mobile-responsive layout (confirmed live
-         — YouTube Music/Spotify/Pandora all render a much simpler, more compact player at this
-         width than their desktop layout), rather than squeezing their full desktop UI into a
-         narrow space. -->
-    <Grid RowDefinitions="Auto,*" MaxWidth="420" HorizontalAlignment="Center" VerticalAlignment="Stretch">
-        <Border Grid.Row="0" Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="0,0,0,1" Padding="10,6">
-            <StackPanel Orientation="Horizontal" Spacing="10">
-                <TextBlock Text="Music service:" VerticalAlignment="Center" Opacity="0.7" FontSize="11" />
-                <Button Name="YouTubeMusicButton" Click="OnYouTubeMusicClick" Background="Transparent" BorderThickness="0" Padding="4"
-                        ToolTip.Tip="YouTube Music">
-                    <Image Name="YouTubeMusicIcon" Height="22" />
-                </Button>
-                <Button Name="SpotifyButton" Click="OnSpotifyClick" Background="Transparent" BorderThickness="0" Padding="4"
-                        ToolTip.Tip="Spotify">
-                    <Image Name="SpotifyIcon" Height="22" />
-                </Button>
-                <Button Name="PandoraButton" Click="OnPandoraClick" Background="Transparent" BorderThickness="0" Padding="4"
-                        ToolTip.Tip="Pandora">
-                    <Image Name="PandoraIcon" Height="22" />
-                </Button>
-            </StackPanel>
-        </Border>
-
-        <NativeWebView Name="WebView" Grid.Row="1" />
-
-        <!-- Pandora has no stable DOM to script the way YouTube Music/Spotify do (see
-             PandoraPlayerController's remarks) — it gets its own native-Avalonia UI instead of
-             the WebView, toggled via IsVisible the same way the WebView itself is show/hidden
-             elsewhere in this app rather than destroyed/recreated. -->
-        <Grid Name="PandoraPanel" Grid.Row="1" IsVisible="False" Margin="16">
-            <StackPanel Name="PandoraSignInPanel" Spacing="10" VerticalAlignment="Center">
-                <TextBlock Text="Sign in to Pandora" FontSize="16" FontWeight="Bold" HorizontalAlignment="Center" />
-                <TextBox Name="PandoraUsernameBox" PlaceholderText="Email or username" />
-                <TextBox Name="PandoraPasswordBox" PlaceholderText="Password" PasswordChar="*" />
-                <Button Name="PandoraSignInButton" Content="Sign In" Click="OnPandoraSignInClick" HorizontalAlignment="Stretch" HorizontalContentAlignment="Center" />
-                <TextBlock Name="PandoraStatusText" Foreground="#E8827A" TextWrapping="Wrap" IsVisible="False" />
-            </StackPanel>
-
-            <StackPanel Name="PandoraStationPanel" Spacing="10" VerticalAlignment="Top" IsVisible="False">
-                <TextBlock Text="Stations" FontSize="14" FontWeight="Bold" Opacity="0.8" />
-                <ComboBox Name="PandoraStationCombo" HorizontalAlignment="Stretch" SelectionChanged="OnPandoraStationSelected"
-                          DisplayMemberBinding="{Binding StationName}" x:CompileBindings="False" />
-                <TextBlock Name="PandoraNowPlayingText" Text="Pick a station to start listening." Opacity="0.7" TextWrapping="Wrap" Margin="0,20,0,0" HorizontalAlignment="Center" />
-            </StackPanel>
-        </Grid>
+         viewport deliberately triggers YouTube Music's own mobile-responsive layout (confirmed
+         live), rather than squeezing its full desktop UI into a narrow space. -->
+    <Grid MaxWidth="420" HorizontalAlignment="Center" VerticalAlignment="Stretch">
+        <NativeWebView Name="WebView" />
     </Grid>
 </UserControl>

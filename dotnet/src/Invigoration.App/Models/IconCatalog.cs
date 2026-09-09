@@ -72,8 +72,6 @@ public static class IconCatalog
         ("test", "Test"),
         ("whisper", "Whispers Tab"),
         ("youtube-music", "YouTube Music"),
-        ("spotify", "Spotify"),
-        ("pandora", "Pandora"),
         ("hotline", "Hotline"),
         ("discord-relay", "Discord (relay)"),
     ];

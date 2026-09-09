@@ -724,8 +724,8 @@ public sealed partial class BotEngine
     /// that's genuinely shareable info rather than a personal control confirmation.
     ///
     /// isSupported lets a command quietly no-op instead of showing a misleading failure message
-    /// when the current service just doesn't have the concept at all (e.g. Spotify has no
-    /// "dislike," only a Save-to-Library heart) — see IMusicPlayerController.SupportsThumbsDown.
+    /// when the current service just doesn't have the concept at all — see
+    /// IMusicPlayerController.SupportsThumbsDown.
     /// </summary>
     private async Task HandleMusicCommandAsync(
         bool isLocal,

@@ -19,11 +19,11 @@ public interface IMusicPlayerController
     Task<NowPlayingInfo?> GetNowPlayingAsync();
 
     /// <summary>
-    /// Whether the current service actually has a "like"/"dislike" concept at all — Spotify has
-    /// no dislike (just a Save-to-Library heart), so !thumbsdown there should quietly do nothing
-    /// rather than show a "couldn't dislike, make sure you're signed in" message that implies a
-    /// real, fixable problem. Default true (every real implementation so far supports both) so
-    /// existing/test controllers don't need updating just to add this.
+    /// Whether the current service actually has a "like"/"dislike" concept at all — a service
+    /// with no dislike concept should have !thumbsdown quietly do nothing rather than show a
+    /// "couldn't dislike, make sure you're signed in" message that implies a real, fixable
+    /// problem. Default true (every real implementation so far supports both) so existing/test
+    /// controllers don't need updating just to add this.
     /// </summary>
     bool SupportsThumbsUp => true;
 

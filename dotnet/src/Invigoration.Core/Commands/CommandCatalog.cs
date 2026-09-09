@@ -74,7 +74,7 @@ public static class CommandCatalog
         new("musicthumbsup", "Like the current track", ["thumbsup"],
             "thumbsup — likes the current track. No arguments. Quietly does nothing on a service with no \"like\" concept."),
         new("musicthumbsdown", "Dislike the current track", ["thumbsdown"],
-            "thumbsdown — dislikes the current track. No arguments. Quietly does nothing on a service with no \"dislike\" concept (e.g. Spotify)."),
+            "thumbsdown — dislikes the current track. No arguments. Quietly does nothing on a service with no \"dislike\" concept."),
         new("nowplaying", "Show the current track", ["nowplaying", "np", "music"],
             "nowplaying (or np, music) — replies with the currently-playing track and service. No arguments."),
     ];

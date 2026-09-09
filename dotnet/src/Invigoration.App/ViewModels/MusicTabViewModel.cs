@@ -36,8 +36,6 @@ public sealed partial class MusicTabViewModel : ViewModelBase
 
     public Bitmap? TabIconImage => GameIconLoader.Get(SelectedService switch
     {
-        MusicService.Spotify => "spotify",
-        MusicService.Pandora => "pandora",
         _ => "youtube-music",
     });
 
