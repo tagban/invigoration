@@ -45,6 +45,7 @@ public static class ChatIcon
             "RHSS" => "sware",
             "RTSJ" => "jsc",
             "NB2W" => "war2",
+            "TAHC" => "chat",
             _ => "",
         };
     }
