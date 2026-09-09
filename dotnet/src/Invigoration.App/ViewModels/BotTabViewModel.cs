@@ -58,6 +58,14 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
 
     public ObservableCollection<ChannelUserViewModel> ChannelUsers { get; } = [];
 
+    /// <summary>
+    /// Username -> row index for ChannelUsers, kept in sync at every add/remove/clear site below.
+    /// A plain ChannelUsers.FirstOrDefault(u => u.Username == ...) scan is O(n) per lookup, which
+    /// made a burst of many users joining/leaving a channel at once (e.g. a mass-join flood) cost
+    /// O(n²) overall — confirmed live as the cause of the UI falling badly behind during one.
+    /// </summary>
+    private readonly Dictionary<string, ChannelUserViewModel> _channelUsersByName = new();
+
     /// <summary>Whether this bot can be joined to several channels at once (SC2/SC:R/WC3:R) — gates the sub-tab UI. Classic BNCS/Chat-Telnet stay on the single flat ChatLines/ChannelUsers above.</summary>
     public bool SupportsMultiChannel => BncsProduct.IsStimpakBacked(Config.Product);
 
@@ -143,6 +151,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             IsConnected = false;
             StatusText = "Disconnected";
             ChannelUsers.Clear();
+            _channelUsersByName.Clear();
             Friends.Clear();
         });
         Engine.Sc2ChannelJoined += OnSc2ChannelJoined;
@@ -537,6 +546,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         {
             case ChatEventType.Channel:
                 ChannelUsers.Clear();
+                _channelUsersByName.Clear();
                 ChatLines.Add(new ChatLineViewModel($"*** Joined channel: {e.Text}", palette.Channel));
                 break;
 
@@ -551,8 +561,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
                 break;
 
             case ChatEventType.Leave:
-                var leaving = ChannelUsers.FirstOrDefault(u => u.Username == e.Username);
-                if (leaving is not null)
+                if (_channelUsersByName.Remove(e.Username, out var leaving))
                 {
                     ChannelUsers.Remove(leaving);
                 }
@@ -603,14 +612,14 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// </summary>
     private void UpsertUser(ChatEvent e)
     {
-        var user = ChannelUsers.FirstOrDefault(u => u.Username == e.Username);
-        if (user is not null)
+        if (_channelUsersByName.TryGetValue(e.Username, out var user))
         {
             ChannelUsers.Remove(user);
         }
         else
         {
             user = new ChannelUserViewModel(e.Username) { UseClassicIconStyle = Config.ClassicUserIconStyle };
+            _channelUsersByName[e.Username] = user;
         }
 
         user.Flags = e.Flags;
@@ -672,7 +681,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             return null;
         }
 
-        var statString = ChannelUsers.FirstOrDefault(u => u.Username == username)?.StatString;
+        var statString = _channelUsersByName.GetValueOrDefault(username)?.StatString;
         if (string.IsNullOrEmpty(statString))
         {
             return null;

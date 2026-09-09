@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Net.Sockets;
 
 namespace Invigoration.Core.Networking;
@@ -131,17 +132,33 @@ public abstract class FramedTcpClient : IAsyncDisposable
 
                 _receiveBuffer.AddRange(readBuffer.AsSpan(0, bytesRead).ToArray());
 
+                // Extract every complete frame currently buffered against an offset *view* rather
+                // than physically removing each one as it's found, then compact once at the end —
+                // RemoveRange(0, frameLength) here previously shifted the entire remaining buffer
+                // down on every single frame, which is O(bytes remaining) per frame. A burst that
+                // lands k small frames in one read (e.g. many bots joining a channel at once, each
+                // producing its own small SID_CHATEVENT) turned that into O(k * bytes) for that one
+                // read — confirmed live as the cause of the client falling badly behind/appearing
+                // to hang during a mass-join burst. One RemoveRange for everything consumed this
+                // pass is O(bytes) total instead.
+                var consumed = 0;
                 while (true)
                 {
-                    var frameLength = TryGetFrameLength(_receiveBuffer);
-                    if (frameLength is null || _receiveBuffer.Count < frameLength.Value)
+                    var view = new BufferOffsetView(_receiveBuffer, consumed);
+                    var frameLength = TryGetFrameLength(view);
+                    if (frameLength is null || view.Count < frameLength.Value)
                     {
                         break;
                     }
 
-                    var frame = _receiveBuffer.GetRange(0, frameLength.Value).ToArray();
-                    _receiveBuffer.RemoveRange(0, frameLength.Value);
+                    var frame = _receiveBuffer.GetRange(consumed, frameLength.Value).ToArray();
+                    consumed += frameLength.Value;
                     PacketReceived?.Invoke(frame);
+                }
+
+                if (consumed > 0)
+                {
+                    _receiveBuffer.RemoveRange(0, consumed);
                 }
             }
         }
@@ -161,5 +178,28 @@ public abstract class FramedTcpClient : IAsyncDisposable
     {
         Close();
         return ValueTask.CompletedTask;
+    }
+
+    /// <summary>
+    /// Zero-copy "everything from <paramref name="offset"/> onward" view of a growing
+    /// <see cref="List{T}"/>, so TryGetFrameLength implementations (which only ever use
+    /// <see cref="Count"/> and the indexer) can inspect not-yet-consumed bytes without the
+    /// receive loop having to physically shift the buffer after every single frame.
+    /// </summary>
+    private sealed class BufferOffsetView(List<byte> source, int offset) : IReadOnlyList<byte>
+    {
+        public int Count => source.Count - offset;
+
+        public byte this[int index] => source[offset + index];
+
+        public IEnumerator<byte> GetEnumerator()
+        {
+            for (var i = offset; i < source.Count; i++)
+            {
+                yield return source[i];
+            }
+        }
+
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }
