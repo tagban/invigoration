@@ -128,6 +128,7 @@ public class ApplyRankBehaviorsTests
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
         ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             await InvokeApplyRankBehaviors(engine, username);
@@ -137,6 +138,7 @@ public class ApplyRankBehaviorsTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }
@@ -150,6 +152,7 @@ public class ApplyRankBehaviorsTests
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
         ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             await InvokeApplyRankBehaviors(engine, username);
@@ -161,6 +164,7 @@ public class ApplyRankBehaviorsTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }
@@ -174,6 +178,7 @@ public class ApplyRankBehaviorsTests
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoKick = true }); // no whisper message set
         ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             await InvokeApplyRankBehaviors(engine, username);
@@ -183,6 +188,7 @@ public class ApplyRankBehaviorsTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }

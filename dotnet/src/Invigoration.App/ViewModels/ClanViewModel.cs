@@ -82,6 +82,7 @@ public partial class ClanViewModel : ObservableObject
     {
         var member = new ClanMember { Name = "New Member", IsClanMember = true };
         ClanRosterStore.Members.Add(member);
+        ClanRosterStore.InvalidateNameIndex();
         var vm = new ClanMemberViewModel(member) { IsExpanded = true };
         Members.Add(vm);
         RefreshFilter();
@@ -91,6 +92,7 @@ public partial class ClanViewModel : ObservableObject
     private void RemoveMember(ClanMemberViewModel member)
     {
         ClanRosterStore.Members.Remove(member.Member);
+        ClanRosterStore.InvalidateNameIndex();
         Members.Remove(member);
         RefreshFilter();
     }

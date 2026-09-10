@@ -61,6 +61,7 @@ public class BotEngineTriviaScoringTests
 
         var name = $"test-{Guid.NewGuid():N}";
         ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             var question = TriviaQuestion.Parse("What year was Diablo released?*1996", "Diablo");
@@ -77,6 +78,7 @@ public class BotEngineTriviaScoringTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
         }
     }
 
@@ -88,6 +90,7 @@ public class BotEngineTriviaScoringTests
         var triviaEngine = CreateTriviaEngine(engine);
         var name = $"test-{Guid.NewGuid():N}";
         ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             var question = TriviaQuestion.CreateMultipleChoice("Diablo", "What class of enemy is Diablo?", "Demon", ["Undead"]);
@@ -104,6 +107,7 @@ public class BotEngineTriviaScoringTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
         }
     }
 }

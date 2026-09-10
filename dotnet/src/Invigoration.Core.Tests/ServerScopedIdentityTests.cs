@@ -69,6 +69,7 @@ public class ClanRosterStoreFindTrustedTests
     {
         var name = $"tagban-{Guid.NewGuid():N}";
         ClanRosterStore.Members.Add(new ClanMember { Name = $"{name}@useast.battle.net", Rank = "Leader" });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             var trustedOnEast = ClanRosterStore.FindTrusted(name, "useast.battle.net");
@@ -80,6 +81,7 @@ public class ClanRosterStoreFindTrustedTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name.StartsWith(name));
+            ClanRosterStore.InvalidateNameIndex();
         }
     }
 
@@ -88,6 +90,7 @@ public class ClanRosterStoreFindTrustedTests
     {
         var name = $"plain-{Guid.NewGuid():N}";
         ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = "Officer" });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             Assert.NotNull(ClanRosterStore.FindTrusted(name, "useast.battle.net"));
@@ -96,6 +99,7 @@ public class ClanRosterStoreFindTrustedTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
         }
     }
 }

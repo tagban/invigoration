@@ -25,6 +25,7 @@ public class BotEngineAuthorizationTests
         var engine = new BotEngine(config);
         var name = $"test-{Guid.NewGuid():N}";
         ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = rank });
+        ClanRosterStore.InvalidateNameIndex();
         return (engine, name);
     }
 
@@ -50,6 +51,7 @@ public class BotEngineAuthorizationTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
         }
     }
 
@@ -92,6 +94,7 @@ public class BotEngineAuthorizationTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }
@@ -111,6 +114,7 @@ public class BotEngineAuthorizationTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }
@@ -135,6 +139,7 @@ public class ClanRosterStoreAutoRegistrationTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
     }
@@ -154,6 +159,7 @@ public class ClanRosterStoreAutoRegistrationTests
     {
         var name = $"existing-{Guid.NewGuid():N}";
         ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = "Officer" });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             ClanRosterStore.RecordSeen(name, "Trivia Participant");
@@ -163,6 +169,7 @@ public class ClanRosterStoreAutoRegistrationTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
     }

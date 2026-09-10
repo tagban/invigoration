@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Invigoration.Core.Chat;
 using Invigoration.Core.Protocol;
 
 namespace Invigoration.Core.Clan;
@@ -24,13 +25,95 @@ public static class ClanRosterStore
 
     public static string FilePath => Path.Combine(Config.ConfigStore.DefaultConfigDirectory(), "clan-members.json");
 
+    /// <summary>
+    /// Forces the next Find/FindTrusted to rebuild NameIndex immediately rather than waiting out
+    /// NameIndexTtl — needed by any caller (tests, mainly) that mutates Members directly
+    /// (Add/RemoveAll/in-place edit) instead of through RecordSeen/RecordProductSeen/Save, which
+    /// already invalidate on their own. Without this, a test that adds a member and immediately
+    /// looks it up can race a *different* test's still-warm cache from within the same TTL
+    /// window — confirmed live as real failures, not a hypothetical.
+    /// </summary>
+    public static void InvalidateNameIndex() => _nameIndex = null;
+
     public static List<ClanMember> Members => _cache ??= LoadFromDisk();
 
     /// <summary>Raised after every Save() — lets an open bot tab or management window pick up roster changes made elsewhere (a chat command, another window) without needing to reopen.</summary>
     public static event Action? RosterChanged;
 
+    // Name/alias -> candidate members, keyed on the bare (server-qualifier stripped, '*'-stripped)
+    // name so a single lookup handles both Find and FindTrusted's "any member whose Name or an
+    // Alias matches" shape. Every Join/ShowUser/UserFlags event calls Find and/or FindTrusted
+    // (RecordProductSeen, ApplyRankBehaviorsAsync) — a plain Members.FirstOrDefault(m =>
+    // m.Matches(...)) scan is O(roster size) per lookup, which is fine for a roster of a few
+    // dozen formal clan members but became a real bottleneck once auto-tracking (RecordSeen,
+    // "everyone who's ever spoken") had grown the roster to ~1000 entries under repeated load
+    // testing — confirmed live as a cause of lag reappearing at that scale even after the
+    // per-event send-pileup fixes.
+    //
+    // Rebuilt on a short TTL rather than incrementally maintained or invalidated by comparing
+    // Members.Count: Members is a plain public List<ClanMember> that callers all over the
+    // codebase (including 40+ existing test call sites and the Clan Members management window)
+    // mutate directly via Add/RemoveAll/in-place edits, with no CollectionChanged-style hook to
+    // key an index off. A first attempt compared Members.Count to detect staleness, but that's
+    // unsound: many tests each add exactly one member then remove it in a finally block, so
+    // Count oscillates back to the same values across unrelated tests — confirmed live as 11 real
+    // test failures (a stale index served a *different* member than the one just added, because
+    // the count happened to match a previous build). A TTL sidesteps needing to detect mutations
+    // at all: during an actual burst the roster is essentially static, so a sub-second staleness
+    // window costs at most a couple of extra O(roster) rebuilds over the whole burst while still
+    // eliminating the O(roster) cost from every individual lookup. RecordSeen's own Members.Add
+    // (adding a first-time talker) and Save() (the only path an in-place rename reaches) both
+    // still invalidate immediately too, so the common paths never wait out the TTL at all.
+    private static readonly TimeSpan NameIndexTtl = TimeSpan.FromMilliseconds(500);
+    private static Dictionary<string, List<ClanMember>>? _nameIndex;
+    private static DateTime _nameIndexBuiltAtUtc = DateTime.MinValue;
+
+    private static Dictionary<string, List<ClanMember>> NameIndex
+    {
+        get
+        {
+            if (_nameIndex is null || DateTime.UtcNow - _nameIndexBuiltAtUtc > NameIndexTtl)
+            {
+                _nameIndex = BuildNameIndex();
+                _nameIndexBuiltAtUtc = DateTime.UtcNow;
+            }
+
+            return _nameIndex;
+        }
+    }
+
+    private static Dictionary<string, List<ClanMember>> BuildNameIndex()
+    {
+        var index = new Dictionary<string, List<ClanMember>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var member in Members)
+        {
+            IndexKey(index, member.Name, member);
+            foreach (var alias in member.Aliases)
+            {
+                IndexKey(index, alias, member);
+            }
+        }
+
+        return index;
+    }
+
+    private static void IndexKey(Dictionary<string, List<ClanMember>> index, string entry, ClanMember member)
+    {
+        var key = BnetUsername.Normalize(BnetUsername.SplitServerQualifier(entry).Name);
+        if (!index.TryGetValue(key, out var candidates))
+        {
+            candidates = [];
+            index[key] = candidates;
+        }
+
+        candidates.Add(member);
+    }
+
+    private static IEnumerable<ClanMember> Candidates(string username) =>
+        NameIndex.TryGetValue(BnetUsername.Normalize(username), out var candidates) ? candidates : [];
+
     /// <summary>Finds the member whose primary name or an alias matches the given Battle.net username, or null if untracked. Unscoped by server — for editing/management lookups, not authorization (use FindTrusted for those).</summary>
-    public static ClanMember? Find(string username) => Members.FirstOrDefault(m => m.Matches(username));
+    public static ClanMember? Find(string username) => Candidates(username).FirstOrDefault(m => m.Matches(username));
 
     /// <summary>
     /// Server-scoped lookup for authorization decisions (bot-master check,
@@ -39,7 +122,7 @@ public static class ClanRosterStore
     /// of just using <see cref="Find"/> everywhere.
     /// </summary>
     public static ClanMember? FindTrusted(string username, string speakerServer) =>
-        Members.FirstOrDefault(m => m.MatchesOnServer(username, speakerServer));
+        Candidates(username).FirstOrDefault(m => m.MatchesOnServer(username, speakerServer));
 
     /// <summary>
     /// Stamps a tracked member's LastSeenUtc as now, and — when known —
@@ -69,6 +152,7 @@ public static class ClanRosterStore
 
                 member = new ClanMember { Name = username, Rank = defaultRankIfNew, IsClanMember = false };
                 Members.Add(member);
+                _nameIndex = null; // a first-time talker must be immediately findable, not wait out NameIndexTtl
             }
 
             member.LastSeenUtc = DateTime.UtcNow;
@@ -135,13 +219,14 @@ public static class ClanRosterStore
         }
     }
 
-    /// <summary>Locked so concurrent Save() calls from multiple bots (or a bot and the Clan Members window) can't collide writing the same file. Immediate, unlike the auto-tracking paths (RecordSeen/RecordProductSeen) — this is only ever called for an explicit user action (e.g. the Clan Members window's own Save), where "wrote to disk right now" is the expected behavior.</summary>
+    /// <summary>Locked so concurrent Save() calls from multiple bots (or a bot and the Clan Members window) can't collide writing the same file. Immediate, unlike the auto-tracking paths (RecordSeen/RecordProductSeen) — this is only ever called for an explicit user action (e.g. the Clan Members window's own Save), where "wrote to disk right now" is the expected behavior. Also the one place an in-place rename (Name/Aliases edited on an existing member, so Members.Count doesn't change) reaches this store, so it explicitly invalidates NameIndex rather than relying on the count-mismatch check.</summary>
     public static void Save()
     {
         lock (SyncRoot)
         {
             SaveLocked();
             _saveDirty = false;
+            _nameIndex = null;
         }
 
         RosterChanged?.Invoke();

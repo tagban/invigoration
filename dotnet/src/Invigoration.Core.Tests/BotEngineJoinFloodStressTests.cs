@@ -63,6 +63,7 @@ public class BotEngineJoinFloodStressTests
             var name = $"tracked-{i}-{Guid.NewGuid():N}";
             trackedNames.Add(name);
             ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = rankName });
+            ClanRosterStore.InvalidateNameIndex();
         }
 
         var allFrames = new List<byte[]>();
@@ -124,6 +125,7 @@ public class BotEngineJoinFloodStressTests
             foreach (var name in trackedNames)
             {
                 ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+                ClanRosterStore.InvalidateNameIndex();
             }
 
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);

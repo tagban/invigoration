@@ -44,6 +44,7 @@ public class BotEngineJoinBurstTests
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
         ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             // Under the threshold: rank behaviors still run normally, stamping LastAutoWhisperUtc
@@ -65,6 +66,7 @@ public class BotEngineJoinBurstTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }
@@ -78,6 +80,7 @@ public class BotEngineJoinBurstTests
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
         ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.InvalidateNameIndex();
         try
         {
             await InvokeHandleChatEvent(engine, BuildJoinFrame(username));
@@ -87,6 +90,7 @@ public class BotEngineJoinBurstTests
         finally
         {
             ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
     }
