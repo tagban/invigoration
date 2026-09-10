@@ -17,6 +17,22 @@ public abstract class FramedTcpClient : IAsyncDisposable
     private NetworkStream? _stream;
     private CancellationTokenSource? _receiveCts;
 
+    /// <summary>
+    /// Serializes every write to the socket. NetworkStream.WriteAsync is not safe to call
+    /// concurrently from multiple callers — nothing previously prevented that here, and this
+    /// class is shared by every outgoing path (chat commands, BNLS/auth packets, and the
+    /// keepalive SID_NULL ping, which deliberately bypasses BotEngine's chat-send flood-
+    /// protection gate so it's never delayed by that — see BotEngine.RunKeepAliveLoopAsync).
+    /// Two of those racing to write at the same instant could interleave their bytes on the
+    /// wire, producing a malformed packet a real BNCS/PVPGN server has every reason to
+    /// disconnect the client over — a plausible, previously-unnoticed cause of a connection
+    /// dropping for no apparent protocol-level reason. This only ever blocks a caller for the
+    /// duration of one other packet's actual write (microseconds for the small packets this
+    /// protocol uses), never anything close to BotEngine's own artificial flood-protection delay,
+    /// so it can't reintroduce the kind of pileup that caused the mass-join hang.
+    /// </summary>
+    private readonly SemaphoreSlim _writeLock = new(1, 1);
+
     public event Action? Connected;
     public event Action<Exception?>? Disconnected;
     public event Action<byte[]>? PacketReceived;
@@ -82,9 +98,17 @@ public abstract class FramedTcpClient : IAsyncDisposable
             return;
         }
 
+        await _writeLock.WaitAsync(cancellationToken).ConfigureAwait(false);
         try
         {
-            await stream.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
+            // Re-read _stream after acquiring the lock: Close() (from another writer's failed
+            // send, or a normal disconnect) could have nulled it out while this call was waiting.
+            if (_stream is not { } liveStream)
+            {
+                return;
+            }
+
+            await liveStream.WriteAsync(packet, cancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or ObjectDisposedException or SocketException)
         {
@@ -96,6 +120,10 @@ public abstract class FramedTcpClient : IAsyncDisposable
             // Hotline session tried to send a chat message on an already-broken connection — a
             // real defect in this shared base class, not something specific to Hotline.
             Close();
+        }
+        finally
+        {
+            _writeLock.Release();
         }
     }
 
@@ -177,6 +205,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
     public ValueTask DisposeAsync()
     {
         Close();
+        _writeLock.Dispose();
         return ValueTask.CompletedTask;
     }
 

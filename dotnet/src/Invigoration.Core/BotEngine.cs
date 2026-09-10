@@ -173,11 +173,34 @@ public sealed partial class BotEngine : IAsyncDisposable
         await ConnectAsync(cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>
+    /// Runs on its own dedicated OS thread rather than as an ordinary async continuation on the
+    /// thread pool — explicit request, after a Diablo (DRTL) connection was seen disconnecting
+    /// and auto-reconnecting every 2-4 minutes. An async loop's `await` continuations (here,
+    /// PeriodicTimer.WaitForNextTickAsync resuming, and SendBncsAsync's own internal awaits)
+    /// normally resume via the thread pool's work queue regardless of `.ConfigureAwait(false)` —
+    /// that flag only skips restoring a captured SynchronizationContext, it doesn't move the
+    /// continuation off the pool. A mass-join burst (or any other source of many concurrently
+    /// queued fire-and-forget tasks) competing for pool worker threads could in principle delay
+    /// this ping's actual send past a server's own idle-timeout window. A real dedicated Thread,
+    /// blocking synchronously on its own CancellationToken.WaitHandle between sends, can't be
+    /// starved by anything else the process is doing — this is a deliberate correctness
+    /// guarantee, not just an optimization, for a packet whose entire purpose is "prove to the
+    /// server we're still alive on schedule."
+    /// </summary>
+    private Thread? _keepAliveThread;
+
     private void StartKeepAlive()
     {
         StopKeepAlive();
         _keepAliveCts = new CancellationTokenSource();
-        SafeFireAndForget(RunKeepAliveLoopAsync(_keepAliveCts.Token), "sending a keep-alive");
+        var token = _keepAliveCts.Token;
+        _keepAliveThread = new Thread(() => RunKeepAliveLoop(token))
+        {
+            IsBackground = true,
+            Name = "Invigoration-KeepAlive",
+        };
+        _keepAliveThread.Start();
     }
 
     private void StopKeepAlive()
@@ -185,21 +208,39 @@ public sealed partial class BotEngine : IAsyncDisposable
         _keepAliveCts?.Cancel();
         _keepAliveCts?.Dispose();
         _keepAliveCts = null;
+        _keepAliveThread = null;
     }
 
-    private async Task RunKeepAliveLoopAsync(CancellationToken cancellationToken)
+    private void RunKeepAliveLoop(CancellationToken cancellationToken)
     {
         try
         {
-            using var timer = new PeriodicTimer(KeepAliveInterval);
-            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            // WaitOne(interval) blocks this dedicated thread efficiently (no polling/spinning,
+            // an OS-level wait) and returns true the instant StopKeepAlive() cancels — so
+            // disconnecting doesn't leave this thread lingering for up to KeepAliveInterval.
+            while (!cancellationToken.WaitHandle.WaitOne(KeepAliveInterval))
             {
-                await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_NULL).ConfigureAwait(false);
+                // GetAwaiter().GetResult() (not await — this method is deliberately synchronous
+                // so the whole loop stays on this one dedicated thread) blocks only until the
+                // send's own internal waits (the write lock, the actual socket write) clear —
+                // never anything close to KeepAliveInterval, so this can't itself become a
+                // source of delay for whichever thread is blocked here (only this one is).
+                SendBncsAsync(new PacketWriter(), BncsPacketId.SID_NULL).GetAwaiter().GetResult();
             }
         }
-        catch (OperationCanceledException)
+        catch (ObjectDisposedException)
         {
-            // Normal on disconnect — StopKeepAlive() cancels this loop deliberately.
+            // StopKeepAlive() disposed _keepAliveCts (and so its WaitHandle) between this
+            // thread's last WaitOne returning and the next loop check — a normal shutdown race,
+            // not a failure.
+        }
+        catch (Exception ex)
+        {
+            // This runs on a raw Thread, not a Task — nothing like SafeFireAndForget is
+            // catching for us here, and an exception escaping a Thread's delegate crashes the
+            // whole process by default. Must never let one through.
+            LogError($"Error while sending a keep-alive: {ex.Message}");
+            LogDebug(ex.ToString());
         }
     }
 
