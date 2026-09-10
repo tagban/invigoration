@@ -20,7 +20,11 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Title = BaseTitle;
-        Closing += (_, _) => ViewModel?.SaveAll();
+        Closing += (_, _) =>
+        {
+            ViewModel?.SaveAll();
+            Invigoration.Core.Clan.ClanRosterStore.FlushPendingSave();
+        };
         StartTitleUpdateTimer();
         // TopLevelTabs puts the Whispers pseudo-tab first, then (if enabled) Music — default to
         // the first real bot/group instead, matching this window's behavior before either

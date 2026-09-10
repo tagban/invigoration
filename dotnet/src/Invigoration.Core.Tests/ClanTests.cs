@@ -148,10 +148,10 @@ public class ClanRosterStoreTests
     }
 
     [Fact]
-    public void RecordProductSeen_TrackedMember_UpdatesProductAndServer()
+    public void RecordProductSeen_FormalClanMember_UpdatesProductAndServer()
     {
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.Members.Add(new ClanMember { Name = name, IsClanMember = true });
         try
         {
             ClanRosterStore.RecordProductSeen(name, "3RAW", "useast.battle.net");
@@ -160,6 +160,34 @@ public class ClanRosterStoreTests
             Assert.Equal("3RAW", member!.LastSeenProduct);
             Assert.Equal("useast.battle.net", member.LastSeenServer);
             Assert.Null(member.LastSeenUtc); // presence alone shouldn't stamp LastSeenUtc — only actual chat does (RecordSeen)
+        }
+        finally
+        {
+            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.Save();
+        }
+    }
+
+    /// <summary>
+    /// Regression: RecordProductSeen used to update (and full-roster-disk-save for) *any*
+    /// tracked entry, formal clan member or not — every Join/ShowUser/UserFlags event for every
+    /// tracked user in a channel called this unconditionally, so a mass-join burst including even
+    /// a few informal (auto-tracked-from-chat, not IsClanMember) entries triggered a full roster
+    /// disk write per event, confirmed live as a real cause of the app hanging. An informal entry
+    /// should only ever be updated by actually talking (RecordSeen), not by merely being present.
+    /// </summary>
+    [Fact]
+    public void RecordProductSeen_InformalEntry_DoesNotUpdate()
+    {
+        var name = $"test-{Guid.NewGuid():N}";
+        ClanRosterStore.Members.Add(new ClanMember { Name = name, IsClanMember = false });
+        try
+        {
+            ClanRosterStore.RecordProductSeen(name, "3RAW", "useast.battle.net");
+
+            var member = ClanRosterStore.Find(name);
+            Assert.Equal("", member!.LastSeenProduct);
+            Assert.Equal("", member.LastSeenServer);
         }
         finally
         {

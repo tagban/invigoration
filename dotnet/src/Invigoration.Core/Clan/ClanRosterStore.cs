@@ -17,6 +17,11 @@ public static class ClanRosterStore
     private static readonly Lock SyncRoot = new();
     private static List<ClanMember>? _cache;
 
+    /// <summary>How long a rapid run of auto-tracking mutations (RecordSeen/RecordProductSeen) can pile up before the next actual disk write — see MarkDirtyAndNotify's remarks.</summary>
+    private static readonly TimeSpan SaveDebounceInterval = TimeSpan.FromSeconds(2);
+    private static Timer? _saveTimer;
+    private static bool _saveDirty;
+
     public static string FilePath => Path.Combine(Config.ConfigStore.DefaultConfigDirectory(), "clan-members.json");
 
     public static List<ClanMember> Members => _cache ??= LoadFromDisk();
@@ -78,7 +83,7 @@ public static class ClanRosterStore
                 member.LastSeenServer = server;
             }
 
-            SaveLocked();
+            MarkDirtyAndNotify();
         }
     }
 
@@ -100,18 +105,25 @@ public static class ClanRosterStore
     }
 
     /// <summary>
-    /// Opportunistically updates an already-tracked member's last-seen
-    /// game/server from a presence sighting (joining/showing up in a
-    /// channel) rather than actual chat — a no-op for anyone not already
-    /// tracked, since presence alone shouldn't auto-create a roster entry
-    /// the way actually talking does (see RecordSeen).
+    /// Opportunistically updates a formal clan member's last-seen game/server from a presence
+    /// sighting (joining/showing up in a channel) rather than actual chat — a no-op for anyone
+    /// not already tracked, since presence alone shouldn't auto-create a roster entry the way
+    /// actually talking does (see RecordSeen), AND a no-op for a tracked-but-informal entry
+    /// (IsClanMember false — someone who's merely spoken before, not a real clan member): every
+    /// Join/ShowUser/UserFlags event for every tracked user in a channel called this
+    /// unconditionally, so a mass-join burst including even a few informal entries (e.g. a load
+    /// test's bots, auto-tracked from an earlier run's chat) triggered a full roster disk-write
+    /// per event — confirmed live as a real cause of the app hanging under one. Actual clan
+    /// members are the only ones this app has ever claimed to track presence for; everyone else
+    /// only gets updated from RecordSeen (an actual chat message), which is inherently far rarer
+    /// than "reconnected to a channel."
     /// </summary>
     public static void RecordProductSeen(string username, string product, string server)
     {
         lock (SyncRoot)
         {
             var member = Find(username);
-            if (member is null)
+            if (member is null || !member.IsClanMember)
             {
                 return;
             }
@@ -119,24 +131,58 @@ public static class ClanRosterStore
             member.LastSeenProduct = product;
             RecordPlatform(member, product);
             member.LastSeenServer = server;
-            SaveLocked();
+            MarkDirtyAndNotify();
         }
     }
 
-    /// <summary>Locked so concurrent Save() calls from multiple bots (or a bot and the Clan Members window) can't collide writing the same file.</summary>
+    /// <summary>Locked so concurrent Save() calls from multiple bots (or a bot and the Clan Members window) can't collide writing the same file. Immediate, unlike the auto-tracking paths (RecordSeen/RecordProductSeen) — this is only ever called for an explicit user action (e.g. the Clan Members window's own Save), where "wrote to disk right now" is the expected behavior.</summary>
     public static void Save()
     {
         lock (SyncRoot)
         {
             SaveLocked();
+            _saveDirty = false;
+        }
+
+        RosterChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Marks the roster dirty and schedules (or reschedules) a single debounced disk write
+    /// SaveDebounceInterval from now, coalescing a burst of many rapid-fire RecordSeen/
+    /// RecordProductSeen calls (e.g. several tracked users joining/talking within the same
+    /// couple of seconds) into one JSON-serialize-and-write instead of one per call — the actual
+    /// fix for the mass-join hang (see RecordProductSeen's remarks). RosterChanged still fires
+    /// immediately so any open UI reflects the in-memory change right away; only the disk I/O is
+    /// deferred.
+    /// </summary>
+    private static void MarkDirtyAndNotify()
+    {
+        _saveDirty = true;
+        _saveTimer ??= new Timer(static _ => FlushIfDirty(), null, Timeout.Infinite, Timeout.Infinite);
+        _saveTimer.Change(SaveDebounceInterval, Timeout.InfiniteTimeSpan);
+        RosterChanged?.Invoke();
+    }
+
+    private static void FlushIfDirty()
+    {
+        lock (SyncRoot)
+        {
+            if (_saveDirty)
+            {
+                SaveLocked();
+                _saveDirty = false;
+            }
         }
     }
+
+    /// <summary>Forces any pending debounced save out immediately — called on app shutdown so the last couple of seconds of auto-tracked activity aren't silently lost.</summary>
+    public static void FlushPendingSave() => FlushIfDirty();
 
     private static void SaveLocked()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
         File.WriteAllText(FilePath, JsonSerializer.Serialize(Members, JsonOptions));
-        RosterChanged?.Invoke();
     }
 
     private static List<ClanMember> LoadFromDisk()
