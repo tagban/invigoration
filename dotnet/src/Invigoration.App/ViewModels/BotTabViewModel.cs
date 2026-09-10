@@ -1,4 +1,6 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.Threading;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Avalonia.Threading;
@@ -50,7 +52,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
     }
 
-    /// <summary>A subtle "something happened while you weren't looking" flag for this bot's top-level tab — set on a new Talk/Emote/Broadcast line while !IsActive (see HandleChatEvent and OnChatMessage's multi-channel branch), cleared on becoming active.</summary>
+    /// <summary>A subtle "something happened while you weren't looking" flag for this bot's top-level tab — set on a new Talk/Emote/Broadcast line while !IsActive (see HandleChatEvent and ProcessChatEvent's multi-channel branch), cleared on becoming active.</summary>
     [ObservableProperty]
     public partial bool HasUnread { get; set; }
 
@@ -336,7 +338,85 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
 
     private static bool IsUnreadWorthy(ChatEventType type) => type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Broadcast;
 
-    private void OnChatMessage(ChatEvent e) => Dispatcher.UIThread.Post(() =>
+    /// <summary>
+    /// Events queued by OnChatMessage (called from whatever thread the engine's own network
+    /// processing runs on), drained by ProcessPendingChatEvents on the UI thread. A
+    /// ConcurrentQueue rather than a lock-protected List — enqueue and drain genuinely run on
+    /// different threads concurrently, and this needs to stay cheap precisely during the
+    /// scenario (a mass-join flood) it exists to help with.
+    /// </summary>
+    private readonly ConcurrentQueue<ChatEvent> _pendingChatEvents = new();
+
+    /// <summary>0 = no drain currently scheduled/running, 1 = one is. CompareExchange-guarded so a flood of OnChatMessage calls schedules exactly one Dispatcher.Post, not one per event — see OnChatMessage's remarks for why that mattered.</summary>
+    private int _chatEventDrainScheduled;
+
+    /// <summary>
+    /// Caps how many events one DrainPendingChatEvents call processes before yielding back to
+    /// the Dispatcher (scheduling a follow-up drain for the rest) rather than draining the whole
+    /// queue in one shot. Batching collapsed "2500 separate Dispatcher.Posts" down to "however
+    /// many drains the flood needed" — but if all 2500 already landed in the queue before the
+    /// very first drain got a chance to run (plausible: enqueueing from the network thread is
+    /// much faster than the UI thread getting scheduled to look at the queue), "however many"
+    /// would otherwise be exactly one, single 2500-event batch — back to one long UI-thread block,
+    /// just with a different cause than the original per-event Dispatcher overhead. Chunking
+    /// guarantees the window gets a real chance to repaint between chunks regardless of how large
+    /// a burst arrives all at once.
+    /// </summary>
+    private const int MaxChatEventsPerDrain = 200;
+
+    /// <summary>
+    /// Queues the event and ensures exactly one drain is scheduled on the UI thread, rather than
+    /// this class's previous approach of Dispatcher.UIThread.Post-ing individually per event.
+    /// Each individual event's own processing was already fixed to be O(1) (the roster/channel-
+    /// user-list indexing work elsewhere), but Avalonia's Dispatcher still has real per-Post
+    /// scheduling/queuing overhead of its own — confirmed live as still a genuine source of a
+    /// multi-second UI stall under a large mass-join burst (2500 joins), even with every
+    /// individual event now cheap: 2500 separate queued Dispatcher operations is 2500 separate
+    /// opportunities for the UI thread's own queue management overhead to add up, and every one
+    /// of them sits ahead of the "please repaint the window" work in that same queue, which is
+    /// what actually produces a beachball — the OS sees an unresponsive main thread, not slow
+    /// C# code. Draining a whole batch in one Dispatcher operation collapses that back down to
+    /// however many batches the flood actually needed (typically a small, roughly constant
+    /// number), not one per event.
+    /// </summary>
+    private void OnChatMessage(ChatEvent e)
+    {
+        _pendingChatEvents.Enqueue(e);
+        if (Interlocked.CompareExchange(ref _chatEventDrainScheduled, 1, 0) == 0)
+        {
+            Dispatcher.UIThread.Post(DrainPendingChatEvents);
+        }
+    }
+
+    private void DrainPendingChatEvents()
+    {
+        // Reset before draining (not after): an event that arrives while this method is running
+        // must see the flag already clear and successfully schedule its own follow-up drain,
+        // rather than finding a drain "already scheduled" (this one, already past the point of
+        // ever looking at it) and silently going unprocessed until something else happens to
+        // enqueue later. The cost of that safety is possibly one redundant extra Post if timing
+        // lines up just wrong — never a dropped or stalled event.
+        Interlocked.Exchange(ref _chatEventDrainScheduled, 0);
+
+        // Bounded by MaxChatEventsPerDrain (see its own remarks), not just "whatever's here right
+        // now" — a flood still actively arriving from the network thread, or one that entirely
+        // landed before this drain got scheduled, could otherwise keep this one Dispatcher
+        // operation running for as long as the whole queue takes, which is just as capable of
+        // starving the window's repaint as 2500 separate Posts was. Whatever's left after the cap
+        // gets its own follow-up drain below instead.
+        var count = Math.Min(_pendingChatEvents.Count, MaxChatEventsPerDrain);
+        for (var i = 0; i < count && _pendingChatEvents.TryDequeue(out var e); i++)
+        {
+            ProcessChatEvent(e);
+        }
+
+        if (!_pendingChatEvents.IsEmpty && Interlocked.CompareExchange(ref _chatEventDrainScheduled, 1, 0) == 0)
+        {
+            Dispatcher.UIThread.Post(DrainPendingChatEvents);
+        }
+    }
+
+    private void ProcessChatEvent(ChatEvent e)
     {
         if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
         {
@@ -359,7 +439,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
 
         HandleChatEvent(e);
-    });
+    }
 
     private void OnSc2ChannelJoined(byte channelIndex, ChatChannel channel, ObservableCollection<Person> users) =>
         Dispatcher.UIThread.Post(() =>
