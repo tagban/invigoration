@@ -403,7 +403,7 @@ public sealed partial class BotEngine
             Clan.ClanRosterStore.RecordProductSeen(chatEvent.Username, product, Config.BattlenetServer);
         }
 
-        if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join && !IsJoinBurstActive())
+        if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join && !IsJoinBurstActive() && !IsChatSendQueueBusy())
         {
             await ApplyRankBehaviorsAsync(chatEvent.Username).ConfigureAwait(false);
         }
@@ -524,6 +524,23 @@ public sealed partial class BotEngine
 
         return _recentJoinBurstTimestamps.Count > JoinBurstThreshold;
     }
+
+    /// <summary>
+    /// True whenever a chat send is already scheduled/in flight — SendChatCommandAsync's own
+    /// static, shared-across-every-bot flood-protection gate (_nextChatSendAllowedUtc,
+    /// BotEngine.cs) is in the future. Gates ApplyRankBehaviorsAsync alongside IsJoinBurstActive:
+    /// that count-based check alone still let up to JoinBurstThreshold tracked+ranked joiners each
+    /// queue a real auto-whisper/-kick/-ban send *before* it tripped, and because every send
+    /// serializes behind the same shared gate (each holding it across its own ~FloodProtectionDelayMs
+    /// wait), that was enough on its own to lock the whole app's outgoing chat — every bot, not just
+    /// the flooded one — for up to JoinBurstThreshold * FloodProtectionDelayMs (confirmed live: ~30s
+    /// for the default threshold=15/delay=2000ms, via a synthetic 50-join burst harness). Checking
+    /// this directly makes auto-behaviors skip themselves the moment even ONE send is already
+    /// pending, rather than joining the queue behind it — at most one discretionary send per
+    /// FloodProtectionDelayMs window, network-connected or not, independent of how many joiners
+    /// would otherwise have qualified.
+    /// </summary>
+    private bool IsChatSendQueueBusy() => DateTime.UtcNow < _nextChatSendAllowedUtc;
 
     /// <summary>
     /// Applies whatever automated behaviors this tracked member's current
