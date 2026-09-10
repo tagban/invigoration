@@ -148,13 +148,28 @@ public static class ClanRosterStore
     }
 
     /// <summary>
+    /// For a caller that mutated a ClanMember obtained via Find/FindTrusted directly (e.g.
+    /// BotEngine's auto-whisper bookkeeping stamping LastAutoWhisperUtc) rather than through one
+    /// of this store's own Record* methods — same debounced-write behavior as those, just a
+    /// public entry point for external mutation instead of a private implementation detail.
+    /// </summary>
+    public static void MarkDirty()
+    {
+        lock (SyncRoot)
+        {
+            MarkDirtyAndNotify();
+        }
+    }
+
+    /// <summary>
     /// Marks the roster dirty and schedules (or reschedules) a single debounced disk write
     /// SaveDebounceInterval from now, coalescing a burst of many rapid-fire RecordSeen/
     /// RecordProductSeen calls (e.g. several tracked users joining/talking within the same
     /// couple of seconds) into one JSON-serialize-and-write instead of one per call — the actual
     /// fix for the mass-join hang (see RecordProductSeen's remarks). RosterChanged still fires
     /// immediately so any open UI reflects the in-memory change right away; only the disk I/O is
-    /// deferred.
+    /// deferred. Callers already inside `lock (SyncRoot)` (RecordSeen/RecordProductSeen) call this
+    /// directly; external callers go through the public MarkDirty() wrapper above instead.
     /// </summary>
     private static void MarkDirtyAndNotify()
     {

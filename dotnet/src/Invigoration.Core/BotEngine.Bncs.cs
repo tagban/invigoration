@@ -345,6 +345,12 @@ public sealed partial class BotEngine
     /// <summary>Per-user rolling window of recent Join/Leave timestamps, for Config.HideJoinLeaveSpamEnabled — see IsJoinLeaveNoisy.</summary>
     private readonly Dictionary<string, List<DateTime>> _recentJoinLeaveTimestamps = new(StringComparer.OrdinalIgnoreCase);
 
+    /// <summary>Channel-wide (not per-username, unlike _recentJoinLeaveTimestamps) rolling window of recent Join/ShowUser timestamps, for IsJoinBurstActive.</summary>
+    private readonly Queue<DateTime> _recentJoinBurstTimestamps = new();
+
+    private const int JoinBurstThreshold = 15;
+    private static readonly TimeSpan JoinBurstWindow = TimeSpan.FromSeconds(3);
+
     /// <summary>Parses a raw binary SID_CHATEVENT frame, then hands off to the shared (transport-agnostic) HandleChatEvent below — the Chat-protocol connection feeds the same method from its own line parser (see BotEngine.Chat.cs).</summary>
     private Task HandleBncsChatEventFrame(byte[] frame) => HandleChatEvent(ChatEventParser.Parse(frame));
 
@@ -397,7 +403,7 @@ public sealed partial class BotEngine
             Clan.ClanRosterStore.RecordProductSeen(chatEvent.Username, product, Config.BattlenetServer);
         }
 
-        if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join)
+        if (chatEvent.Type is ChatEventType.ShowUser or ChatEventType.Join && !IsJoinBurstActive())
         {
             await ApplyRankBehaviorsAsync(chatEvent.Username).ConfigureAwait(false);
         }
@@ -493,6 +499,33 @@ public sealed partial class BotEngine
     }
 
     /// <summary>
+    /// True once more than JoinBurstThreshold Join/ShowUser events (any username — this is a
+    /// channel-wide flood detector, unlike the per-user IsJoinLeaveNoisy above) have landed
+    /// within the last JoinBurstWindow. Gates ApplyRankBehaviorsAsync: a mass-join burst that
+    /// includes even a handful of tracked members with a matching rank previously triggered one
+    /// real awaited network round-trip (an auto-whisper/-kick/-ban SendChatCommandAsync) per such
+    /// joiner, run serially in the same chat-event pipeline that's also trying to drain the
+    /// burst itself — confirmed live as the actual remaining cause of the app hanging even after
+    /// the roster-save fix (that fix removed the *disk I/O* multiplier; this removes the *network
+    /// round-trip* multiplier, the much bigger of the two). A Queue (not the List+RemoveAll shape
+    /// IsJoinLeaveNoisy uses) so this itself stays O(1) amortized per call even while a large
+    /// burst is actively happening — the whole point is not adding another burst-sensitive
+    /// bottleneck to fix a bottleneck. Self-correcting like IsJoinLeaveNoisy: once the rate drops,
+    /// old timestamps age out and rank behaviors resume with no explicit reset needed.
+    /// </summary>
+    private bool IsJoinBurstActive()
+    {
+        var now = DateTime.UtcNow;
+        _recentJoinBurstTimestamps.Enqueue(now);
+        while (_recentJoinBurstTimestamps.Count > 0 && now - _recentJoinBurstTimestamps.Peek() > JoinBurstWindow)
+        {
+            _recentJoinBurstTimestamps.Dequeue();
+        }
+
+        return _recentJoinBurstTimestamps.Count > JoinBurstThreshold;
+    }
+
+    /// <summary>
     /// Applies whatever automated behaviors this tracked member's current
     /// rank carries (see ClanRank) — a welcome whisper, and/or an automatic
     /// kick/ban for flagging troublemakers without needing to watch for them
@@ -538,7 +571,7 @@ public sealed partial class BotEngine
         {
             await SendChatCommandAsync($"/w {username} {rank.AutoWhisperMessage}").ConfigureAwait(false);
             member.LastAutoWhisperUtc = DateTime.UtcNow;
-            Clan.ClanRosterStore.Save();
+            Clan.ClanRosterStore.MarkDirty();
         }
     }
 
