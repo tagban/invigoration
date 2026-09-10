@@ -56,6 +56,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
 
     public ObservableCollection<ChatLineViewModel> ChatLines { get; } = [];
 
+    /// <summary>Fired after ChatLineTrimmer trims old lines off the front of ChatLines — see its own remarks. The view rebuilds its Inlines from the (now bounded) collection in response.</summary>
+    public event Action? ChatLinesTrimmed;
+
     public ObservableCollection<ChannelUserViewModel> ChannelUsers { get; } = [];
 
     /// <summary>
@@ -154,6 +157,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     public BotTabViewModel(BotEngine engine)
     {
         Engine = engine;
+        ChatLineTrimmer.Attach(ChatLines, () => ChatLinesTrimmed?.Invoke());
         ShowStartupBanner();
         ChannelUsers.CollectionChanged += (_, _) => OnPropertyChanged(nameof(UsersTabHeader));
         Engine.Log += OnLog;
@@ -370,6 +374,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             }
 
             var tab = new ChannelTabViewModel(channelIndex, channel, users);
+            tab.AttachChatLineTrimmer();
             Channels.Add(tab);
             SelectedChannel ??= tab;
         });

@@ -41,15 +41,14 @@ public partial class BotTabView : UserControl
         if (_attachedViewModel is not null)
         {
             _attachedViewModel.ChatLines.CollectionChanged -= OnChatLinesChanged;
+            _attachedViewModel.ChatLinesTrimmed -= OnChatLinesTrimmed;
         }
 
         _attachedViewModel = DataContext as BotTabViewModel;
 
-        var chatText = this.FindControl<SelectableTextBlock>("ChatText");
-        chatText?.Inlines?.Clear();
-
         if (_attachedViewModel is null)
         {
+            this.FindControl<SelectableTextBlock>("ChatText")?.Inlines?.Clear();
             return;
         }
 
@@ -64,12 +63,10 @@ public partial class BotTabView : UserControl
                 : Sc2LoginChallenge.ShowAsync(owner, url);
         };
 
-        foreach (var line in _attachedViewModel.ChatLines)
-        {
-            AppendLine(chatText, line);
-        }
+        RebuildChatInlines();
 
         _attachedViewModel.ChatLines.CollectionChanged += OnChatLinesChanged;
+        _attachedViewModel.ChatLinesTrimmed += OnChatLinesTrimmed;
 
         // Switching to this bot's tab repopulates the whole log above, but that alone doesn't
         // move the ScrollViewer — it keeps whatever offset it last had (from this bot's own
@@ -81,6 +78,25 @@ public partial class BotTabView : UserControl
             Dispatcher.UIThread.Post(() => scroll.ScrollToEnd(), DispatcherPriority.Background);
         }
     }
+
+    /// <summary>Full clear-and-repopulate of ChatText's Inlines from the ViewModel's current ChatLines — used both for the initial attach and whenever ChatLineTrimmer has just trimmed the collection (see OnChatLinesTrimmed). Cheap even as a full rebuild since ChatLines is now bounded to ChatLineTrimmer.MaxLines.</summary>
+    private void RebuildChatInlines()
+    {
+        var chatText = this.FindControl<SelectableTextBlock>("ChatText");
+        chatText?.Inlines?.Clear();
+        if (_attachedViewModel is null || chatText is null)
+        {
+            return;
+        }
+
+        foreach (var line in _attachedViewModel.ChatLines)
+        {
+            AppendLine(chatText, line);
+        }
+    }
+
+    /// <summary>ChatLineTrimmer already fired several RemoveAt notifications (see OnChatLinesChanged — Remove isn't individually handled there) by the time this fires; a full rebuild from the now-trimmed ChatLines is simpler and just as cheap as reconciling them one by one would be.</summary>
+    private void OnChatLinesTrimmed() => RebuildChatInlines();
 
     private void OnChatLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

@@ -25,24 +25,21 @@ public partial class ChannelTabView : UserControl
         if (_attachedViewModel is not null)
         {
             _attachedViewModel.ChatLines.CollectionChanged -= OnChatLinesChanged;
+            _attachedViewModel.ChatLinesTrimmed -= OnChatLinesTrimmed;
         }
 
         _attachedViewModel = DataContext as ChannelTabViewModel;
 
-        var chatText = this.FindControl<SelectableTextBlock>("ChatText");
-        chatText?.Inlines?.Clear();
-
         if (_attachedViewModel is null)
         {
+            this.FindControl<SelectableTextBlock>("ChatText")?.Inlines?.Clear();
             return;
         }
 
-        foreach (var line in _attachedViewModel.ChatLines)
-        {
-            AppendLine(chatText, line);
-        }
+        RebuildChatInlines();
 
         _attachedViewModel.ChatLines.CollectionChanged += OnChatLinesChanged;
+        _attachedViewModel.ChatLinesTrimmed += OnChatLinesTrimmed;
 
         // Same fix as BotTabView.axaml.cs's AttachChatLog: repopulating the log above doesn't
         // move the ScrollViewer on its own, so switching to a different joined channel's
@@ -53,6 +50,24 @@ public partial class ChannelTabView : UserControl
             Dispatcher.UIThread.Post(() => scroll.ScrollToEnd(), DispatcherPriority.Background);
         }
     }
+
+    /// <summary>Full clear-and-repopulate of ChatText's Inlines from the ViewModel's current ChatLines — see BotTabView.axaml.cs's RebuildChatInlines for why this is cheap even as a full rebuild (ChatLines is bounded to ChatLineTrimmer.MaxLines).</summary>
+    private void RebuildChatInlines()
+    {
+        var chatText = this.FindControl<SelectableTextBlock>("ChatText");
+        chatText?.Inlines?.Clear();
+        if (_attachedViewModel is null || chatText is null)
+        {
+            return;
+        }
+
+        foreach (var line in _attachedViewModel.ChatLines)
+        {
+            AppendLine(chatText, line);
+        }
+    }
+
+    private void OnChatLinesTrimmed() => RebuildChatInlines();
 
     private void OnChatLinesChanged(object? sender, NotifyCollectionChangedEventArgs e)
     {

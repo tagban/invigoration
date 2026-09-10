@@ -23,6 +23,18 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
 
     public ObservableCollection<ChatLineViewModel> ChatLines { get; } = [];
 
+    /// <summary>Fired after ChatLineTrimmer trims old lines off ChatLines — see BotTabViewModel.ChatLinesTrimmed's matching remarks (this channel's own analog, for a busy long-lived SC2/SC:R/WC3:R channel's chat log). ChannelTabView rebuilds its Inlines from the (now bounded) collection in response.</summary>
+    public event Action? ChatLinesTrimmed;
+
+    /// <summary>
+    /// Must be called once, right after construction (see BotTabViewModel.OnSc2ChannelJoined,
+    /// the only place this class is instantiated) — a primary constructor has no ordinary body,
+    /// and a field initializer can't reference any instance member at all (CS0236, not just
+    /// method calls, as an earlier attempt here assumed), so there's no way to wire this up
+    /// during construction itself.
+    /// </summary>
+    public void AttachChatLineTrimmer() => ChatLineTrimmer.Attach(ChatLines, () => ChatLinesTrimmed?.Invoke());
+
     public ObservableCollection<Person> Users { get; } = users;
 
     /// <summary>Set by BotTabViewModel.OnChatMessage when a new message arrives here while this isn't the bot's SelectedChannel — cleared when it becomes selected (OnSelectedChannelChanged).</summary>
@@ -76,4 +88,5 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
                 break;
         }
     }
+
 }
