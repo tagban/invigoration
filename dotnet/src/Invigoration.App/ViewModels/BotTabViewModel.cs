@@ -66,6 +66,24 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     /// </summary>
     private readonly Dictionary<string, ChannelUserViewModel> _channelUsersByName = new();
 
+    /// <summary>The classic-BNCS channel this bot is currently in, from the server's own ChatEventType.Channel notification — "" before joining one (or after a disconnect). Only meaningful for a non-SupportsMultiChannel bot; see UsersTabHeader.</summary>
+    [ObservableProperty]
+    public partial string CurrentChannelName { get; set; } = "";
+
+    /// <summary>"Users" Tab header text — just "Users" until a channel name is known, then "<channel> (<count>)" so the tab itself answers "how many people are in here" without opening it. Recomputed (via the OnPropertyChanged calls scattered below) whenever anything it reads changes: CurrentChannelName, ChannelUsers' count, SelectedChannel, or the selected channel's own Users count.</summary>
+    public string UsersTabHeader
+    {
+        get
+        {
+            if (SupportsMultiChannel)
+            {
+                return SelectedChannel is { } channel ? $"{channel.Title} ({channel.Users.Count})" : "Users";
+            }
+
+            return string.IsNullOrEmpty(CurrentChannelName) ? "Users" : $"{CurrentChannelName} ({ChannelUsers.Count})";
+        }
+    }
+
     /// <summary>Whether this bot can be joined to several channels at once (SC2/SC:R/WC3:R) — gates the sub-tab UI. Classic BNCS/Chat-Telnet stay on the single flat ChatLines/ChannelUsers above.</summary>
     public bool SupportsMultiChannel => BncsProduct.IsStimpakBacked(Config.Product);
 
@@ -137,6 +155,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     {
         Engine = engine;
         ShowStartupBanner();
+        ChannelUsers.CollectionChanged += (_, _) => OnPropertyChanged(nameof(UsersTabHeader));
         Engine.Log += OnLog;
         Engine.SelfChatSent += OnSelfChatSent;
         Engine.ChatMessage += OnChatMessage;
@@ -152,6 +171,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             StatusText = "Disconnected";
             ChannelUsers.Clear();
             _channelUsersByName.Clear();
+            CurrentChannelName = "";
             Friends.Clear();
         });
         Engine.Sc2ChannelJoined += OnSc2ChannelJoined;
@@ -384,14 +404,31 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
     });
 
+    /// <summary>Unsubscribes UsersTabHeader's count-tracking from whichever channel is being left, mirrored by the subscribe half in OnSelectedChannelChanged below.</summary>
+    partial void OnSelectedChannelChanging(ChannelTabViewModel? oldValue, ChannelTabViewModel? newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.Users.CollectionChanged -= OnSelectedChannelUsersChanged;
+        }
+    }
+
     partial void OnSelectedChannelChanged(ChannelTabViewModel? value)
     {
         if (value is not null)
         {
             Engine.SetActiveSc2Channel(value.ChannelIndex);
             value.HasUnread = false;
+            value.Users.CollectionChanged += OnSelectedChannelUsersChanged;
         }
+
+        OnPropertyChanged(nameof(UsersTabHeader));
     }
+
+    private void OnSelectedChannelUsersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
+        OnPropertyChanged(nameof(UsersTabHeader));
+
+    partial void OnCurrentChannelNameChanged(string value) => OnPropertyChanged(nameof(UsersTabHeader));
 
     [RelayCommand]
     private void LeaveChannel(ChannelTabViewModel tab) => Engine.LeaveSc2Channel(tab.ChannelIndex);
@@ -547,6 +584,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             case ChatEventType.Channel:
                 ChannelUsers.Clear();
                 _channelUsersByName.Clear();
+                CurrentChannelName = e.Text;
                 ChatLines.Add(new ChatLineViewModel($"*** Joined channel: {e.Text}", palette.Channel));
                 break;
 

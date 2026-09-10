@@ -129,7 +129,10 @@
             <TabItem>
                 <TabItem.Header>
                     <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="0,0,0,4">
-                        <TextBlock Text="Users" />
+                        <!-- "Users" until a channel's actually joined, then "<channel name> (<count>)" —
+                             see BotTabViewModel.UsersTabHeader for how the count stays current for
+                             both classic BNCS (ChannelUsers) and SC2/SC:R/WC3:R (SelectedChannel.Users). -->
+                        <TextBlock Text="{Binding UsersTabHeader}" />
                     </Border>
                 </TabItem.Header>
                 <Panel>
