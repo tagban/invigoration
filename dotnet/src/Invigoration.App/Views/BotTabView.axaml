@@ -192,6 +192,16 @@
                                 <Image Grid.Column="0" Source="{Binding DisplayIconImage}" MaxWidth="32" MaxHeight="32"
                                        Stretch="Uniform" VerticalAlignment="Center" />
 
+                                <!-- Real classic Battle.net behavior: once a StarCraft-family/Warcraft II
+                                     user is actually ladder-rated, their win-count badge (ChatIcon.
+                                     GetProductIconKey's star/axe/sword plate) is stamped with their
+                                     numeric rating instead — see ChannelUserViewModel.LadderScoreText. -->
+                                <Border Grid.Column="0" Background="#B0000000" CornerRadius="2" Padding="2,0"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        IsVisible="{Binding ShowLadderScore}">
+                                    <TextBlock Text="{Binding LadderScoreText}" FontSize="8" FontWeight="Bold" Foreground="White" />
+                                </Border>
+
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="6,0"
                                             VerticalAlignment="Center" IsVisible="{Binding !IsLargeIcon}">
                                     <TextBlock Text="{Binding Username}" Foreground="White" VerticalAlignment="Center" />

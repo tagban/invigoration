@@ -43,9 +43,43 @@ public static class ChatIcon
         }
 
         var product = statString.Length >= 4 ? statString[..4] : statString;
-        if (product == "LTRD" && GetStatusIconKey(flags) == "" && TryGetDiabloDots(statString) is { } dots)
+        var noStatusIcon = GetStatusIconKey(flags) == "";
+
+        if (product == "LTRD" && noStatusIcon && TryGetDiabloDots(statString) is { } dots)
         {
             return $"diablo-dot{dots}";
+        }
+
+        // StarCraft/Brood War/SC-Japanese share one generic win-based rank badge on real
+        // Battle.net (classic.battle.net/info/icons.shtml lists it once, not per-product) —
+        // pixel-exact sprites extracted from the real icons_STAR.bni (bnetdocs.org/document/25/
+        // icons-bni), not fabricated. "sc-stars0" is deliberately reused for both 0 wins AND a
+        // ranked player (confirmed): once a player has an actual ladder rating, the real client
+        // drops the win-count star display entirely in favor of stamping the numeric rating on
+        // this same plain plate — see GetLadderScore, which the UI overlays as text.
+        if (product is "RATS" or "PXES" or "RTSJ" && noStatusIcon && TryGetIconClassStats(statString, out var scRating, out var scWins))
+        {
+            return scRating > 0 ? "sc-stars0" : $"sc-stars{Math.Clamp(scWins, 0, 10)}";
+        }
+
+        // Warcraft II BNE: half an axe per win up to 4 axes (8 wins), a single sword at 9 wins,
+        // two swords from 10 wins until the player is actually ladder-rated — at which point,
+        // same as StarCraft above, the badge switches to a plain plate with the rating stamped on
+        // it instead of axes/swords. Real icons_STAR.bni-family sprites extracted from
+        // icons_W2BN.bni via the same bnetdocs.org archive.
+        if (product == "NB2W" && noStatusIcon && TryGetIconClassStats(statString, out var w2Rating, out var w2Wins))
+        {
+            if (w2Rating > 0)
+            {
+                return "war2-ranked";
+            }
+
+            return w2Wins switch
+            {
+                <= 8 => $"war2-axes{w2Wins}",
+                9 => "war2-sword1",
+                _ => "war2-sword2",
+            };
         }
 
         return product switch
@@ -66,6 +100,24 @@ public static class ChatIcon
     }
 
     /// <summary>
+    /// The ladder rating ("score") to stamp as text over a StarCraft-family/Warcraft II win badge
+    /// once a player has one — a value of 0 means "not yet ladder-rated" (matches
+    /// ParseIconClassStats' own check), in which case there's nothing to stamp and this returns
+    /// null. Not applicable (also null) to Diablo, whose rank badge (GetProductIconKey's dot
+    /// picker) has no equivalent numeric score to show.
+    /// </summary>
+    public static int? GetLadderScore(string statString)
+    {
+        var product = statString.Length >= 4 ? statString[..4] : statString;
+        if (product is not ("RATS" or "PXES" or "RTSJ" or "NB2W"))
+        {
+            return null;
+        }
+
+        return TryGetIconClassStats(statString, out var rating, out _) && rating > 0 ? rating : null;
+    }
+
+    /// <summary>
     /// The number of "red dots" (0-3) a Diablo statstring's icon-class stats report — same
     /// space-split wire layout StatStringParser.ParseDiabloClassicStats reads (index 1 there,
     /// labeled "dots"), duplicated here rather than shared since that method builds a
@@ -77,6 +129,26 @@ public static class ChatIcon
     {
         var values = statString.Length > 5 ? statString[5..].Split(' ') : [];
         return values.Length == 9 && int.TryParse(values[1], out var dots) ? Math.Clamp(dots, 0, 3) : null;
+    }
+
+    /// <summary>
+    /// Rating (index 0) and wins (index 2) out of the same "icon class stats" wire layout
+    /// StatStringParser.ParseIconClassStats reads for StarCraft/Brood War/SC-Japanese/Warcraft II
+    /// — duplicated here for the same reason as TryGetDiabloDots (that method formats a sentence
+    /// and has no reason to expose structured fields). False (both out params 0) if the
+    /// statstring doesn't parse as icon-class stats at all.
+    /// </summary>
+    private static bool TryGetIconClassStats(string statString, out int rating, out int wins)
+    {
+        var values = statString.Length > 5 ? statString[5..].Split(' ') : [];
+        if (values.Length == 9 && int.TryParse(values[0], out rating) && int.TryParse(values[2], out wins))
+        {
+            return true;
+        }
+
+        rating = 0;
+        wins = 0;
+        return false;
     }
 
     /// <summary>The status/rank badge icon key, or "" if the user has none of these flags.</summary>
@@ -109,6 +181,9 @@ public static class ChatIcon
         // under one "Speaker / VIP" label even though they're different flags/icons on real
         // Battle.net. See ChatPalette, which already treats this same flag as "Guest" for text
         // color — this is the matching icon-badge half of that, previously unhandled here.
+        // guest.png is real Blizzard art (index 4 of the shared 0-7 status-icon prefix in both
+        // icons_STAR.bni and icons_W2BN.bni — bnetdocs.org/document/25/icons-bni), replacing an
+        // earlier hand-drawn placeholder once the real file was found.
         if (uflags.HasFlag(UserFlags.Special))
         {
             return "guest";

@@ -62,12 +62,38 @@ public partial class IconManagerViewModel : ViewModelBase
     /// Icons" section (warrior.jpg/sorcerer.jpg/2dots.jpg/rogue.jpg for 0/1/2/3 dots respectively,
     /// sourced 2026-09-11) — contrary to the "went down" note above, that page is still live at
     /// its original URL as of this date, so it's worth re-checking directly for anything else
-    /// still missing here rather than assuming it's gone.
+    /// still missing here rather than assuming it's gone. sc-stars0..10 and war2-axes0..8/
+    /// war2-sword1/war2-sword2/war2-ranked are likewise real — not fabricated placeholders —
+    /// extracted from the actual icons_STAR.bni and icons_W2BN.bni resource files themselves
+    /// (bnetdocs.org/document/25/icons-bni documents the .bni binary format; the already-decoded
+    /// individual PNGs live at files.bnetdocs.org/Battle.net/Icons/Extracted/STAR and .../W2BN —
+    /// indices 8-17 of STAR and 8-18 of W2BN respectively, confirmed against the user's own
+    /// firsthand knowledge of the exact win/rank thresholds since the .bni's icon-selection
+    /// metadata isn't included in those extracted PNGs). guest.png (index 4, shared by both
+    /// files) also came from here, replacing an earlier hand-drawn placeholder — see ChatIcon's
+    /// remarks on GetStatusIconKey. Two ranked-plate variants these games' real icons.bni also
+    /// define (a "top 5% of ladder" artsy background and a literal "#1 rank" plate) are NOT wired
+    /// up anywhere despite being extracted (indices 20/21 of both files) — nothing in this app's
+    /// data has ladder position/percentile, only the rating number itself, so there's no way to
+    /// choose between them; every ranked user gets the plain "ranked" plate today.
     /// </summary>
     private static readonly (string Key, string Folder, string SourceKey)[] Bnet1ClassicSet =
     [
         ("sc", "GameIconsClassic", "sc"), ("scbw", "GameIconsClassic", "scbw"), ("jsc", "GameIconsClassic", "jsc"),
-        ("sware", "GameIconsClassic", "sware"), ("war2", "GameIconsClassic", "war2"),
+        ("sware", "GameIconsClassic", "sware"),
+        ("sc-stars0", "GameIconsClassic", "sc-stars0"), ("sc-stars1", "GameIconsClassic", "sc-stars1"),
+        ("sc-stars2", "GameIconsClassic", "sc-stars2"), ("sc-stars3", "GameIconsClassic", "sc-stars3"),
+        ("sc-stars4", "GameIconsClassic", "sc-stars4"), ("sc-stars5", "GameIconsClassic", "sc-stars5"),
+        ("sc-stars6", "GameIconsClassic", "sc-stars6"), ("sc-stars7", "GameIconsClassic", "sc-stars7"),
+        ("sc-stars8", "GameIconsClassic", "sc-stars8"), ("sc-stars9", "GameIconsClassic", "sc-stars9"),
+        ("sc-stars10", "GameIconsClassic", "sc-stars10"),
+        ("war2", "GameIconsClassic", "war2"),
+        ("war2-axes0", "GameIconsClassic", "war2-axes0"), ("war2-axes1", "GameIconsClassic", "war2-axes1"),
+        ("war2-axes2", "GameIconsClassic", "war2-axes2"), ("war2-axes3", "GameIconsClassic", "war2-axes3"),
+        ("war2-axes4", "GameIconsClassic", "war2-axes4"), ("war2-axes5", "GameIconsClassic", "war2-axes5"),
+        ("war2-axes6", "GameIconsClassic", "war2-axes6"), ("war2-axes7", "GameIconsClassic", "war2-axes7"),
+        ("war2-axes8", "GameIconsClassic", "war2-axes8"), ("war2-sword1", "GameIconsClassic", "war2-sword1"),
+        ("war2-sword2", "GameIconsClassic", "war2-sword2"), ("war2-ranked", "GameIconsClassic", "war2-ranked"),
         ("war3", "GameIconsClassic", "war3"), ("w3tft", "GameIconsClassic", "w3tft"),
         ("diablo", "GameIconsClassic", "diablo"), ("dshr", "GameIconsClassic", "dshr"),
         ("diablo-dot0", "GameIconsClassic", "diablo-dot0"), ("diablo-dot1", "GameIconsClassic", "diablo-dot1"),
@@ -96,7 +122,21 @@ public partial class IconManagerViewModel : ViewModelBase
     private static readonly (string Key, string Folder, string SourceKey)[] Wc3ClassicSet =
     [
         ("sc", "GameIconsHD", "sc"), ("scbw", "GameIconsHD", "scbw"), ("jsc", "GameIconsHD", "sc"),
-        ("sware", "GameIconsHD", "sc"), ("war2", "GameIconsHD", "war2"), ("war3", "GameIconsHD", "war3"),
+        ("sware", "GameIconsHD", "sc"),
+        ("sc-stars0", "GameIconsHD", "sc-stars0"), ("sc-stars1", "GameIconsHD", "sc-stars1"),
+        ("sc-stars2", "GameIconsHD", "sc-stars2"), ("sc-stars3", "GameIconsHD", "sc-stars3"),
+        ("sc-stars4", "GameIconsHD", "sc-stars4"), ("sc-stars5", "GameIconsHD", "sc-stars5"),
+        ("sc-stars6", "GameIconsHD", "sc-stars6"), ("sc-stars7", "GameIconsHD", "sc-stars7"),
+        ("sc-stars8", "GameIconsHD", "sc-stars8"), ("sc-stars9", "GameIconsHD", "sc-stars9"),
+        ("sc-stars10", "GameIconsHD", "sc-stars10"),
+        ("war2", "GameIconsHD", "war2"),
+        ("war2-axes0", "GameIconsHD", "war2-axes0"), ("war2-axes1", "GameIconsHD", "war2-axes1"),
+        ("war2-axes2", "GameIconsHD", "war2-axes2"), ("war2-axes3", "GameIconsHD", "war2-axes3"),
+        ("war2-axes4", "GameIconsHD", "war2-axes4"), ("war2-axes5", "GameIconsHD", "war2-axes5"),
+        ("war2-axes6", "GameIconsHD", "war2-axes6"), ("war2-axes7", "GameIconsHD", "war2-axes7"),
+        ("war2-axes8", "GameIconsHD", "war2-axes8"), ("war2-sword1", "GameIconsHD", "war2-sword1"),
+        ("war2-sword2", "GameIconsHD", "war2-sword2"), ("war2-ranked", "GameIconsHD", "war2-ranked"),
+        ("war3", "GameIconsHD", "war3"),
         ("w3tft", "GameIconsHD", "w3tft"), ("diablo", "GameIconsHD", "diablo"), ("dshr", "GameIconsHD", "diablo"),
         ("diablo-dot0", "GameIconsHD", "diablo-dot0"), ("diablo-dot1", "GameIconsHD", "diablo-dot1"),
         ("diablo-dot2", "GameIconsHD", "diablo-dot2"), ("diablo-dot3", "GameIconsHD", "diablo-dot3"),
@@ -148,6 +188,18 @@ public partial class IconManagerViewModel : ViewModelBase
         ("diablo-dot1", "GameIconsHD", "diablo-dot1"),
         ("diablo-dot2", "GameIconsHD", "diablo-dot2"),
         ("diablo-dot3", "GameIconsHD", "diablo-dot3"),
+        ("sc-stars0", "GameIconsHD", "sc-stars0"), ("sc-stars1", "GameIconsHD", "sc-stars1"),
+        ("sc-stars2", "GameIconsHD", "sc-stars2"), ("sc-stars3", "GameIconsHD", "sc-stars3"),
+        ("sc-stars4", "GameIconsHD", "sc-stars4"), ("sc-stars5", "GameIconsHD", "sc-stars5"),
+        ("sc-stars6", "GameIconsHD", "sc-stars6"), ("sc-stars7", "GameIconsHD", "sc-stars7"),
+        ("sc-stars8", "GameIconsHD", "sc-stars8"), ("sc-stars9", "GameIconsHD", "sc-stars9"),
+        ("sc-stars10", "GameIconsHD", "sc-stars10"),
+        ("war2-axes0", "GameIconsHD", "war2-axes0"), ("war2-axes1", "GameIconsHD", "war2-axes1"),
+        ("war2-axes2", "GameIconsHD", "war2-axes2"), ("war2-axes3", "GameIconsHD", "war2-axes3"),
+        ("war2-axes4", "GameIconsHD", "war2-axes4"), ("war2-axes5", "GameIconsHD", "war2-axes5"),
+        ("war2-axes6", "GameIconsHD", "war2-axes6"), ("war2-axes7", "GameIconsHD", "war2-axes7"),
+        ("war2-axes8", "GameIconsHD", "war2-axes8"), ("war2-sword1", "GameIconsHD", "war2-sword1"),
+        ("war2-sword2", "GameIconsHD", "war2-sword2"), ("war2-ranked", "GameIconsHD", "war2-ranked"),
     ];
 
     public ObservableCollection<IconSlotViewModel> GameIcons { get; } = [];

@@ -14,6 +14,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(DisplayIconImage))]
     [NotifyPropertyChangedFor(nameof(ShowSeparateStatusIcon))]
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
+    [NotifyPropertyChangedFor(nameof(ShowLadderScore))]
     public partial uint Flags { get; set; }
 
     [ObservableProperty]
@@ -23,6 +24,8 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
     [NotifyPropertyChangedFor(nameof(DisplayIconImage))]
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
+    [NotifyPropertyChangedFor(nameof(LadderScoreText))]
+    [NotifyPropertyChangedFor(nameof(ShowLadderScore))]
     public partial string StatString { get; set; } = "";
 
     /// <summary>Mirrors BotConfig.ClassicUserIconStyle — pushed in by BotTabViewModel (see UpsertUser/ApplyClassicUserIconStyle) rather than read from Config directly, since this row's own DataContext has no reachable path back up to it (the same ancestor-binding pitfall noted throughout BotTabView.axaml).</summary>
@@ -45,6 +48,12 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     /// <summary>True once a bigger-than-classic icon (e.g. a 64x64 override, or a 64x64 status badge in classic icon style) is in play, so the row template can switch from one inline line to username/ping stacked — the tall icon otherwise dwarfs a single text line. Checks whatever's actually displayed (DisplayIconImage), not always ProductIconImage, since classic style can swap in a differently-sized badge.</summary>
     public bool IsLargeIcon => DisplayIconImage is { PixelSize.Height: > 16 };
 
+    /// <summary>The ladder rating to stamp as text over the product-icon slot (real classic Battle.net behavior — see ChatIcon.GetLadderScore), or "" when there's nothing to show.</summary>
+    public string LadderScoreText => ChatIcon.GetLadderScore(StatString)?.ToString() ?? "";
+
+    /// <summary>Only when there's a score AND the product-icon slot is actually showing the win/rank plate it belongs on — StatusIconImage not null means GetProductIconKey already deferred to the flat generic logo instead (same status-icon-takes-priority rule it applies internally), so stamping a score on that would be wrong.</summary>
+    public bool ShowLadderScore => LadderScoreText != "" && StatusIconImage is null;
+
     /// <summary>Re-raises change notifications for the icon-derived properties — called after an override is applied/reset so an already-populated user list updates immediately instead of needing a reconnect.</summary>
     public void RefreshIcons()
     {
@@ -53,5 +62,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
         OnPropertyChanged(nameof(DisplayIconImage));
         OnPropertyChanged(nameof(ShowSeparateStatusIcon));
         OnPropertyChanged(nameof(IsLargeIcon));
+        OnPropertyChanged(nameof(LadderScoreText));
+        OnPropertyChanged(nameof(ShowLadderScore));
     }
 }
