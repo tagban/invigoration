@@ -32,6 +32,41 @@ public class ChatIconTests
         Assert.Equal("", ChatIcon.GetProductIconKey("ZZZZ"));
     }
 
+    // "LTRD" + 1 icon byte, then "<level> <dots> <class> <str> <magic> <dex> <vit> <gold>
+    // <unused>" glued on with no separating space (statString[5..] is the first value's own first
+    // digit, not a delimiter) — same wire layout ParseDiabloClassicStats reads. dots (index 1) is
+    // classic.battle.net/info/icons.shtml's "red dots" progress marker (0-3, no/Normal/Nightmare/
+    // Hell killed).
+    [Theory]
+    [InlineData("LTRDX30 0 0 55 20 15 40 100 0", "diablo-dot0")]
+    [InlineData("LTRDX30 1 0 55 20 15 40 100 0", "diablo-dot1")]
+    [InlineData("LTRDX30 2 0 55 20 15 40 100 0", "diablo-dot2")]
+    [InlineData("LTRDX30 3 0 55 20 15 40 100 0", "diablo-dot3")]
+    public void GetProductIconKey_DiabloWithDots_ReturnsDotBadge(string statString, string expected)
+    {
+        Assert.Equal(expected, ChatIcon.GetProductIconKey(statString));
+    }
+
+    // Regression: an Open Character (no icon-class stats parsed yet, statString.Length <= 5) has
+    // no dots to read — GetProductIconKey must fall back to the flat "diablo" icon rather than
+    // throwing or defaulting to dot0 by accident.
+    [Fact]
+    public void GetProductIconKey_DiabloOpenCharacter_FallsBackToPlainIcon()
+    {
+        Assert.Equal("diablo", ChatIcon.GetProductIconKey("LTRD"));
+    }
+
+    // Regression: a status icon (e.g. a Blizzard rep playing Diablo) must keep showing its status
+    // badge as the more important thing — the dot badge should only ever replace the plain
+    // product icon, matching the explicit request to show it "when they don't have a special
+    // icon."
+    [Fact]
+    public void GetProductIconKey_DiabloWithStatusIcon_StatusTakesPriorityOverDots()
+    {
+        var statString = "LTRDX30 3 0 55 20 15 40 100 0";
+        Assert.Equal("diablo", ChatIcon.GetProductIconKey(statString, (uint)UserFlags.Blizzard));
+    }
+
     [Theory]
     [InlineData(UserFlags.Blizzard, "blizz")]
     [InlineData(UserFlags.Admin, "sysop")]

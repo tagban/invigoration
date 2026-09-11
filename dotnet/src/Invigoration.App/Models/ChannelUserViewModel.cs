@@ -10,6 +10,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusIconImage))]
+    [NotifyPropertyChangedFor(nameof(ProductIconImage))]
     [NotifyPropertyChangedFor(nameof(DisplayIconImage))]
     [NotifyPropertyChangedFor(nameof(ShowSeparateStatusIcon))]
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
@@ -31,7 +32,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
     public partial bool UseClassicIconStyle { get; set; }
 
-    public Bitmap? ProductIconImage => GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString));
+    public Bitmap? ProductIconImage => GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags));
 
     public Bitmap? StatusIconImage => GameIconLoader.Get(ChatIcon.GetStatusIconKey(Flags));
 

@@ -56,7 +56,13 @@ public partial class IconManagerViewModel : ViewModelBase
     /// user-made (2026-08-24, hand-drawn to match the aesthetic, dropped straight in at the same
     /// 28x14 size as the rest of this set) rather than sourced from anywhere. Not in Wc3ClassicSet
     /// below: that set is 64x64, and this icon is 28x14 — forcing it in would look inconsistently
-    /// tiny/blurry next to the rest of that set.
+    /// tiny/blurry next to the rest of that set. diablo-dot0..3 (the "how far have they gotten"
+    /// badges GetProductIconKey picks for a Diablo user with no status icon — see its own remarks)
+    /// are real Blizzard originals too, from classic.battle.net/info/icons.shtml's own "Diablo
+    /// Icons" section (warrior.jpg/sorcerer.jpg/2dots.jpg/rogue.jpg for 0/1/2/3 dots respectively,
+    /// sourced 2026-09-11) — contrary to the "went down" note above, that page is still live at
+    /// its original URL as of this date, so it's worth re-checking directly for anything else
+    /// still missing here rather than assuming it's gone.
     /// </summary>
     private static readonly (string Key, string Folder, string SourceKey)[] Bnet1ClassicSet =
     [
@@ -64,6 +70,8 @@ public partial class IconManagerViewModel : ViewModelBase
         ("sware", "GameIconsClassic", "sware"), ("war2", "GameIconsClassic", "war2"),
         ("war3", "GameIconsClassic", "war3"), ("w3tft", "GameIconsClassic", "w3tft"),
         ("diablo", "GameIconsClassic", "diablo"), ("dshr", "GameIconsClassic", "dshr"),
+        ("diablo-dot0", "GameIconsClassic", "diablo-dot0"), ("diablo-dot1", "GameIconsClassic", "diablo-dot1"),
+        ("diablo-dot2", "GameIconsClassic", "diablo-dot2"), ("diablo-dot3", "GameIconsClassic", "diablo-dot3"),
         ("diablo2", "GameIconsClassic", "diablo2"), ("d2exp", "GameIconsClassic", "d2exp"),
         ("chat", "GameIconsClassic", "chat"), ("blizz", "GameIconsClassic", "blizz"),
         ("sysop", "GameIconsClassic", "sysop"), ("mod-gavel", "GameIconsClassic", "mod-gavel"),
@@ -90,6 +98,8 @@ public partial class IconManagerViewModel : ViewModelBase
         ("sc", "GameIconsHD", "sc"), ("scbw", "GameIconsHD", "scbw"), ("jsc", "GameIconsHD", "sc"),
         ("sware", "GameIconsHD", "sc"), ("war2", "GameIconsHD", "war2"), ("war3", "GameIconsHD", "war3"),
         ("w3tft", "GameIconsHD", "w3tft"), ("diablo", "GameIconsHD", "diablo"), ("dshr", "GameIconsHD", "diablo"),
+        ("diablo-dot0", "GameIconsHD", "diablo-dot0"), ("diablo-dot1", "GameIconsHD", "diablo-dot1"),
+        ("diablo-dot2", "GameIconsHD", "diablo-dot2"), ("diablo-dot3", "GameIconsHD", "diablo-dot3"),
         ("diablo2", "GameIconsHD", "diablo2"), ("d2exp", "GameIconsHD", "d2exp"), ("chat", "GameIconsHD", "chat"),
         ("blizz", "GameIconsHD", "blizz"), ("sysop", "GameIconsHD", "sysop"),
         ("mod-gavel", "GameIconsHD", "mod-gavel"), ("mega", "GameIconsHD", "mega"),
@@ -134,6 +144,10 @@ public partial class IconManagerViewModel : ViewModelBase
         ("ignore", "GameIconsHD", "ignore"),
         ("diablo", "GameIconsBnet2", "diablo"),
         ("dshr", "GameIconsBnet2", "diablo"),
+        ("diablo-dot0", "GameIconsHD", "diablo-dot0"),
+        ("diablo-dot1", "GameIconsHD", "diablo-dot1"),
+        ("diablo-dot2", "GameIconsHD", "diablo-dot2"),
+        ("diablo-dot3", "GameIconsHD", "diablo-dot3"),
     ];
 
     public ObservableCollection<IconSlotViewModel> GameIcons { get; } = [];
