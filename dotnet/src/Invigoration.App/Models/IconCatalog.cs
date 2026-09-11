@@ -53,7 +53,8 @@ public static class IconCatalog
         ("blizz", "Blizzard Representative"),
         ("sysop", "Administrator"),
         ("mod-gavel", "Channel Operator"),
-        ("mega", "Speaker / VIP"),
+        ("mega", "Speaker"),
+        ("guest", "Special Guest (VIP)"),
         ("ignore", "Squelched"),
     ];
 

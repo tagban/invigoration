@@ -75,6 +75,16 @@ public static class ChatIcon
             return "mega";
         }
 
+        // "Special guest" (BLIZZARD_GUEST) — the sunglasses badge, kept distinct from Speaker
+        // (mega.png) per explicit request, since the two had previously been folded together
+        // under one "Speaker / VIP" label even though they're different flags/icons on real
+        // Battle.net. See ChatPalette, which already treats this same flag as "Guest" for text
+        // color — this is the matching icon-badge half of that, previously unhandled here.
+        if (uflags.HasFlag(UserFlags.Special))
+        {
+            return "guest";
+        }
+
         if (uflags.HasFlag(UserFlags.Squelched))
         {
             return "ignore";
@@ -85,9 +95,10 @@ public static class ChatIcon
 
     /// <summary>
     /// True for any rank badge that should sort to the top of a channel's user list — Blizzard
-    /// rep, Admin, Operator ("has a gavel"), or Speaker/VIP — matching classic Battle.net's own
-    /// "moderators, then everyone else" ordering per user request. Squelched deliberately isn't
-    /// included: it's a punishment marker, not a rank, and shouldn't float someone to the top.
+    /// rep, Admin, Operator ("has a gavel"), or Speaker — matching classic Battle.net's own
+    /// "moderators, then everyone else" ordering per user request. Squelched and Special guest
+    /// deliberately aren't included: one's a punishment marker, the other's just a badge, and
+    /// neither is a rank that should float someone to the top.
     /// </summary>
     public static bool IsPrivileged(uint flags)
     {

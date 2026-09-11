@@ -31,4 +31,42 @@ public class ChatIconTests
     {
         Assert.Equal("", ChatIcon.GetProductIconKey("ZZZZ"));
     }
+
+    [Theory]
+    [InlineData(UserFlags.Blizzard, "blizz")]
+    [InlineData(UserFlags.Admin, "sysop")]
+    [InlineData(UserFlags.Operator, "mod-gavel")]
+    [InlineData(UserFlags.Speaker, "mega")]
+    // Regression: UserFlags.Special (BLIZZARD_GUEST, "glasses" icon in the original) was defined
+    // but GetStatusIconKey had no case for it, so a special-guest user never got a status badge at
+    // all — ChatPalette already treated this same flag as "Guest" for text color, but the icon
+    // half was missing.
+    [InlineData(UserFlags.Special, "guest")]
+    [InlineData(UserFlags.Squelched, "ignore")]
+    [InlineData(UserFlags.None, "")]
+    public void GetStatusIconKey_KnownFlag_ReturnsExpectedKey(UserFlags flag, string expected)
+    {
+        Assert.Equal(expected, ChatIcon.GetStatusIconKey((uint)flag));
+    }
+
+    [Fact]
+    public void GetStatusIconKey_PrecedenceOrder_BlizzardBeatsEverythingElse()
+    {
+        var flags = UserFlags.Blizzard | UserFlags.Admin | UserFlags.Operator | UserFlags.Speaker |
+                    UserFlags.Special | UserFlags.Squelched;
+        Assert.Equal("blizz", ChatIcon.GetStatusIconKey((uint)flags));
+    }
+
+    [Fact]
+    public void GetStatusIconKey_SpeakerAndSpecial_SpeakerTakesPrecedence()
+    {
+        var flags = UserFlags.Speaker | UserFlags.Special;
+        Assert.Equal("mega", ChatIcon.GetStatusIconKey((uint)flags));
+    }
+
+    [Fact]
+    public void IsPrivileged_SpecialGuestAlone_IsNotPrivileged()
+    {
+        Assert.False(ChatIcon.IsPrivileged((uint)UserFlags.Special));
+    }
 }

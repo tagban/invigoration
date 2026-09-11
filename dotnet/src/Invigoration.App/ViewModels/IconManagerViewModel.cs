@@ -67,8 +67,8 @@ public partial class IconManagerViewModel : ViewModelBase
         ("diablo2", "GameIconsClassic", "diablo2"), ("d2exp", "GameIconsClassic", "d2exp"),
         ("chat", "GameIconsClassic", "chat"), ("blizz", "GameIconsClassic", "blizz"),
         ("sysop", "GameIconsClassic", "sysop"), ("mod-gavel", "GameIconsClassic", "mod-gavel"),
-        ("mega", "GameIconsClassic", "mega"), ("ignore", "GameIconsClassic", "ignore"),
-        ("sc2", "GameIconsClassic", "sc2"),
+        ("mega", "GameIconsClassic", "mega"), ("guest", "GameIconsClassic", "guest"),
+        ("ignore", "GameIconsClassic", "ignore"), ("sc2", "GameIconsClassic", "sc2"),
     ];
 
     /// <summary>
@@ -93,7 +93,8 @@ public partial class IconManagerViewModel : ViewModelBase
         ("diablo2", "GameIconsHD", "diablo2"), ("d2exp", "GameIconsHD", "d2exp"), ("chat", "GameIconsHD", "chat"),
         ("blizz", "GameIconsHD", "blizz"), ("sysop", "GameIconsHD", "sysop"),
         ("mod-gavel", "GameIconsHD", "mod-gavel"), ("mega", "GameIconsHD", "mega"),
-        ("ignore", "GameIconsHD", "ignore"), ("sc2", "GameIconsHD", "sc2"),
+        ("guest", "GameIconsHD", "guest"), ("ignore", "GameIconsHD", "ignore"),
+        ("sc2", "GameIconsHD", "sc2"),
     ];
 
     /// <summary>
@@ -129,6 +130,7 @@ public partial class IconManagerViewModel : ViewModelBase
         ("sysop", "GameIconsHD", "sysop"),
         ("mod-gavel", "GameIconsBnet2", "mod-gavel-glow"),
         ("mega", "GameIconsHD", "mega"),
+        ("guest", "GameIconsHD", "guest"),
         ("ignore", "GameIconsHD", "ignore"),
         ("diablo", "GameIconsBnet2", "diablo"),
         ("dshr", "GameIconsBnet2", "diablo"),
