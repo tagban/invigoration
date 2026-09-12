@@ -319,6 +319,15 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
             // runs, same as every other BotConfig field (window close / Config window save).
             Config.ChatGemActivations++;
             OnPropertyChanged(nameof(ChatGemTooltip));
+
+            // Separately, the opt-in leaderboard's own per-account monthly tally. Counted even
+            // before (or without) consent so that agreeing partway through a month doesn't start
+            // the user at zero — ChatGemTallyStore gates sharing, not counting, and nothing
+            // transmits anywhere until an endpoint is configured. See ChatGemTallySender.
+            if (!string.IsNullOrWhiteSpace(Config.Username))
+            {
+                ChatGemTallyStore.RecordActivation($"{Config.Username}@{Config.BattlenetServer}", DateTimeOffset.UtcNow);
+            }
         }
     }
 
