@@ -182,11 +182,9 @@ public static class ChatIcon
     /// bnetdocs.org/document/18/chat-statstrings — "often appears with bots who join a channel
     /// automatically and not waiting until the user clicks 'Enter Chat'"), the code doesn't match
     /// the documented "Level + Tier + 3W" shape, or it names a tier this app has no art for
-    /// (level 6/TFT-only, or the Tournament race). Untested against a real WC3 connection as of
-    /// this writing — the field-start offset (index 5, mirroring every other product's icon-class
-    /// stats layout) is inferred from the documented "space-delimited fields after the product
-    /// code," not confirmed byte-for-byte, so treat a wrong badge here as a likely off-by-one to
-    /// fix, not a dead end.
+    /// (level 6/TFT-only, or the Tournament race). The field-start offset (index 5, mirroring
+    /// every other product's icon-class stats layout) was an inferred guess as of 2026-09-11 —
+    /// confirmed correct the next day against the user's own real WC3: TFT connection.
     /// </summary>
     private static string? TryGetWar3TierIconKey(string statString)
     {

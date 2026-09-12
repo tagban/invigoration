@@ -68,8 +68,8 @@ public static class StatStringParser
     // documented edge case where a statstring carries a level and clan tag but no icon code —
     // handled here by checking whether the first field actually looks like an icon code (ends in
     // "3W") rather than assuming a fixed position. Field-start offset (index 5, same convention
-    // as every other product below) isn't independently confirmed against a live WC3 statstring
-    // as of this writing — see ChatIcon.TryGetWar3TierIconKey's matching remarks.
+    // as every other product below) was an inferred guess as of 2026-09-11, confirmed correct the
+    // next day against the user's own real WC3: TFT connection.
     private static string ParseWar3Stats(string statString, string label)
     {
         var fields = statString.Length > 5 ? statString[5..].Split(' ') : [];
