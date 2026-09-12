@@ -287,11 +287,39 @@ public partial class ConfigViewModel : ObservableObject
         HomeChannel = config.HomeChannel;
         ColorScheme = config.ChatColorScheme;
         CustomSchemeName = config.CustomColorSchemeName;
+        UseD2ChatLayout = config.UseD2ChatLayout;
         IconSetName = string.IsNullOrEmpty(config.IconSetName) ? DefaultIconSetLabel : config.IconSetName;
         RefreshServerSuggestions();
         RefreshLibrarySchemes();
         RefreshAvailableIconSets();
         RefreshAvailableProfiles(config.BattlenetCredentialProfileId);
+
+        // Everything above is just loading saved values into the editor; only edits the user
+        // makes from here on should trigger the "turning D2 Style on also switches the colors"
+        // convenience below.
+        _loaded = true;
+    }
+
+    private bool _loaded;
+
+    /// <summary>
+    /// Mirrors BotConfig.UseD2ChatLayout, but as a real ViewModel property rather than a direct
+    /// Config binding so switching it on can also default the chat colors to the Diablo II
+    /// scheme (per explicit request — D2 Style should look like D2 out of the box, not just
+    /// rearrange the panels). Only a default, not a lock: the color dropdown right above stays
+    /// editable, and reopening this window later won't re-force the scheme on a bot that already
+    /// had D2 Style saved — see the _loaded guard.
+    /// </summary>
+    [ObservableProperty]
+    public partial bool UseD2ChatLayout { get; set; }
+
+    partial void OnUseD2ChatLayoutChanged(bool value)
+    {
+        Config.UseD2ChatLayout = value;
+        if (value && _loaded)
+        {
+            ColorScheme = ChatColorScheme.DiabloII;
+        }
     }
 
     private void RefreshPaletteSwatches() => OnPropertyChanged(nameof(PaletteSwatches));

@@ -280,6 +280,48 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     [RelayCommand]
     private Task DisconnectAsync() => Engine.DisconnectAsync();
 
+    /// <summary>
+    /// Diablo II's chat gem — the little jewel sitting above the character strip in D2 Style
+    /// (shown only in that layout). Blue when activated, red when not. Purely local flavor: it
+    /// toggles its own color and prints one line into this bot's own chat log, and deliberately
+    /// sends nothing to Battle.net, per explicit request.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ChatGemBrush))]
+    public partial bool ChatGemActive { get; set; } = true;
+
+    /// <summary>The gem's fill — the palette's own blue/red rather than hardcoded colors, so it follows whichever scheme the bot is using.</summary>
+    public IBrush ChatGemBrush
+    {
+        get
+        {
+            var c = ChatGemActive ? Engine.Palette.Blue : Engine.Palette.Red;
+            return new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
+        }
+    }
+
+    /// <summary>The running activation tally (BotConfig.ChatGemActivations), for the gem's tooltip.</summary>
+    public string ChatGemTooltip =>
+        $"Chat gem — click to toggle. Activated {Config.ChatGemActivations} time{(Config.ChatGemActivations == 1 ? "" : "s")} on this bot. Local decoration only; nothing is sent to Battle.net.";
+
+    [RelayCommand]
+    private void ToggleChatGem()
+    {
+        ChatGemActive = !ChatGemActive;
+        var palette = Engine.Palette;
+        var message = ChatGemActive ? "Chat Gem Activated" : "Chat Gem Deactivated";
+        var color = ChatGemActive ? palette.Blue : palette.Red;
+        (SelectedChannel?.ChatLines ?? ChatLines).Add(new ChatLineViewModel(message, color));
+
+        if (ChatGemActive)
+        {
+            // Activations only — a toggle off isn't an activation. Persisted whenever SaveAll next
+            // runs, same as every other BotConfig field (window close / Config window save).
+            Config.ChatGemActivations++;
+            OnPropertyChanged(nameof(ChatGemTooltip));
+        }
+    }
+
     /// <summary>Diablo II's server doesn't push status updates automatically, so a manual refresh is the only way to see current friend status there.</summary>
     [RelayCommand]
     private Task RefreshFriendsAsync() => Engine.RequestFriendsListAsync();
@@ -746,6 +788,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
                 UseClassicIconStyle = Config.ClassicUserIconStyle,
                 BotProduct = Config.Product,
                 Palette = Engine.Palette,
+                UseD2Layout = Config.UseD2ChatLayout,
             };
             _channelUsersByName[e.Username] = user;
         }

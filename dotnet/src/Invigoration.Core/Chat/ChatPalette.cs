@@ -122,6 +122,21 @@ public sealed class ChatPalette
     }
 
     /// <summary>
+    /// D2 Style's own, deliberately sparser name coloring (per explicit user description of how
+    /// Diablo II's chat actually looked): blue for Blizzard reps/techs, yellow for Speakers,
+    /// white for everyone else. Note this is NOT GetChannelListNameColor's rule — D2 had no
+    /// separate green admin color and no same-game-vs-other-game distinction at all, so a bot in
+    /// D2 Style deliberately shows fewer colors than the same roster would in Normal layout.
+    /// </summary>
+    public RgbColor GetD2NameColor(uint flags)
+    {
+        var f = (UserFlags)flags;
+        if (f.HasFlag(UserFlags.Blizzard) || f.HasFlag(UserFlags.Admin)) return Blue;
+        if (f.HasFlag(UserFlags.Speaker)) return Yellow;
+        return White;
+    }
+
+    /// <summary>
     /// This port's original palette — bnubot's InvigorationColorScheme, using
     /// the correctly byte-order-decoded values this port already shipped
     /// with (bnubot's own Java source reuses the raw VB6 BGR literals

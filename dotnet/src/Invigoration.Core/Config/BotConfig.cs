@@ -244,6 +244,26 @@ public sealed class BotConfig
     public bool ClassicUserIconStyle { get; set; }
 
     /// <summary>
+    /// Off by default ("Normal" layout: chat on the left, the Users/Friends/Clan panel docked
+    /// vertically on the right). On, switches that bot's tab to "D2 Style": the same panel moves
+    /// to a short horizontal dock along the bottom of the tab and the Users list inside it lays
+    /// its rows out left-to-right as a portrait strip, with the chat log taking the full width
+    /// above it — the classic Diablo II lobby arrangement, per explicit request. A per-bot choice
+    /// made in the Config window rather than a live toggle, since it's a "how does this bot load"
+    /// preference. Nothing is hidden in either mode: the panel keeps all three of its tabs, it
+    /// just changes where it sits and which way the user rows flow.
+    /// </summary>
+    public bool UseD2ChatLayout { get; set; }
+
+    /// <summary>
+    /// How many times D2 Style's chat gem has been switched ON for this bot (activations only,
+    /// not deactivations — see BotTabViewModel.ToggleChatGem). Persisted with the rest of the
+    /// bot's config so the tally survives restarts. Purely a local counter today: nothing reads
+    /// it but the gem's own tooltip, and nothing transmits it anywhere.
+    /// </summary>
+    public int ChatGemActivations { get; set; }
+
+    /// <summary>
     /// Minutes of no chat activity before IdleMessage auto-sends once — 0 (default) turns the
     /// feature off entirely. See BotEngine.Idle.cs. Also settable live via the "idle" chat
     /// command ("idle 30 back in a bit" / "idle off"), which writes here directly.

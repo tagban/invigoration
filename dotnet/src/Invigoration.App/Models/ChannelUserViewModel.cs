@@ -43,6 +43,11 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
     public partial ChatPalette Palette { get; set; } = ChatPalette.Invigoration;
 
+    /// <summary>Mirrors BotConfig.UseD2ChatLayout — pushed in alongside BotProduct/Palette, same reason. Drives both this row's arrangement (portrait above name, no ping — see BotTabView.axaml) and which name-coloring rule UsernameBrush uses.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(UsernameBrush))]
+    public partial bool UseD2Layout { get; set; }
+
     /// <summary>Mirrors BotConfig.ClassicUserIconStyle — pushed in by BotTabViewModel (see UpsertUser/ApplyClassicUserIconStyle) rather than read from Config directly, since this row's own DataContext has no reachable path back up to it (the same ancestor-binding pitfall noted throughout BotTabView.axaml).</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(DisplayIconImage))]
@@ -80,7 +85,12 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     {
         get
         {
-            var c = Palette.GetChannelListNameColor(Flags, IsSameProduct);
+            // D2 Style uses Diablo II's own sparser rule (blue rep/tech, yellow Speaker, white
+            // everyone else); Normal uses classic Battle.net's channel-list rule (blue rep, green
+            // admin, white same-game, yellow everyone else). See both ChatPalette methods.
+            var c = UseD2Layout
+                ? Palette.GetD2NameColor(Flags)
+                : Palette.GetChannelListNameColor(Flags, IsSameProduct);
             return new SolidColorBrush(Color.FromRgb(c.R, c.G, c.B));
         }
     }

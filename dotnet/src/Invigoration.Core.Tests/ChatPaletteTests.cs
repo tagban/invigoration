@@ -52,4 +52,39 @@ public class ChatPaletteTests
         var flags = (uint)(UserFlags.Blizzard | UserFlags.Admin);
         Assert.Equal(Palette.Blue, Palette.GetChannelListNameColor(flags, isSameGame: true));
     }
+
+    // D2 Style's own rule, per the user's description of how Diablo II's chat actually looked:
+    // blue for Blizzard reps/techs, yellow for Speakers, white for everyone else — deliberately
+    // fewer colors than GetChannelListNameColor above (no green admin, no same-game distinction).
+    [Theory]
+    [InlineData(UserFlags.Blizzard)]
+    [InlineData(UserFlags.Admin)]
+    public void GetD2NameColor_RepAndTech_ReturnBlue(UserFlags flag)
+    {
+        Assert.Equal(Palette.Blue, Palette.GetD2NameColor((uint)flag));
+    }
+
+    [Fact]
+    public void GetD2NameColor_Speaker_ReturnsYellow()
+    {
+        Assert.Equal(Palette.Yellow, Palette.GetD2NameColor((uint)UserFlags.Speaker));
+    }
+
+    [Theory]
+    [InlineData(UserFlags.None)]
+    [InlineData(UserFlags.Operator)]
+    [InlineData(UserFlags.Special)]
+    [InlineData(UserFlags.Squelched)]
+    public void GetD2NameColor_EveryoneElse_ReturnsWhite(UserFlags flag)
+    {
+        Assert.Equal(Palette.White, Palette.GetD2NameColor((uint)flag));
+    }
+
+    // Regression: a rep who also holds Speaker still reads as a rep — blue outranks yellow, the
+    // same way Blizzard outranks everything in the classic channel-list rule.
+    [Fact]
+    public void GetD2NameColor_RepAndSpeaker_RepWins()
+    {
+        Assert.Equal(Palette.Blue, Palette.GetD2NameColor((uint)(UserFlags.Blizzard | UserFlags.Speaker)));
+    }
 }

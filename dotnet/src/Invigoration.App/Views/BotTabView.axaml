@@ -11,7 +11,11 @@
              x:Class="Invigoration.App.Views.BotTabView"
              x:DataType="vm:BotTabViewModel">
 
-    <Grid RowDefinitions="Auto,*,Auto">
+    <!-- Row 2 is D2 Style's bottom dock (BotConfig.UseD2ChatLayout): the Users/Friends/Clan panel
+         moves down there instead of sitting in column 2, and the chat log spans the full width
+         above it. In Normal layout that row simply has no visible child, so Auto collapses it to
+         nothing — no second copy of the panel, no layout cost when the setting is off. -->
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MinWidth="200" />
             <ColumnDefinition Width="4" />
@@ -34,6 +38,7 @@
              BNCS/Chat-Telnet only — a SupportsMultiChannel bot (SC2/SC:R/WC3:R)
              uses the per-channel sub-tabs below instead. -->
         <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll" Background="{Binding BackgroundBrush}"
+                      Grid.ColumnSpan="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
                       IsVisible="{Binding !SupportsMultiChannel}">
             <!-- Explicit FontSize/LineHeight (not left to the theme default) so AppendLine's inline
                  icon has a known, controllable line box to center inside — a 20px icon on an
@@ -49,6 +54,7 @@
              ChannelTabView, resolved via the same global ViewLocator MainWindow.axaml's own
              bot-tab TabControl relies on) and its own roster (see the Users tab below). -->
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*" IsVisible="{Binding SupportsMultiChannel}"
+              Grid.ColumnSpan="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
               Background="{Binding BackgroundBrush}">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,0">
                 <Button Content="+" Padding="8,2" FontSize="12" ToolTip.Tip="Join another channel">
@@ -106,11 +112,102 @@
             </TabControl>
         </Grid>
 
+        <!-- Column splitter only makes sense while the panel is actually in column 2; D2 Style
+             docks it below the chat instead, where a column-resizer would drag nothing. -->
         <GridSplitter Grid.Row="1" Grid.Column="1" Width="4" Background="#3A3A3A"
-                      HorizontalAlignment="Stretch" ResizeDirection="Columns" />
+                      HorizontalAlignment="Stretch" ResizeDirection="Columns"
+                      IsVisible="{Binding !Config.UseD2ChatLayout}" />
 
-        <!-- Right-hand panel: users in the current channel, friends list, and (per-game) clan roster -->
-        <TabControl Grid.Row="1" Grid.Column="2" Margin="0,4,8,8"
+        <!-- D2 Style's ornamental frame: a metallic/bone surround for the chat area with corner
+             flourishes and a cradle the chat gem sits in, echoing Diablo II's own gothic chat
+             chrome. Drawn as vector paths rather than sourced art so it scales to any window
+             size and tints from one gradient instead of shipping nine-slice bitmaps. Purely an
+             overlay — IsHitTestVisible="False" so it can sit over the chat without swallowing
+             text selection, scrolling or clicks, and declared before the gem button below so the
+             gem paints on top of its cradle. -->
+        <Panel Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3" Margin="3,1,3,0"
+               IsVisible="{Binding Config.UseD2ChatLayout}" IsHitTestVisible="False">
+            <Panel.Resources>
+                <LinearGradientBrush x:Key="OrnateMetal" StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Color="#9A8757" Offset="0" />
+                    <GradientStop Color="#E8DBB4" Offset="0.3" />
+                    <GradientStop Color="#7A6A47" Offset="0.62" />
+                    <GradientStop Color="#3E3428" Offset="1" />
+                </LinearGradientBrush>
+            </Panel.Resources>
+
+            <Border BorderBrush="{StaticResource OrnateMetal}" BorderThickness="2" CornerRadius="5" Margin="0,0,0,9" />
+
+            <!-- Corner flourishes: an L-bracket that curls inward at the elbow, mirrored into each
+                 corner via RenderTransform rather than four hand-written path strings. -->
+            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,2,0,0" />
+            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                  HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
+                  RenderTransform="scaleX(-1)" />
+            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                  HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,11"
+                  RenderTransform="scaleY(-1)" />
+            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                  HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,11"
+                  RenderTransform="scale(-1,-1)" />
+
+            <!-- Gem cradle: scrollwork sweeping out either side of the gem, with a socket ring
+                 behind it, so the gem reads as set into the frame rather than floating over it.
+                 The solid backing plate hides the frame's own bottom edge behind the setting. -->
+            <Panel HorizontalAlignment="Center" VerticalAlignment="Bottom" Height="26" Width="150" Margin="0,0,0,0">
+                <Border Background="#1B1B1B" Width="46" Height="20" CornerRadius="10"
+                        HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Path Data="M 0,10 C 18,10 24,2 38,2 M 2,15 C 18,15 22,7 36,6"
+                      Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="14,0,0,0" />
+                <Path Data="M 0,10 C 18,10 24,2 38,2 M 2,15 C 18,15 22,7 36,6"
+                      Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                      RenderTransform="scaleX(-1)" />
+                <Ellipse Width="30" Height="22" Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+            </Panel>
+        </Panel>
+
+        <!-- Diablo II's chat gem: centered just above the character strip, exactly where D2 put
+             it. Click toggles blue (activated) / red (deactivated) and prints one line into this
+             bot's own chat log — local flavor only, nothing goes to Battle.net. D2 Style only,
+             since there's no strip for it to sit above in Normal layout. Overlaid at the bottom
+             of the chat row rather than given its own grid row so it doesn't add vertical
+             chrome when the chat is short, and declared after the frame above so it sits inside
+             its cradle. -->
+        <Button Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="3"
+                IsVisible="{Binding Config.UseD2ChatLayout}"
+                Command="{Binding ToggleChatGemCommand}"
+                HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,2"
+                Background="Transparent" BorderThickness="0" Padding="6,2" Cursor="Hand"
+                ToolTip.Tip="{Binding ChatGemTooltip}">
+            <Panel Width="26" Height="18">
+                <!-- Faceted look on the cheap: a diamond behind a smaller highlight sliver, both
+                     tinted from the palette's blue/red so the gem follows the bot's color scheme
+                     instead of hardcoding Diablo's own palette. -->
+                <Path Data="M 13,0 L 26,9 L 13,18 L 0,9 Z" Fill="{Binding ChatGemBrush}"
+                      Stroke="#20000000" StrokeThickness="1" />
+                <Path Data="M 13,3 L 20,9 L 13,7 L 6,9 Z" Fill="#59FFFFFF" />
+            </Panel>
+        </Button>
+
+        <!-- Users in the current channel, friends list, and (per-game) clan roster. Normally the
+             right-hand column; in D2 Style (BotConfig.UseD2ChatLayout) the same control moves to
+             the bottom dock (row 2, full width) and gets a height cap so it reads as a strip
+             under the chat rather than eating half the tab. The 100000 "cap" in Normal layout is
+             just an unreachable number standing in for "no cap" — Grid row sizing handles it
+             there. -->
+        <TabControl Grid.Row="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='2|1'}"
+                    Grid.Column="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='0|2'}"
+                    Grid.ColumnSpan="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
+                    MaxHeight="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='190|100000'}"
+                    Margin="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToThicknessConverter.Instance}, ConverterParameter='8,0,8,8|0,4,8,8'}"
                     Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="6" Padding="0">
             <TabControl.Styles>
                 <!-- Compact header text (this panel is otherwise all small/dense text — Fluent's default TabItem
@@ -137,7 +234,18 @@
                 </TabItem.Header>
                 <Panel>
                 <ListBox ItemsSource="{Binding ChannelUsers}" Background="Transparent" BorderThickness="0" Padding="0,4"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
                          IsVisible="{Binding !SupportsMultiChannel}">
+                    <!-- D2 Style lays these out left-to-right as a portrait strip along the bottom
+                         dock; Normal keeps the usual vertical list. Still a VirtualizingStackPanel
+                         either way — this list routinely holds thousands of rows during a mass-join
+                         flood, and swapping in a plain StackPanel to get a horizontal flow would
+                         have quietly undone all of the load-testing work that made that survivable. -->
+                    <ListBox.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <VirtualizingStackPanel Orientation="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToOrientationConverter.Instance}}" />
+                        </ItemsPanelTemplate>
+                    </ListBox.ItemsPanel>
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="8,1" />
@@ -153,23 +261,12 @@
                                  (true once the loaded icon is taller than the classic 14px) switches the row
                                  between a single compact line and username/ping stacked, so a 32px-tall icon isn't
                                  left towering over one thin line of text. -->
-                            <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center">
-                                <!-- Whisper switches to the global Whispers tab with a thread open for this user
-                                     (MainWindowViewModel.FocusWhisperThread) rather than silently setting
-                                     whisper-focus with no visible feedback. Profile Info opens a real BNCS 1.0
-                                     profile window (SID_READUSERDATA/WRITEUSERDATA — ProfileWindow). Clan Rank is
-                                     a submenu: "View Info" (/claninfo) plus one "Set: <rank>" entry per
-                                     ClanRankStore rank, built in code-behind (OnUserContextMenuOpened) rather than
-                                     bound from XAML — this row's own (ChannelUserViewModel) DataContext binding up
-                                     to the enclosing BotTabViewModel via a $parent[views:BotTabView] ancestor-walk
-                                     crashed the published build outright (type resolution failed at runtime
-                                     despite compiling fine in Debug), and this codebase already has a standing
-                                     warning (see OnSendInlineWhisperClick's remarks) that this class of binding
-                                     fails silently through TabControls/Popups even when it doesn't crash. Squelch
-                                     and Add Friend are real BNCS chat commands, sent straight through. Everything
-                                     here shows unconditionally (no SupportsClan gating) since /claninfo and
-                                     /clanrank already reply gracefully when clan tracking isn't set up. -->
-                                <Grid.ContextMenu>
+                            <!-- Panel (not the Grid directly) is the template root so the context menu
+                                 below applies to both arrangements — D2 Style hides the Grid, and a
+                                 menu attached to a hidden control would leave the portrait tiles with
+                                 no right-click at all. -->
+                            <Panel>
+                                <Panel.ContextMenu>
                                     <ContextMenu Opened="OnUserContextMenuOpened">
                                         <MenuItem Header="Whisper" Click="OnUserWhisperClick" />
                                         <MenuItem Header="Focus for Reply" Click="OnUserFocusClick"
@@ -188,7 +285,42 @@
                                                   ToggleType="CheckBox" Click="OnToggleClassicIconStyleClick"
                                                   ToolTip.Tip="When on, a moderator/Blizzard Rep/etc.'s rank badge replaces their game icon (real classic Battle.net behavior) instead of showing both side by side." />
                                     </ContextMenu>
-                                </Grid.ContextMenu>
+                                </Panel.ContextMenu>
+                            <!-- D2 Style tile: portrait above the name, centered, and nothing else —
+                                 no ping, no separate rank badge, matching how Diablo II's own chat
+                                 lined characters up along the bottom of the screen. Fixed tile width
+                                 so the strip reads as an even lineup instead of jittering with name
+                                 length; longer names ellipsize rather than stretching their tile. The
+                                 name color follows D2's own sparser rule (see
+                                 ChannelUserViewModel.UsernameBrush). -->
+                            <StackPanel IsVisible="{Binding UseD2Layout}" Width="88" Margin="2,4"
+                                        Orientation="Vertical" Spacing="3" VerticalAlignment="Top">
+                                <Image Source="{Binding DisplayIconImage}" MaxWidth="44" MaxHeight="44"
+                                       Stretch="Uniform" HorizontalAlignment="Center"
+                                       ToolTip.Tip="{Binding StatStringDescription}" />
+                                <TextBlock Text="{Binding Username}" Foreground="{Binding UsernameBrush}"
+                                           FontSize="11" TextAlignment="Center" HorizontalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="86"
+                                           ToolTip.Tip="{Binding Username}" />
+                            </StackPanel>
+
+                            <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center"
+                                  IsVisible="{Binding !UseD2Layout}">
+                                <!-- Whisper switches to the global Whispers tab with a thread open for this user
+                                     (MainWindowViewModel.FocusWhisperThread) rather than silently setting
+                                     whisper-focus with no visible feedback. Profile Info opens a real BNCS 1.0
+                                     profile window (SID_READUSERDATA/WRITEUSERDATA — ProfileWindow). Clan Rank is
+                                     a submenu: "View Info" (/claninfo) plus one "Set: <rank>" entry per
+                                     ClanRankStore rank, built in code-behind (OnUserContextMenuOpened) rather than
+                                     bound from XAML — this row's own (ChannelUserViewModel) DataContext binding up
+                                     to the enclosing BotTabViewModel via a $parent[views:BotTabView] ancestor-walk
+                                     crashed the published build outright (type resolution failed at runtime
+                                     despite compiling fine in Debug), and this codebase already has a standing
+                                     warning (see OnSendInlineWhisperClick's remarks) that this class of binding
+                                     fails silently through TabControls/Popups even when it doesn't crash. Squelch
+                                     and Add Friend are real BNCS chat commands, sent straight through. Everything
+                                     here shows unconditionally (no SupportsClan gating) since /claninfo and
+                                     /clanrank already reply gracefully when clan tracking isn't set up. -->
                                 <Image Grid.Column="0" Source="{Binding DisplayIconImage}" MaxWidth="32" MaxHeight="32"
                                        Stretch="Uniform" VerticalAlignment="Center"
                                        ToolTip.Tip="{Binding StatStringDescription}" />
@@ -219,6 +351,7 @@
                                        Stretch="Uniform" VerticalAlignment="Center"
                                        IsVisible="{Binding ShowSeparateStatusIcon}" />
                             </Grid>
+                            </Panel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>
@@ -356,7 +489,9 @@
         </TabControl>
 
         <!-- Input -->
-        <Grid Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" Margin="8">
+        <!-- Row 3, not 2 — row 2 is D2 Style's bottom dock (see the root Grid's remarks); the
+             input box stays below it in both layouts. -->
+        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto" Margin="8">
             <!-- Tinted with the scheme's Highlight color, thickening on focus, so it's obvious this box has focus before you type. -->
             <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message or /command..."
                      Classes="chatInput" BorderBrush="{Binding HighlightBrush}" BorderThickness="1">
