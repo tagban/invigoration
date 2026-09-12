@@ -205,13 +205,13 @@
 
                                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="6,0"
                                             VerticalAlignment="Center" IsVisible="{Binding !IsLargeIcon}">
-                                    <TextBlock Text="{Binding Username}" Foreground="White" VerticalAlignment="Center" />
+                                    <TextBlock Text="{Binding Username}" Foreground="{Binding UsernameBrush}" VerticalAlignment="Center" />
                                     <TextBlock Text="{Binding Ping}" Foreground="White" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
                                 </StackPanel>
 
                                 <StackPanel Grid.Column="1" Orientation="Vertical" Margin="6,0"
                                             VerticalAlignment="Center" IsVisible="{Binding IsLargeIcon}">
-                                    <TextBlock Text="{Binding Username}" Foreground="White" />
+                                    <TextBlock Text="{Binding Username}" Foreground="{Binding UsernameBrush}" />
                                     <TextBlock Text="{Binding Ping}" Foreground="White" Opacity="0.6" FontSize="11" />
                                 </StackPanel>
 

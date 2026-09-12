@@ -265,6 +265,9 @@ public partial class ConfigViewModel : ObservableObject
                 new("Rep", p.GetUserNameColor((uint)UserFlags.Blizzard)),
                 new("Guest", p.GetUserNameColor((uint)UserFlags.Special)),
                 new("Ignored", p.GetUserNameColor((uint)UserFlags.Squelched)),
+                new("Rep (channel list)", p.GetChannelListNameColor((uint)UserFlags.Blizzard, false)),
+                new("Same game (channel list)", p.GetChannelListNameColor(0, true)),
+                new("Different game (channel list)", p.GetChannelListNameColor(0, false)),
             ];
         }
     }
@@ -327,6 +330,8 @@ public partial class ConfigViewModel : ObservableObject
         dst.Guest = src.Guest;
         dst.UserNameDefault = src.UserNameDefault;
         dst.EmoteDefault = src.EmoteDefault;
+        dst.Blue = src.Blue;
+        dst.Yellow = src.Yellow;
 
         ColorScheme = ChatColorScheme.Custom;
         RefreshPaletteSwatches();

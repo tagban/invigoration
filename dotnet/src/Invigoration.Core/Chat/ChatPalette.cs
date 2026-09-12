@@ -60,6 +60,12 @@ public sealed class ChatPalette
     public required RgbColor UserNameDefault { get; init; }
     public required RgbColor EmoteDefault { get; init; }
 
+    /// <summary>Channel-list-only role (see GetChannelListNameColor) — distinct from Cyan, which GetUserNameColor/GetChatColor use for Blizzard reps in chat text instead. Real classic Battle.net used a plain blue here, not cyan.</summary>
+    public required RgbColor Blue { get; init; }
+
+    /// <summary>Channel-list-only default for a user on a different game than the local bot (see GetChannelListNameColor) — distinct from UserNameDefault, which colors chat text instead.</summary>
+    public required RgbColor Yellow { get; init; }
+
     /// <summary>Ported from bnubot's getUserNameColor(flags): colors a user's name by their highest-priority channel flag.</summary>
     public RgbColor GetUserNameColor(uint flags)
     {
@@ -99,6 +105,23 @@ public sealed class ChatPalette
     }
 
     /// <summary>
+    /// Real classic Battle.net channel-list username coloring (per explicit user description, not
+    /// derived from bnubot — the channel list used its own distinct rule, separate from
+    /// GetUserNameColor's chat-text-flag-priority scheme above): Blizzard Representatives in blue,
+    /// Battle.net Administrators in green, anyone playing the same product as the local bot in
+    /// white, everyone else in yellow. Unlike GetUserNameColor, Operator/Speaker/Special guest
+    /// don't get their own color here — those are already conveyed by the row's status badge
+    /// (ChatIcon.GetStatusIconKey), and real Battle.net didn't color-code them in the list either.
+    /// </summary>
+    public RgbColor GetChannelListNameColor(uint flags, bool isSameGame)
+    {
+        var f = (UserFlags)flags;
+        if (f.HasFlag(UserFlags.Blizzard)) return Blue;
+        if (f.HasFlag(UserFlags.Admin)) return Green;
+        return isSameGame ? White : Yellow;
+    }
+
+    /// <summary>
     /// This port's original palette — bnubot's InvigorationColorScheme, using
     /// the correctly byte-order-decoded values this port already shipped
     /// with (bnubot's own Java source reuses the raw VB6 BGR literals
@@ -123,6 +146,8 @@ public sealed class ChatPalette
         Guest = new RgbColor(0x8D, 0x00, 0xCE),
         UserNameDefault = new RgbColor(0xA8, 0x9D, 0x65),
         EmoteDefault = new RgbColor(0xA8, 0x9D, 0x65),
+        Blue = new RgbColor(0x2C, 0xAC, 0xE8), // same legible sky-blue as SelfUserName above
+        Yellow = new RgbColor(0xCE, 0xCE, 0x51), // matches DiabloII's Speaker/Debug yellow below
     };
 
     /// <summary>bnubot's StarcraftColorScheme — plain java.awt.Color named constants, no byte-order ambiguity. Background is lightened from bnubot's pure black, which left pure-blue Info text nearly illegible.</summary>
@@ -145,6 +170,8 @@ public sealed class ChatPalette
         Guest = new RgbColor(0xFF, 0x00, 0xFF),
         UserNameDefault = new RgbColor(0xFF, 0xFF, 0x00),
         EmoteDefault = new RgbColor(0xFF, 0xFF, 0x00),
+        Blue = new RgbColor(0x5C, 0x8D, 0xFF), // same lightened blue as Info above (pure Color.BLUE was illegible)
+        Yellow = new RgbColor(0xFF, 0xFF, 0x00), // Color.YELLOW — same as Debug/UserNameDefault above
     };
 
     /// <summary>bnubot's Diablo2ColorScheme — already standard RGB hex literals, no byte-order ambiguity.</summary>
@@ -167,6 +194,8 @@ public sealed class ChatPalette
         Guest = new RgbColor(0x8D, 0x00, 0xCE),
         UserNameDefault = new RgbColor(0xA8, 0x9D, 0x65),
         EmoteDefault = new RgbColor(0x55, 0x55, 0x55),
+        Blue = new RgbColor(0x44, 0x40, 0x9C), // same indigo-blue as Info above
+        Yellow = new RgbColor(0xCE, 0xCE, 0x51), // same as Speaker/Debug above
     };
 
     public static ChatPalette ForScheme(Config.BotConfig config) => config.ChatColorScheme switch
@@ -196,6 +225,8 @@ public sealed class ChatPalette
         Guest = FromPacked(c.Guest),
         UserNameDefault = FromPacked(c.UserNameDefault),
         EmoteDefault = FromPacked(c.EmoteDefault),
+        Blue = FromPacked(c.Blue),
+        Yellow = FromPacked(c.Yellow),
     };
 
     private static RgbColor FromPacked(int rgb) => new((byte)(rgb >> 16), (byte)(rgb >> 8), (byte)rgb);
@@ -220,6 +251,8 @@ public sealed class ChatPalette
         Guest = ToPacked(Guest),
         UserNameDefault = ToPacked(UserNameDefault),
         EmoteDefault = ToPacked(EmoteDefault),
+        Blue = ToPacked(Blue),
+        Yellow = ToPacked(Yellow),
     };
 
     private static int ToPacked(RgbColor c) => (c.R << 16) | (c.G << 8) | c.B;

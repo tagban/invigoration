@@ -741,7 +741,12 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         }
         else
         {
-            user = new ChannelUserViewModel(e.Username) { UseClassicIconStyle = Config.ClassicUserIconStyle };
+            user = new ChannelUserViewModel(e.Username)
+            {
+                UseClassicIconStyle = Config.ClassicUserIconStyle,
+                BotProduct = Config.Product,
+                Palette = Engine.Palette,
+            };
             _channelUsersByName[e.Username] = user;
         }
 

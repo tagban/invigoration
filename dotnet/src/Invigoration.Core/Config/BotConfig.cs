@@ -309,6 +309,8 @@ public sealed class CustomChatPalette
     public int Guest { get; set; } = 0x8D00CE;
     public int UserNameDefault { get; set; } = 0xA89D65;
     public int EmoteDefault { get; set; } = 0xA89D65;
+    public int Blue { get; set; } = 0x2CACE8;
+    public int Yellow { get; set; } = 0xCECE51;
 }
 
 /// <summary>A custom color scheme plus its display name, as exported to/imported from a standalone .json file to share with other users.</summary>

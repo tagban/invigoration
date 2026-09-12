@@ -50,6 +50,9 @@ public partial class ColorManagerViewModel : ObservableObject
                 new("Rep", p.GetUserNameColor((uint)UserFlags.Blizzard)),
                 new("Guest", p.GetUserNameColor((uint)UserFlags.Special)),
                 new("Ignored", p.GetUserNameColor((uint)UserFlags.Squelched)),
+                new("Rep (channel list)", p.GetChannelListNameColor((uint)UserFlags.Blizzard, false)),
+                new("Same game (channel list)", p.GetChannelListNameColor(0, true)),
+                new("Different game (channel list)", p.GetChannelListNameColor(0, false)),
             ];
         }
     }
@@ -76,6 +79,8 @@ public partial class ColorManagerViewModel : ObservableObject
             new("Guest name/chat", () => c.Guest, v => c.Guest = v, RefreshPreview),
             new("Default username", () => c.UserNameDefault, v => c.UserNameDefault = v, RefreshPreview),
             new("Default emote", () => c.EmoteDefault, v => c.EmoteDefault = v, RefreshPreview),
+            new("Blizzard-rep name (channel list)", () => c.Blue, v => c.Blue = v, RefreshPreview),
+            new("Different-game name (channel list)", () => c.Yellow, v => c.Yellow = v, RefreshPreview),
         ];
 
         RefreshSchemes();
@@ -186,5 +191,7 @@ public partial class ColorManagerViewModel : ObservableObject
         dst.Guest = src.Guest;
         dst.UserNameDefault = src.UserNameDefault;
         dst.EmoteDefault = src.EmoteDefault;
+        dst.Blue = src.Blue;
+        dst.Yellow = src.Yellow;
     }
 }
