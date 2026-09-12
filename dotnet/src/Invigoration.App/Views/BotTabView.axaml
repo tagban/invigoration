@@ -190,7 +190,8 @@
                                     </ContextMenu>
                                 </Grid.ContextMenu>
                                 <Image Grid.Column="0" Source="{Binding DisplayIconImage}" MaxWidth="32" MaxHeight="32"
-                                       Stretch="Uniform" VerticalAlignment="Center" />
+                                       Stretch="Uniform" VerticalAlignment="Center"
+                                       ToolTip.Tip="{Binding StatString}" />
 
                                 <!-- Real classic Battle.net behavior: once a StarCraft-family/Warcraft II
                                      user is actually ladder-rated, their win-count badge (ChatIcon.
