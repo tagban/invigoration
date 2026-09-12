@@ -134,43 +134,80 @@
                     <GradientStop Color="#7A6A47" Offset="0.62" />
                     <GradientStop Color="#3E3428" Offset="1" />
                 </LinearGradientBrush>
+                <!-- Dimmer companion tone for the inner hairline and the mid-edge filigree, so the
+                     ornament reads as layered depth rather than one flat outline everywhere. -->
+                <LinearGradientBrush x:Key="OrnateMetalDim" StartPoint="0%,0%" EndPoint="0%,100%">
+                    <GradientStop Color="#5E5138" Offset="0" />
+                    <GradientStop Color="#8E7C55" Offset="0.35" />
+                    <GradientStop Color="#4A3F2C" Offset="1" />
+                </LinearGradientBrush>
             </Panel.Resources>
 
+            <!-- Double rule: a heavier outer band with a thin inner hairline just inside it, the
+                 cheapest way to read as cast metal rather than a plain 2px box. -->
             <Border BorderBrush="{StaticResource OrnateMetal}" BorderThickness="2" CornerRadius="5" Margin="0,0,0,9" />
+            <Border BorderBrush="{StaticResource OrnateMetalDim}" BorderThickness="1" CornerRadius="3" Margin="4,4,4,13" />
 
-            <!-- Corner flourishes: an L-bracket that curls inward at the elbow, mirrored into each
+            <!-- Mid-edge filigree: a small diamond flanked by tapering strokes, centred on the top
+                 edge and both sides, so the long runs of border aren't left bare between corners. -->
+            <Path Data="M 22,7 L 29,0 L 36,7 L 29,14 Z M 0,7 L 20,7 M 38,7 L 58,7"
+                  Stroke="{StaticResource OrnateMetalDim}" StrokeThickness="2" Fill="{StaticResource OrnateMetalDim}"
+                  HorizontalAlignment="Center" VerticalAlignment="Top" Margin="0,-5,0,0" />
+            <Path Data="M 7,22 L 0,29 L 7,36 L 14,29 Z M 7,0 L 7,20 M 7,38 L 7,58"
+                  Stroke="{StaticResource OrnateMetalDim}" StrokeThickness="2" Fill="{StaticResource OrnateMetalDim}"
+                  HorizontalAlignment="Left" VerticalAlignment="Center" Margin="-4,0,0,9" />
+            <Path Data="M 7,22 L 0,29 L 7,36 L 14,29 Z M 7,0 L 7,20 M 7,38 L 7,58"
+                  Stroke="{StaticResource OrnateMetalDim}" StrokeThickness="2" Fill="{StaticResource OrnateMetalDim}"
+                  HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,-4,9" />
+
+            <!-- Corner flourishes: an L-bracket that curls inward at the elbow, with a second
+                 inner curl and a small boss (stud) where the two arms meet — mirrored into each
                  corner via RenderTransform rather than four hand-written path strings. -->
-            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
-                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+            <Path Data="M 0,38 L 0,11 C 0,5 5,0 11,0 L 38,0 M 5,17 C 5,10 10,5 17,5 M 11,27 C 11,18 18,11 27,11 M 6,6 l 4,0 l 0,4 l -4,0 Z"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2" Fill="{StaticResource OrnateMetal}"
                   HorizontalAlignment="Left" VerticalAlignment="Top" Margin="2,2,0,0" />
-            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
-                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+            <Path Data="M 0,38 L 0,11 C 0,5 5,0 11,0 L 38,0 M 5,17 C 5,10 10,5 17,5 M 11,27 C 11,18 18,11 27,11 M 6,6 l 4,0 l 0,4 l -4,0 Z"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2" Fill="{StaticResource OrnateMetal}"
                   HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,2,0"
                   RenderTransform="scaleX(-1)" />
-            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
-                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+            <Path Data="M 0,38 L 0,11 C 0,5 5,0 11,0 L 38,0 M 5,17 C 5,10 10,5 17,5 M 11,27 C 11,18 18,11 27,11 M 6,6 l 4,0 l 0,4 l -4,0 Z"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2" Fill="{StaticResource OrnateMetal}"
                   HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="2,0,0,11"
                   RenderTransform="scaleY(-1)" />
-            <Path Data="M 0,26 L 0,9 C 0,4 4,0 9,0 L 26,0 M 4,13 C 4,8 8,4 13,4"
-                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+            <Path Data="M 0,38 L 0,11 C 0,5 5,0 11,0 L 38,0 M 5,17 C 5,10 10,5 17,5 M 11,27 C 11,18 18,11 27,11 M 6,6 l 4,0 l 0,4 l -4,0 Z"
+                  Stroke="{StaticResource OrnateMetal}" StrokeThickness="2" Fill="{StaticResource OrnateMetal}"
                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,2,11"
                   RenderTransform="scale(-1,-1)" />
 
             <!-- Gem cradle: scrollwork sweeping out either side of the gem, with a socket ring
                  behind it, so the gem reads as set into the frame rather than floating over it.
                  The solid backing plate hides the frame's own bottom edge behind the setting. -->
-            <Panel HorizontalAlignment="Center" VerticalAlignment="Bottom" Height="26" Width="150" Margin="0,0,0,0">
-                <Border Background="#1B1B1B" Width="46" Height="20" CornerRadius="10"
+            <Panel HorizontalAlignment="Center" VerticalAlignment="Bottom" Height="30" Width="230" Margin="0,0,0,0">
+                <!-- Backing plate first, so the frame's bottom rule disappears behind the setting
+                     and the gem looks mounted into the metal rather than taped over it. -->
+                <Border Background="#1B1B1B" Width="58" Height="24" CornerRadius="12"
                         HorizontalAlignment="Center" VerticalAlignment="Center" />
-                <Path Data="M 0,10 C 18,10 24,2 38,2 M 2,15 C 18,15 22,7 36,6"
+                <!-- Wings: a long sweep out to a curl, with a shorter under-stroke shadowing it
+                     and three tapering feathers fanning back toward the frame edge. -->
+                <Path Data="M 0,12 C 24,12 32,3 52,3 C 58,3 60,7 56,9 C 53,10 51,8 53,6
+                            M 3,17 C 24,17 30,9 48,8
+                            M 10,12 L 4,6 M 22,11 L 17,4 M 34,9 L 30,2"
                       Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
-                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="14,0,0,0" />
-                <Path Data="M 0,10 C 18,10 24,2 38,2 M 2,15 C 18,15 22,7 36,6"
+                      HorizontalAlignment="Left" VerticalAlignment="Center" Margin="20,0,0,0" />
+                <Path Data="M 0,12 C 24,12 32,3 52,3 C 58,3 60,7 56,9 C 53,10 51,8 53,6
+                            M 3,17 C 24,17 30,9 48,8
+                            M 10,12 L 4,6 M 22,11 L 17,4 M 34,9 L 30,2"
                       Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
-                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,14,0"
+                      HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,20,0"
                       RenderTransform="scaleX(-1)" />
-                <Ellipse Width="30" Height="22" Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                <!-- Double socket ring with four claw prongs holding the stone. -->
+                <Ellipse Width="38" Height="26" Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
                          HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Ellipse Width="30" Height="20" Stroke="{StaticResource OrnateMetalDim}" StrokeThickness="1"
+                         HorizontalAlignment="Center" VerticalAlignment="Center" />
+                <Path Data="M 0,0 L 5,5 M 22,0 L 17,5 M 0,16 L 5,11 M 22,16 L 17,11"
+                      Stroke="{StaticResource OrnateMetal}" StrokeThickness="2"
+                      HorizontalAlignment="Center" VerticalAlignment="Center" />
             </Panel>
         </Panel>
 
