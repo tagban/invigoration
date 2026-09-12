@@ -82,6 +82,17 @@ public static class ChatIcon
             };
         }
 
+        // WarCraft III/TFT: the client itself already computes a "win level" (1-5, TFT tops out
+        // at 6 but no art exists upstream for that tier) and race tier baked directly into the
+        // statstring's own Icon Code field (bnetdocs.org/document/18/chat-statstrings) — no
+        // separate profile query needed, contrary to an earlier assumption here that this whole
+        // feature was blocked on one. Real per-race, per-level portraits sourced from
+        // classic.battle.net/war3/ladder/icons.shtml (the WC3 ladder site's own icon folder).
+        if (product is "3RAW" or "PX3W" && noStatusIcon && TryGetWar3TierIconKey(statString) is { } war3Key)
+        {
+            return war3Key;
+        }
+
         return product switch
         {
             "3RAW" or "PX3W" => "war3",
@@ -152,6 +163,52 @@ public static class ChatIcon
         rating = 0;
         wins = 0;
         return false;
+    }
+
+    private static readonly Dictionary<char, string> War3TierRaces = new()
+    {
+        ['H'] = "human",
+        ['O'] = "orc",
+        ['U'] = "undead",
+        ['N'] = "nightelf",
+        ['R'] = "random",
+        // 'D' = Tournament (TFT) has no icon art available from classic.battle.net's own ladder
+        // site — falls through to null (and the caller's flat "war3" fallback) below.
+    };
+
+    /// <summary>
+    /// A WarCraft III/TFT statstring's Icon Code field, translated to an asset key — or null if
+    /// there's no code to read yet (0 fields: stats not assigned before joining, per
+    /// bnetdocs.org/document/18/chat-statstrings — "often appears with bots who join a channel
+    /// automatically and not waiting until the user clicks 'Enter Chat'"), the code doesn't match
+    /// the documented "Level + Tier + 3W" shape, or it names a tier this app has no art for
+    /// (level 6/TFT-only, or the Tournament race). Untested against a real WC3 connection as of
+    /// this writing — the field-start offset (index 5, mirroring every other product's icon-class
+    /// stats layout) is inferred from the documented "space-delimited fields after the product
+    /// code," not confirmed byte-for-byte, so treat a wrong badge here as a likely off-by-one to
+    /// fix, not a dead end.
+    /// </summary>
+    private static string? TryGetWar3TierIconKey(string statString)
+    {
+        var fields = statString.Length > 5 ? statString[5..].Split(' ') : [];
+        if (fields.Length == 0 || fields[0].Length < 3 || !fields[0].EndsWith("3W", StringComparison.Ordinal))
+        {
+            return null;
+        }
+
+        var iconCode = fields[0];
+        if (!char.IsDigit(iconCode[0]))
+        {
+            return null;
+        }
+
+        var level = iconCode[0] - '0';
+        if (level is < 1 or > 5)
+        {
+            return null;
+        }
+
+        return War3TierRaces.TryGetValue(iconCode[1], out var race) ? $"war3-tier{level}-{race}" : null;
     }
 
     /// <summary>The status/rank badge icon key, or "" if the user has none of these flags.</summary>

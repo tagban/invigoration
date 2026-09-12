@@ -183,4 +183,44 @@ public class ChatIconTests
     {
         Assert.Equal(expected, ChatIcon.GetLadderScore(statString));
     }
+
+    // "3RAWX" + "<iconCode> <level> [<clanTag>]" — bnetdocs.org/document/18/chat-statstrings'
+    // documented WC3/TFT Icon Code format is "Level + Tier + \"3W\"" (e.g. "5H3W" = level 5
+    // Human). Real per-level, per-race portraits sourced from classic.battle.net/war3/ladder/
+    // icons.shtml. Untested against a live WC3 connection as of this writing — see
+    // ChatIcon.TryGetWar3TierIconKey's own remarks on the field-offset assumption.
+    [Theory]
+    [InlineData("3RAWX1O3W 0", "war3-tier1-orc")]
+    [InlineData("3RAWX5H3W 500", "war3-tier5-human")]
+    [InlineData("3RAWX3U3W 250", "war3-tier3-undead")]
+    [InlineData("3RAWX4N3W 500", "war3-tier4-nightelf")]
+    [InlineData("3RAWX2R3W 25", "war3-tier2-random")]
+    public void GetProductIconKey_War3WithIconCode_ReturnsTierBadge(string statString, string expected)
+    {
+        Assert.Equal(expected, ChatIcon.GetProductIconKey(statString));
+    }
+
+    [Fact]
+    public void GetProductIconKey_War3Tft_SharesTheSameTierBadges()
+    {
+        Assert.Equal("war3-tier2-orc", ChatIcon.GetProductIconKey("PX3WX2O3W 25"));
+    }
+
+    // Regression: 0 fields (stats not assigned yet — bnetdocs notes this "often appears with bots
+    // who join a channel automatically") and a level 6/TFT-only or Tournament-tier code (no art
+    // available) must both fall back to the flat "war3" logo rather than throwing or guessing.
+    [Theory]
+    [InlineData("3RAW")]
+    [InlineData("3RAWX6H3W 3000")]
+    [InlineData("3RAWX1D3W 0")]
+    public void GetProductIconKey_War3WithoutUsableIconCode_FallsBackToPlainIcon(string statString)
+    {
+        Assert.Equal("war3", ChatIcon.GetProductIconKey(statString));
+    }
+
+    [Fact]
+    public void GetProductIconKey_War3WithStatusIcon_StatusTakesPriorityOverTier()
+    {
+        Assert.Equal("war3", ChatIcon.GetProductIconKey("3RAWX5H3W 500", (uint)UserFlags.Blizzard));
+    }
 }

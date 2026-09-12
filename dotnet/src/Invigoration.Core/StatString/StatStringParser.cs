@@ -19,14 +19,10 @@ public static class StatStringParser
         switch (product)
         {
             case "3RAW":
-                if (statString.Length > 4)
-                {
-                    return "";
-                }
+                return ParseWar3Stats(statString, "WarCraft III: Reign of Chaos");
 
-                return statString.Length == 4
-                    ? "WarCraft III: Reign of Chaos (No stats available)"
-                    : $"WarCraft III: Reign of Chaos (error: {statString})";
+            case "PX3W":
+                return ParseWar3Stats(statString, "WarCraft III: The Frozen Throne");
 
             case "RHSS":
                 return "Starcraft Shareware.";
@@ -59,6 +55,36 @@ public static class StatStringParser
             default:
                 return "";
         }
+    }
+
+    // Contrary to an earlier assumption in this codebase (this case used to unconditionally
+    // return "No stats available" for a bare 4-char product code and "" — silently discarding the
+    // data — for anything longer), WarCraft III/TFT statstrings do carry real per-user data:
+    // bnetdocs.org/document/18/chat-statstrings documents 2 fields plus 1 optional one, space-
+    // delimited: an Icon Code ("Level + Tier + \"3W\"", e.g. "5H3W" = level 5 Human), the player's
+    // raw level (their highest across all game types; '0' = no ladder games), and an optional
+    // reversed clan tag. There can also be 0 fields at all ("often appears with bots who join a
+    // channel automatically and not waiting until the user clicks 'Enter Chat'"), and a
+    // documented edge case where a statstring carries a level and clan tag but no icon code —
+    // handled here by checking whether the first field actually looks like an icon code (ends in
+    // "3W") rather than assuming a fixed position. Field-start offset (index 5, same convention
+    // as every other product below) isn't independently confirmed against a live WC3 statstring
+    // as of this writing — see ChatIcon.TryGetWar3TierIconKey's matching remarks.
+    private static string ParseWar3Stats(string statString, string label)
+    {
+        var fields = statString.Length > 5 ? statString[5..].Split(' ') : [];
+        if (fields.Length == 0 || fields[0].Length == 0)
+        {
+            return $"{label} (No stats available)";
+        }
+
+        var hasIconCode = fields[0].EndsWith("3W", StringComparison.Ordinal);
+        var levelField = hasIconCode ? fields.ElementAtOrDefault(1) : fields[0];
+        var clanTagField = hasIconCode ? fields.ElementAtOrDefault(2) : fields.ElementAtOrDefault(1);
+
+        var levelSuffix = levelField is null or "0" ? "" : $" (level {levelField})";
+        var clanSuffix = clanTagField is { Length: > 0 } ? $" [{new string(clanTagField.Reverse().ToArray())}]" : "";
+        return $"{label}{levelSuffix}{clanSuffix}";
     }
 
     private static string ParseIconClassStats(string statString, string label)

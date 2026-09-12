@@ -80,4 +80,35 @@ public class StatStringParserTests
 
         Assert.Equal("Diablo: (Level 30 rogue with 2 dots, 55 strength, 20 magic, 15 dexterity, 40 vitality, and 100 gold).", result);
     }
+
+    // Regression: this used to unconditionally return "" for any WC3/TFT statstring longer than
+    // the bare 4-char product code, silently discarding real data — bnetdocs.org/document/18/
+    // chat-statstrings confirms the fields exist (Icon Code, Level, optional reversed clan tag).
+    [Fact]
+    public void Parse_War3WithIconCodeAndLevel_ReportsLevel()
+    {
+        Assert.Equal("WarCraft III: Reign of Chaos (level 500)", StatStringParser.Parse("3RAWX5H3W 500"));
+    }
+
+    [Fact]
+    public void Parse_War3NoStatsAssignedYet_ReportsNoStats()
+    {
+        Assert.Equal("WarCraft III: Reign of Chaos (No stats available)", StatStringParser.Parse("3RAW"));
+    }
+
+    [Fact]
+    public void Parse_War3WithClanTag_ReversesIt()
+    {
+        // Reversed clan tag on the wire, per bnetdocs — "ATOB" on the wire is clan "BOTA".
+        Assert.Equal("WarCraft III: The Frozen Throne (level 250) [BOTA]", StatStringParser.Parse("PX3WX3U3W 250 ATOB"));
+    }
+
+    // Regression: a documented edge case ("I just got a W3XP statstring that contained a level
+    // and clan tag but no icon data") must still report the level/clan tag rather than
+    // misreading the level number as an icon code and losing both fields.
+    [Fact]
+    public void Parse_War3LevelAndClanTagButNoIconCode_StillReportsBoth()
+    {
+        Assert.Equal("WarCraft III: The Frozen Throne (level 500) [BOTA]", StatStringParser.Parse("PX3WX500 ATOB"));
+    }
 }
