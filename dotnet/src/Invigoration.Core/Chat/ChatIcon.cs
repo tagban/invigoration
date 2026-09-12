@@ -172,19 +172,27 @@ public static class ChatIcon
         ['U'] = "undead",
         ['N'] = "nightelf",
         ['R'] = "random",
-        // 'D' = Tournament (TFT) has no icon art available from classic.battle.net's own ladder
-        // site — falls through to null (and the caller's flat "war3" fallback) below.
+        ['D'] = "tourney", // Tournament (TFT) — real per-tier art, sourced 2026-09-12
     };
 
     /// <summary>
     /// A WarCraft III/TFT statstring's Icon Code field, translated to an asset key — or null if
     /// there's no code to read yet (0 fields: stats not assigned before joining, per
     /// bnetdocs.org/document/18/chat-statstrings — "often appears with bots who join a channel
-    /// automatically and not waiting until the user clicks 'Enter Chat'"), the code doesn't match
-    /// the documented "Level + Tier + 3W" shape, or it names a tier this app has no art for
-    /// (level 6/TFT-only, or the Tournament race). The field-start offset (index 5, mirroring
+    /// automatically and not waiting until the user clicks 'Enter Chat'") or the code doesn't
+    /// match the documented "Level + Tier + 3W" shape. The field-start offset (index 5, mirroring
     /// every other product's icon-class stats layout) was an inferred guess as of 2026-09-11 —
     /// confirmed correct the next day against the user's own real WC3: TFT connection.
+    ///
+    /// Level 1 is a single shared icon across every race/tourney, not per-race art — confirmed
+    /// 2026-09-12 against the real icon-index text files bundled with icons-WAR3.bni
+    /// (files.bnetdocs.org/Battle.net/Icons/Extracted/WAR3/iconindex_def2.txt: every "W3*1" entry,
+    /// human/orc/undead/nightelf/random/tourney alike, maps to the same "tier1-orc.blp" — this
+    /// codebase had earlier sourced distinct-looking tier1 art per race from classic.battle.net's
+    /// public ladder-info page, which turned out to be that page's own illustrative-only art, not
+    /// what the real client actually displays; same "public page shows something prettier/more
+    /// detailed than the functional icon" pattern already seen with SC's "stars.jpg"/WC2's
+    /// "Axes.jpg" concept images).
     /// </summary>
     private static string? TryGetWar3TierIconKey(string statString)
     {
@@ -201,12 +209,17 @@ public static class ChatIcon
         }
 
         var level = iconCode[0] - '0';
-        if (level is < 1 or > 5)
+        if (level is < 1 or > 6)
         {
             return null;
         }
 
-        return War3TierRaces.TryGetValue(iconCode[1], out var race) ? $"war3-tier{level}-{race}" : null;
+        if (!War3TierRaces.ContainsKey(iconCode[1]))
+        {
+            return null;
+        }
+
+        return level == 1 ? "war3-tier1" : $"war3-tier{level}-{War3TierRaces[iconCode[1]]}";
     }
 
     /// <summary>The status/rank badge icon key, or "" if the user has none of these flags.</summary>

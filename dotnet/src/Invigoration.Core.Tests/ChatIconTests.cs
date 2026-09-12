@@ -186,15 +186,22 @@ public class ChatIconTests
 
     // "3RAWX" + "<iconCode> <level> [<clanTag>]" — bnetdocs.org/document/18/chat-statstrings'
     // documented WC3/TFT Icon Code format is "Level + Tier + \"3W\"" (e.g. "5H3W" = level 5
-    // Human). Real per-level, per-race portraits sourced from classic.battle.net/war3/ladder/
-    // icons.shtml. Untested against a live WC3 connection as of this writing — see
-    // ChatIcon.TryGetWar3TierIconKey's own remarks on the field-offset assumption.
+    // Human). Field-start offset confirmed 2026-09-12 against the user's own live WC3: TFT
+    // connection. Level 1 is a single shared icon regardless of race/tourney (confirmed against
+    // the real icon-index text files bundled with icons-WAR3.bni — see
+    // ChatIcon.TryGetWar3TierIconKey's remarks); levels 2-6 are real per-race, per-level art —
+    // level 6 and the Tournament ("D") tier sourced 2026-09-12 from the actual icons-WAR3.bni
+    // resource (files.bnetdocs.org/Battle.net/Icons/Extracted/WAR3), the rest from
+    // classic.battle.net/war3/ladder/icons.shtml.
     [Theory]
-    [InlineData("3RAWX1O3W 0", "war3-tier1-orc")]
+    [InlineData("3RAWX1O3W 0", "war3-tier1")]
+    [InlineData("3RAWX1D3W 0", "war3-tier1")]
     [InlineData("3RAWX5H3W 500", "war3-tier5-human")]
     [InlineData("3RAWX3U3W 250", "war3-tier3-undead")]
     [InlineData("3RAWX4N3W 500", "war3-tier4-nightelf")]
     [InlineData("3RAWX2R3W 25", "war3-tier2-random")]
+    [InlineData("3RAWX6H3W 3000", "war3-tier6-human")]
+    [InlineData("3RAWX2D3W 25", "war3-tier2-tourney")]
     public void GetProductIconKey_War3WithIconCode_ReturnsTierBadge(string statString, string expected)
     {
         Assert.Equal(expected, ChatIcon.GetProductIconKey(statString));
@@ -207,12 +214,13 @@ public class ChatIconTests
     }
 
     // Regression: 0 fields (stats not assigned yet — bnetdocs notes this "often appears with bots
-    // who join a channel automatically") and a level 6/TFT-only or Tournament-tier code (no art
-    // available) must both fall back to the flat "war3" logo rather than throwing or guessing.
+    // who join a channel automatically"), a level outside the documented 1-6 range, or a tier
+    // letter this app doesn't recognize at all must all fall back to the flat "war3" logo rather
+    // than throwing or guessing.
     [Theory]
     [InlineData("3RAW")]
-    [InlineData("3RAWX6H3W 3000")]
-    [InlineData("3RAWX1D3W 0")]
+    [InlineData("3RAWX7H3W 3000")]
+    [InlineData("3RAWX2X3W 25")]
     public void GetProductIconKey_War3WithoutUsableIconCode_FallsBackToPlainIcon(string statString)
     {
         Assert.Equal("war3", ChatIcon.GetProductIconKey(statString));
