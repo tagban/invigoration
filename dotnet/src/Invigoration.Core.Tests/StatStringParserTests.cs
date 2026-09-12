@@ -65,4 +65,19 @@ public class StatStringParserTests
     {
         Assert.Equal("", StatStringParser.Parse("ZZZZ"));
     }
+
+    // Field order per bnetdocs.org/document/18/chat-statstrings, "Diablo I" (confirmed
+    // 2026-09-11): Level, Class, Dots, Strength, Magic, Dexterity, Vitality, Gold, Spawned.
+    // Regression: this previously read Dots at index 1 and Class at index 2 (swapped), so a
+    // rogue who'd killed Diablo on Nightmare (class=1, dots=2) was reported as "1 dots" wearing
+    // a "sorceror" class instead of "2 dots" as a "rogue."
+    [Fact]
+    public void Parse_DiabloClassAndDots_UsesCorrectFieldOrder()
+    {
+        var stats = "LTRDX30 1 2 55 20 15 40 100 0";
+
+        var result = StatStringParser.Parse(stats);
+
+        Assert.Equal("Diablo: (Level 30 rogue with 2 dots, 55 strength, 20 magic, 15 dexterity, 40 vitality, and 100 gold).", result);
+    }
 }

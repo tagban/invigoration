@@ -78,6 +78,11 @@ public static class StatStringParser
             : $"{label}{spawn}: ({wins} wins).";
     }
 
+    // Field order (bnetdocs.org/document/18/chat-statstrings, "Diablo I"): Level, Class, Dots,
+    // Strength, Magic, Dexterity, Vitality, Gold, Spawned — confirmed 2026-09-11. This previously
+    // read values[1] as dots and values[2] as class (swapped), a real bug: any Diablo player who'd
+    // killed Diablo at all showed the wrong class name and a garbled dots value pulled from their
+    // actual character class digit instead.
     private static string ParseDiabloClassicStats(string statString, string fallback, string label)
     {
         var values = statString.Length > 5 ? statString[5..].Split(' ') : [];
@@ -86,7 +91,7 @@ public static class StatStringParser
             return fallback;
         }
 
-        var className = values[2] switch
+        var className = values[1] switch
         {
             "0" => "warrior",
             "1" => "rogue",
@@ -94,7 +99,7 @@ public static class StatStringParser
             _ => "unknown class",
         };
 
-        return $"{label}: (Level {values[0]} {className} with {values[1]} dots, {values[3]} strength, " +
+        return $"{label}: (Level {values[0]} {className} with {values[2]} dots, {values[3]} strength, " +
                $"{values[4]} magic, {values[5]} dexterity, {values[6]} vitality, and {values[7]} gold).";
     }
 

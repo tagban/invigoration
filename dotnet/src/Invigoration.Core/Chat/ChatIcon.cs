@@ -119,16 +119,19 @@ public static class ChatIcon
 
     /// <summary>
     /// The number of "red dots" (0-3) a Diablo statstring's icon-class stats report — same
-    /// space-split wire layout StatStringParser.ParseDiabloClassicStats reads (index 1 there,
-    /// labeled "dots"), duplicated here rather than shared since that method builds a
-    /// human-readable sentence and has no reason to expose a structured field. Null if the
-    /// statstring doesn't parse as Diablo icon-class stats at all (e.g. an Open Character with no
-    /// stats yet) — GetProductIconKey falls back to the flat "diablo" icon in that case.
+    /// space-split wire layout StatStringParser.ParseDiabloClassicStats reads, duplicated here
+    /// rather than shared since that method builds a sentence and has no reason to expose a
+    /// structured field. Field order (bnetdocs.org/document/18/chat-statstrings, confirmed
+    /// 2026-09-11): Level, Class, Dots, Strength, Magic, Dexterity, Vitality, Gold, Spawned — dots
+    /// is index 2, not index 1 (that was a real bug here and in ParseDiabloClassicStats, both
+    /// fixed together). Null if the statstring doesn't parse as Diablo icon-class stats at all
+    /// (e.g. an Open Character with no stats yet) — GetProductIconKey falls back to the flat
+    /// "diablo" icon in that case.
     /// </summary>
     private static int? TryGetDiabloDots(string statString)
     {
         var values = statString.Length > 5 ? statString[5..].Split(' ') : [];
-        return values.Length == 9 && int.TryParse(values[1], out var dots) ? Math.Clamp(dots, 0, 3) : null;
+        return values.Length == 9 && int.TryParse(values[2], out var dots) ? Math.Clamp(dots, 0, 3) : null;
     }
 
     /// <summary>
