@@ -2,6 +2,7 @@ using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Invigoration.Core.Chat;
+using Invigoration.Core.StatString;
 
 namespace Invigoration.App.Models;
 
@@ -29,6 +30,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(LadderScoreText))]
     [NotifyPropertyChangedFor(nameof(ShowLadderScore))]
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
+    [NotifyPropertyChangedFor(nameof(StatStringDescription))]
     public partial string StatString { get; set; } = "";
 
     /// <summary>The local bot's own 4-char wire-order product code (BotConfig.Product) — pushed in by BotTabViewModel.UpsertUser at row construction, same reason as UseClassicIconStyle below (this row's DataContext has no reachable path back up to the tab). Used only to decide whether this row counts as "same game as you" for UsernameBrush.</summary>
@@ -66,6 +68,9 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
 
     /// <summary>Only when there's a score AND the product-icon slot is actually showing the win/rank plate it belongs on — StatusIconImage not null means GetProductIconKey already deferred to the flat generic logo instead (same status-icon-takes-priority rule it applies internally), so stamping a score on that would be wrong.</summary>
     public bool ShowLadderScore => LadderScoreText != "" && StatusIconImage is null;
+
+    /// <summary>The product-icon tooltip's text — StatStringParser's own human-readable rendering (e.g. "StarCraft: (5 wins)", "WarCraft III: Reign of Chaos (level 500)") when it recognizes the product, falling back to the raw wire value for anything it doesn't (still useful for spotting what a genuinely unrecognized/malformed statstring actually contains).</summary>
+    public string StatStringDescription => StatStringParser.Parse(StatString) is { Length: > 0 } desc ? desc : StatString;
 
     private bool IsSameProduct => StatString.Length >= 4 && BotProduct.Length >= 4 &&
                                    StatString.AsSpan(0, 4).SequenceEqual(BotProduct.AsSpan(0, 4));
