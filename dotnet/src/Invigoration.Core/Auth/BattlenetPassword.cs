@@ -10,7 +10,8 @@ namespace Invigoration.Core.Auth;
 /// </summary>
 /// <remarks>
 /// <para>Warcraft III and The Frozen Throne are the exception: they log on through the NLS/SRP
-/// system, and their password goes out exactly as typed.</para>
+/// system, which hashes the password uppercased instead. Uppercasing here is also safe if a BNLS
+/// server already does it itself, since doing it twice changes nothing.</para>
 /// <para>Applied at the point a password leaves the bot (every BNLS hash, logon-challenge and
 /// account-create request) rather than to BotConfig.Password itself, so the Config window still
 /// shows what the user actually typed.</para>
@@ -18,5 +19,5 @@ namespace Invigoration.Core.Auth;
 public static class BattlenetPassword
 {
     public static string Normalize(string password, string product) =>
-        product is BncsProduct.Warcraft3 or BncsProduct.Warcraft3TFT ? password : password.ToLowerInvariant();
+        product is BncsProduct.Warcraft3 or BncsProduct.Warcraft3TFT ? password.ToUpperInvariant() : password.ToLowerInvariant();
 }

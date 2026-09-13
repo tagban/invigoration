@@ -21,17 +21,19 @@ public class BattlenetPasswordTests
     [Theory]
     [InlineData(BncsProduct.Warcraft3)]
     [InlineData(BncsProduct.Warcraft3TFT)]
-    public void Normalize_LeavesWarcraftIIIPasswordsAsTyped(string product)
+    public void Normalize_UppercasesForWarcraftIII(string product)
     {
-        Assert.Equal("HunterTWO!", BattlenetPassword.Normalize("HunterTWO!", product));
+        Assert.Equal("HUNTERTWO!", BattlenetPassword.Normalize("HunterTWO!", product));
     }
 
     // SendPasswordHashRequestAsync writes the length field from the normalized string, so
-    // lowercasing must never change an ASCII password's length.
-    [Fact]
-    public void Normalize_KeepsLengthForAsciiPasswords()
+    // changing case must never change an ASCII password's length.
+    [Theory]
+    [InlineData(BncsProduct.Starcraft)]
+    [InlineData(BncsProduct.Warcraft3TFT)]
+    public void Normalize_KeepsLengthForAsciiPasswords(string product)
     {
         const string typed = "MiXeD-CaSe_Pass99";
-        Assert.Equal(typed.Length, BattlenetPassword.Normalize(typed, BncsProduct.Starcraft).Length);
+        Assert.Equal(typed.Length, BattlenetPassword.Normalize(typed, product).Length);
     }
 }
