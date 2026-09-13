@@ -72,7 +72,7 @@ and never committed to either repo.
 ### 4. Invigoration — fetch and keep
 - **Opt-in, asked once.** When a bot is switched to a theme with the character dock (Diablo II)
   and no pack is stored yet, ask: *"Diablo II characters can be shown wearing their actual gear.
-  Download the gear data?"* Yes fetches it from Command Center's BNFTP right away; No keeps the
+  Download the gear data?"* Yes fetches it from `us.bnet.cc`'s BNFTP right away; No keeps the
   portrait tiles, and the download stays available later from the Config window / Manage Themes.
   Nothing is downloaded without that yes.
 - Minimal BNFTP client (also unblocks the ad banner).
@@ -99,8 +99,12 @@ and never committed to either repo.
   it came from.
 
 ## Open decisions
-- Which Command Center node the opt-in download comes from when the bot isn't currently on one
-  (e.g. a default like bnet.cc, or the first Command Center server the user has configured).
+- ~~Where the opt-in download comes from.~~ **Decided (2026-09-13): `us.bnet.cc`'s BNFTP by
+  default**, whatever server the bot happens to be on. Hosting the file on GitHub was floated as an
+  alternative. It's simpler to fetch (plain HTTPS), but the pack is extracted Blizzard character
+  art, and a public GitHub copy is exactly the kind of distribution Command Center's `LEGAL.md`
+  steers away from; GitHub also acts on DMCA notices, which could take the repo down with it. So
+  us.bnet.cc stays the primary source; GitHub only if that trade-off is accepted deliberately.
 - Whether other (non-Command Center) servers should be able to host a pack too — the format
   would allow it.
 - Whether Invigoration should also build a pack from a local D2 install for people who never
