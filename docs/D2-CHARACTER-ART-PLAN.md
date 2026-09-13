@@ -59,7 +59,8 @@ and never committed to either repo.
 - `bnetcc d2art build` (and/or on `bnetccd` start when MPQs are present): for each class ×
   weapon class × component slot × token that exists in the MPQs, decode only the lobby mode and
   direction, and write palette-indexed frames with their offsets.
-- Pack file: magic + format version + source game version + content hash; palette; colormaps;
+- Pack file: magic + format version (what lets a future Invigoration know it needs a newer
+  pack) + source game version + content hash; palette; colormaps;
   per-class COF draw order; the gear-byte/color-byte mapping tables from phase 0; the frames.
   Target a few MB.
 - Deterministic output, so the same install always produces the same hash.
@@ -75,9 +76,10 @@ and never committed to either repo.
   portrait tiles, and the download stays available later from the Config window / Manage Themes.
   Nothing is downloaded without that yes.
 - Minimal BNFTP client (also unblocks the ad banner).
-- Once opted in, a connection to a Command Center node also checks for a newer pack (sending
-  the cached copy's file time). Store packs in the config folder by content hash; keep the
-  newest valid one and use it on **every** server, including ones that don't serve a pack.
+- **Download once, keep it.** D2 1.14d's art never changes, so there are no update checks: the
+  pack is stored in the config folder and used on **every** server from then on, including ones
+  that don't serve a pack. The only reason to fetch again is an Invigoration update that needs a
+  newer pack format version — and then it asks again rather than downloading on its own.
 - Validate before use (magic, version, hash, bounds on every count and offset — it's data from
   the network).
 - Nothing is sent but the file request; no identity beyond the normal connection.
