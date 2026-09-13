@@ -69,10 +69,15 @@ and never committed to either repo.
   time; a node without D2 files simply doesn't have it.
 
 ### 4. Invigoration — fetch and keep
+- **Opt-in, asked once.** When a bot is switched to a theme with the character dock (Diablo II)
+  and no pack is stored yet, ask: *"Diablo II characters can be shown wearing their actual gear.
+  Download the gear data?"* Yes fetches it from Command Center's BNFTP right away; No keeps the
+  portrait tiles, and the download stays available later from the Config window / Manage Themes.
+  Nothing is downloaded without that yes.
 - Minimal BNFTP client (also unblocks the ad banner).
-- After connecting, ask the server for the pack (sending the cached copy's file time). Store
-  packs in the config folder by content hash; keep the newest valid one and use it on **every**
-  server, including ones that don't serve a pack.
+- Once opted in, a connection to a Command Center node also checks for a newer pack (sending
+  the cached copy's file time). Store packs in the config folder by content hash; keep the
+  newest valid one and use it on **every** server, including ones that don't serve a pack.
 - Validate before use (magic, version, hash, bounds on every count and offset — it's data from
   the network).
 - Nothing is sent but the file request; no identity beyond the normal connection.
@@ -92,6 +97,8 @@ and never committed to either repo.
   it came from.
 
 ## Open decisions
+- Which Command Center node the opt-in download comes from when the bot isn't currently on one
+  (e.g. a default like bnet.cc, or the first Command Center server the user has configured).
 - Whether other (non-Command Center) servers should be able to host a pack too — the format
   would allow it.
 - Whether Invigoration should also build a pack from a local D2 install for people who never
