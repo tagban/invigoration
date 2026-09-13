@@ -44,6 +44,28 @@ public readonly record struct D2Character(
     /// <summary>Which difficulty the character has fully completed, 0-3 — the rank their title reflects.</summary>
     public int TitleTier => Math.Clamp(Progress / (Expansion ? 5 : 4), 0, 3);
 
+    /// <summary>Amazon, Sorceress and Assassin — the classes Diablo II gives feminine titles.</summary>
+    public bool IsFemale => ClassIndex is 0 or 1 or 6;
+
+    /// <summary>
+    /// The title Diablo II shows before the character's name ("Slayer", "Matriarch", "Countess"...),
+    /// or "" before Normal is completed. Classic and expansion characters earn different titles, and
+    /// hardcore characters their own set.
+    /// </summary>
+    public string Title => (Expansion, TitleTier) switch
+    {
+        (_, 0) => "",
+        (true, 1) => Hardcore ? "Destroyer" : "Slayer",
+        (true, 2) => Hardcore ? "Conquerer" : "Champion",
+        (true, _) => Hardcore ? "Guardian" : IsFemale ? "Matriarch" : "Patriarch",
+        (false, 1) => IsFemale ? (Hardcore ? "Countess" : "Dame") : (Hardcore ? "Count" : "Sir"),
+        (false, 2) => IsFemale ? (Hardcore ? "Duchess" : "Lady") : (Hardcore ? "Duke" : "Lord"),
+        (false, _) => IsFemale ? (Hardcore ? "Queen" : "Baroness") : (Hardcore ? "King" : "Baron"),
+    };
+
+    /// <summary>"Matriarch Kilua" — the title and name together, as the lobby labels a character.</summary>
+    public string TitledName => Title.Length > 0 ? $"{Title} {Name}" : Name;
+
     /// <summary>Whether this character's product is the expansion (PX2D) — decides the label, independent of <see cref="Expansion"/>, which is the character's own flag.</summary>
     public static bool IsD2Product(string statString) =>
         statString.StartsWith("VD2D", StringComparison.Ordinal) || statString.StartsWith("PX2D", StringComparison.Ordinal);

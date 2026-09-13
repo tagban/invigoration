@@ -179,6 +179,52 @@
                     </Border>
                 </TabItem.Header>
                 <Panel>
+                <!-- The character dock's ground: dark grass lit toward the middle and falling off into
+                     shadow at the top and edges, like Diablo II's lobby strip. Drawn, not an image, so it
+                     tiles to any width. Only in a character-dock theme. -->
+                <Panel IsVisible="{Binding Theme.UsesCharacterDock}" IsHitTestVisible="False" ClipToBounds="True">
+                    <Border>
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="0%,100%">
+                                <GradientStop Color="#060C05" Offset="0" />
+                                <GradientStop Color="#132710" Offset="0.35" />
+                                <GradientStop Color="#223F17" Offset="0.8" />
+                                <GradientStop Color="#1A3212" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border Margin="0,28,0,0">
+                        <Border.Background>
+                            <DrawingBrush TileMode="Tile" DestinationRect="0,0,17,13" Stretch="None">
+                                <DrawingBrush.Drawing>
+                                    <DrawingGroup>
+                                        <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 17 V 13 H 0 Z" />
+                                        <GeometryDrawing Geometry="M 2,13 L 3,6 M 7,13 L 6,7 M 11,13 L 13,5 M 15,13 L 15,8">
+                                            <GeometryDrawing.Pen>
+                                                <Pen Brush="#5A3F7A26" Thickness="1" />
+                                            </GeometryDrawing.Pen>
+                                        </GeometryDrawing>
+                                        <GeometryDrawing Geometry="M 4,13 L 5,8 M 9,13 L 9,4 M 13,13 L 12,9">
+                                            <GeometryDrawing.Pen>
+                                                <Pen Brush="#48101E0A" Thickness="1" />
+                                            </GeometryDrawing.Pen>
+                                        </GeometryDrawing>
+                                    </DrawingGroup>
+                                </DrawingBrush.Drawing>
+                            </DrawingBrush>
+                        </Border.Background>
+                    </Border>
+                    <Border>
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0%,0%" EndPoint="100%,0%">
+                                <GradientStop Color="#90000000" Offset="0" />
+                                <GradientStop Color="#00000000" Offset="0.12" />
+                                <GradientStop Color="#00000000" Offset="0.88" />
+                                <GradientStop Color="#90000000" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                    </Border>
+                </Panel>
                 <ListBox ItemsSource="{Binding ChannelUsers}" Background="Transparent" BorderThickness="0" Padding="0,4"
                          ScrollViewer.HorizontalScrollBarVisibility="Auto"
                          IsVisible="{Binding !SupportsMultiChannel}">
@@ -232,33 +278,38 @@
                                                   ToolTip.Tip="When on, a moderator/Blizzard Rep/etc.'s rank badge replaces their game icon (real classic Battle.net behavior) instead of showing both side by side." />
                                     </ContextMenu>
                                 </Panel.ContextMenu>
-                            <!-- D2 Style tile: portrait above the name, centered, and nothing else —
-                                 no ping, no separate rank badge, matching how Diablo II's own chat
-                                 lined characters up along the bottom of the screen. Fixed tile width
-                                 so the strip reads as an even lineup instead of jittering with name
-                                 length; longer names ellipsize rather than stretching their tile. The
-                                 name color follows D2's own sparser rule (see
-                                 ChannelUserViewModel.UsernameBrush). -->
-                            <StackPanel IsVisible="{Binding UseD2Layout}" Width="88" Margin="2,4"
-                                        Orientation="Vertical" Spacing="3" VerticalAlignment="Top">
-                                <!-- A Diablo II character gets their real Battle.net portrait tile at
-                                     triple size, pixel-doubled rather than smoothed so the 28×14
-                                     sprite stays crisp; everyone else keeps their usual icon. The
-                                     portrait shows even for a rank-badged user here — the character
-                                     is the point of this strip, and the name color already marks
-                                     reps. -->
-                                <Image Source="{Binding D2PortraitImage}" Width="84" Height="42" Stretch="Fill"
-                                       RenderOptions.BitmapInterpolationMode="None" HorizontalAlignment="Center"
-                                       IsVisible="{Binding HasD2Portrait}"
-                                       ToolTip.Tip="{Binding StatStringDescription}" />
-                                <Image Source="{Binding DisplayIconImage}" MaxWidth="44" MaxHeight="44"
-                                       Stretch="Uniform" HorizontalAlignment="Center"
-                                       IsVisible="{Binding !HasD2Portrait}"
-                                       ToolTip.Tip="{Binding StatStringDescription}" />
-                                <TextBlock Text="{Binding Username}" Foreground="{Binding UsernameBrush}"
-                                           FontSize="11" TextAlignment="Center" HorizontalAlignment="Center"
-                                           TextTrimming="CharacterEllipsis" MaxWidth="86"
-                                           ToolTip.Tip="{Binding Username}" />
+                            <!-- Character dock tile, Diablo II lobby style: a full-body figure standing on
+                                 the grass with the name under it, and nothing else — no ping, no rank
+                                 badge. The figure is the Battle.net chat avatar D2 drew for them (the
+                                 Moderator with his ban hammer, a StarCraft marine, the hooded Unknown...,
+                                 see ChatAvatar); a live D2 character shows their Battle.net portrait tile
+                                 until full dressed figures are drawn. Fixed width so the strip reads as an
+                                 even lineup; long names ellipsize. The name color follows D2's own
+                                 sparser rule (see ChannelUserViewModel.UsernameBrush). -->
+                            <StackPanel IsVisible="{Binding UseD2Layout}" Width="96" Margin="2,2"
+                                        Orientation="Vertical" Spacing="1" VerticalAlignment="Top"
+                                        ToolTip.Tip="{Binding StatStringDescription}">
+                                <Panel Width="92" Height="88">
+                                    <!-- A soft shadow to stand them on the ground. -->
+                                    <Ellipse Width="46" Height="9" Fill="#70000000" VerticalAlignment="Bottom" Margin="0,0,0,1" />
+                                    <views:SpriteAnimationView Animation="{Binding DockAvatar}" Phase="{Binding AnimationPhase}"
+                                                               Width="78" Height="88" HorizontalAlignment="Center"
+                                                               IsVisible="{Binding ShowsDockAvatar}" />
+                                    <Image Source="{Binding D2PortraitImage}" Width="84" Height="42" Stretch="Fill"
+                                           RenderOptions.BitmapInterpolationMode="None" HorizontalAlignment="Center"
+                                           VerticalAlignment="Bottom" Margin="0,0,0,6"
+                                           IsVisible="{Binding ShowsDockPortrait}" />
+                                    <Image Source="{Binding DisplayIconImage}" MaxWidth="44" MaxHeight="44"
+                                           Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,6"
+                                           IsVisible="{Binding ShowsDockIcon}" />
+                                </Panel>
+                                <TextBlock Text="{Binding DockName}" Foreground="{Binding UsernameBrush}"
+                                           FontSize="11" FontWeight="SemiBold" TextAlignment="Center" HorizontalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" MaxWidth="94">
+                                    <TextBlock.Effect>
+                                        <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="1" Color="Black" Opacity="1" />
+                                    </TextBlock.Effect>
+                                </TextBlock>
                             </StackPanel>
 
                             <Grid ColumnDefinitions="Auto,*,Auto" VerticalAlignment="Center"

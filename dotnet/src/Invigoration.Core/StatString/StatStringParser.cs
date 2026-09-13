@@ -143,34 +143,8 @@ public static class StatStringParser
         }
 
         var charClass = character.ClassIndex is >= 0 and <= 6 ? character.ClassIndex : 7;
-        var female = charClass is 0 or 1 or 6;
         var hardcore = character.Hardcore;
-
-        // TitleTier counts completed difficulties from the act byte. It used to be read straight
-        // off bits 0x18 of that byte, which only lines up with the classic game's four acts per
-        // difficulty — an expansion character in Nightmare Act IV/V or Hell Act IV/V was already
-        // titled for the next difficulty up.
-        string title;
-        if (character.Expansion)
-        {
-            title = character.TitleTier switch
-            {
-                1 => hardcore ? "Destroyer" : "Slayer",
-                2 => hardcore ? "Conquerer" : "Champion",
-                3 => hardcore ? "Guardian" : (female ? "Matriarch" : "Patriarch"),
-                _ => "",
-            };
-        }
-        else
-        {
-            title = character.TitleTier switch
-            {
-                1 => female ? (hardcore ? "Countess" : "Dame") : (hardcore ? "Count" : "Sir"),
-                2 => female ? (hardcore ? "Duchess" : "Lady") : (hardcore ? "Duke" : "Lord"),
-                3 => female ? (hardcore ? "Queen" : "Baroness") : (hardcore ? "King" : "Baron"),
-                _ => "",
-            };
-        }
+        var title = character.Title;
 
         var titlePrefix = title.Length > 0 ? title + " " : "";
         var deadPrefix = hardcore && character.Dead ? "dead " : "";

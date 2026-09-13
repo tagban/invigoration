@@ -18,6 +18,10 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
     [NotifyPropertyChangedFor(nameof(ShowLadderScore))]
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
+    [NotifyPropertyChangedFor(nameof(DockAvatar))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockAvatar))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockPortrait))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockIcon))]
     public partial uint Flags { get; set; }
 
     [ObservableProperty]
@@ -33,6 +37,11 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(StatStringDescription))]
     [NotifyPropertyChangedFor(nameof(D2PortraitImage))]
     [NotifyPropertyChangedFor(nameof(HasD2Portrait))]
+    [NotifyPropertyChangedFor(nameof(DockAvatar))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockAvatar))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockPortrait))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockIcon))]
+    [NotifyPropertyChangedFor(nameof(DockName))]
     public partial string StatString { get; set; } = "";
 
     /// <summary>The local bot's own 4-char wire-order product code (BotConfig.Product) — pushed in by BotTabViewModel.UpsertUser at row construction, same reason as UseClassicIconStyle below (this row's DataContext has no reachable path back up to the tab). Used only to decide whether this row counts as "same game as you" for UsernameBrush.</summary>
@@ -61,6 +70,25 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     public Bitmap? D2PortraitImage => D2PortraitLoader.Get(StatString);
 
     public bool HasD2Portrait => D2PortraitImage is not null;
+
+    // --- Character dock (Diablo II lobby strip) ---
+
+    /// <summary>The Battle.net chat avatar D2's lobby would draw for this user — Moderator, Blizzard Rep, a StarCraft marine, the hooded Unknown... (see ChatAvatar for the rules) — or null for a live D2 character, who's drawn as themselves.</summary>
+    public SpriteAnimation? DockAvatar => ChatAvatarLoader.Get(ChatAvatar.For(Flags, StatString));
+
+    public bool ShowsDockAvatar => DockAvatar is not null;
+
+    /// <summary>A live D2 character, shown (for now) by their Battle.net portrait tile; the full dressed figure needs D2's own character art.</summary>
+    public bool ShowsDockPortrait => ChatAvatar.For(Flags, StatString) is null && HasD2Portrait;
+
+    /// <summary>Last resort when neither an avatar nor a portrait is available (e.g. an avatar asset failed to load).</summary>
+    public bool ShowsDockIcon => !ShowsDockAvatar && !ShowsDockPortrait;
+
+    /// <summary>How the lobby labels this user: a D2 character's title and name ("Matriarch Kilua"), otherwise the account name.</summary>
+    public string DockName => Core.StatString.D2Character.TryParse(StatString, out var character) ? character.TitledName : Username;
+
+    /// <summary>A per-user offset into their avatar's loop, so a channel full of the same avatar doesn't move in lockstep. Derived from the name, so it's stable.</summary>
+    public int AnimationPhase { get; } = username.Aggregate(17, (hash, c) => unchecked(hash * 31 + c)) & 0x7FFF;
 
     /// <summary>
     /// The game-icon slot in the regular user list: the product/ladder icon from whichever icon set
