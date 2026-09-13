@@ -31,6 +31,7 @@ public sealed partial class BotEngine
             BncsPacketId.SID_NEWS_INFO => HandleNewsInfo(frame),
             BncsPacketId.SID_REQUIREDWORK => HandleRequiredWork(),
             BncsPacketId.SID_CREATEACCOUNT => HandleLegacyCreateAccountReplyAsync(),
+            BncsPacketId.SID_CHANGEPASSWORD => HandleChangePasswordReplyAsync(frame),
             BncsPacketId.SID_SETEMAIL => HandleSetEmail(),
             BncsPacketId.SID_FRIENDSLIST => HandleFriendsList(frame),
             BncsPacketId.SID_FRIENDSUPDATE => HandleFriendsUpdate(frame),
@@ -116,9 +117,14 @@ public sealed partial class BotEngine
 
     private async Task OnAuthCheckPassedAsync()
     {
+        // Every logon starts from the password exactly as typed; see BattlenetPassword for why a
+        // rejection then gets one retry in the game clients' casing.
+        _auth.LogonPassword = Config.Password;
+        _auth.RetriedPasswordCasing = false;
+
         if (BncsProduct.UsesNewLoginSystem(Config.Product))
         {
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(_auth.LogonPassword);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
             return;
         }
@@ -131,7 +137,7 @@ public sealed partial class BotEngine
         _auth.HashPurpose = _auth.ChangePasswordRequested ? HashPurpose.ChangePassword : HashPurpose.AccountLogon;
         _auth.ChangePasswordRequested = false;
         _auth.HashStage = 0;
-        await SendPasswordHashRequestAsync(Config.Password).ConfigureAwait(false);
+        await SendPasswordHashRequestAsync(_auth.LogonPassword).ConfigureAwait(false);
     }
 
     private async Task HandleAuthAccountCreateAsync(byte[] frame)
@@ -145,7 +151,8 @@ public sealed partial class BotEngine
         if (status == 0)
         {
             LogInfo("Account created! Connecting with your new account...");
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
+            _auth.LogonPassword = Config.Password;
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(_auth.LogonPassword);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
             return;
         }
@@ -173,7 +180,7 @@ public sealed partial class BotEngine
         if (status == 1)
         {
             LogWarning("Account doesn't exist, attempting to create it.");
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CREATEACCOUNT).ConfigureAwait(false);
             return;
         }
@@ -193,7 +200,11 @@ public sealed partial class BotEngine
                 await OnLoggedOnAsync().ConfigureAwait(false);
                 break;
             case 0x0002:
-                LogError("Battle.net logon failed: incorrect password.");
+                if (!await TryRetryPasswordCasingAsync().ConfigureAwait(false))
+                {
+                    LogError("Battle.net logon failed: incorrect password.");
+                }
+
                 break;
             case 0x0006:
                 LogError("This account was closed or banned.");
@@ -218,7 +229,11 @@ public sealed partial class BotEngine
 
                 break;
             case 0x02:
-                LogError("Battle.net logon failed, due to incorrect password.");
+                if (!await TryRetryPasswordCasingAsync().ConfigureAwait(false))
+                {
+                    LogError("Battle.net logon failed, due to incorrect password.");
+                }
+
                 break;
             case 0x06:
                 LogError("This account was closed or banned.");
@@ -290,7 +305,41 @@ public sealed partial class BotEngine
     {
         _auth.HashPurpose = HashPurpose.RealmLogon;
         _auth.HashStage = 0;
-        return SendPasswordHashRequestAsync(Config.Password);
+        return SendPasswordHashRequestAsync(_auth.LogonPassword.Length > 0 ? _auth.LogonPassword : Config.Password);
+    }
+
+    /// <summary>
+    /// After the server rejects the password as incorrect, retries the logon once with it in the
+    /// casing Blizzard's game clients send (see BattlenetPassword) — the form an account made from
+    /// a real client, or a private server's signup page, has on file. Same connection, same
+    /// tokens; both logon systems accept a fresh attempt after a failure. False, with nothing
+    /// sent, when that retry has already happened or the password is already in that form.
+    /// </summary>
+    private async Task<bool> TryRetryPasswordCasingAsync()
+    {
+        if (_auth.RetriedPasswordCasing || BattlenetPassword.RetryCasing(Config.Password, Config.Product) is not { } retry)
+        {
+            return false;
+        }
+
+        _auth.RetriedPasswordCasing = true;
+        _auth.LogonPassword = retry;
+        var casing = BncsProduct.UsesNewLoginSystem(Config.Product) ? "uppercase" : "lowercase";
+        LogWarning($"Password not accepted as typed — retrying in {casing}, the way the game client sends it.");
+
+        if (BncsProduct.UsesNewLoginSystem(Config.Product))
+        {
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(retry);
+            await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
+        }
+        else
+        {
+            _auth.HashPurpose = HashPurpose.AccountLogon;
+            _auth.HashStage = 0;
+            await SendPasswordHashRequestAsync(retry).ConfigureAwait(false);
+        }
+
+        return true;
     }
 
     private async Task HandleLogonRealmExAsync(byte[] frame)
@@ -649,6 +698,79 @@ public sealed partial class BotEngine
     {
         LogDebug("Server sent SID_REQUIREDWORK (not implemented by design).");
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Why "Normalize Password" can't run for this bot, or null when it can. It needs the classic
+    /// logon (Warcraft III's NLS logon changes passwords through a different exchange this bot
+    /// doesn't implement, and SC2/SC:R/WC3:R don't log in with a password here at all), a username
+    /// and password to work from, and a password that isn't already in the game clients' casing.
+    /// </summary>
+    public string? NormalizePasswordUnavailableReason
+    {
+        get
+        {
+            if (BncsProduct.IsStimpakBacked(Config.Product) || BncsProduct.UsesNewLoginSystem(Config.Product))
+            {
+                return $"Normalize Password only works with the classic Battle.net logon (StarCraft, Diablo, Diablo II, Warcraft II) — {BncsProduct.GetDisplayName(Config.Product)} changes passwords a different way.";
+            }
+
+            if (string.IsNullOrEmpty(Config.Username) || string.IsNullOrEmpty(Config.Password))
+            {
+                return "Set this bot's username and password before normalizing the password.";
+            }
+
+            return BattlenetPassword.RetryCasing(Config.Password, Config.Product) is null
+                ? "This bot's password is already all lowercase — there's nothing to normalize."
+                : null;
+        }
+    }
+
+    /// <summary>
+    /// "Normalize Password to Battle.net Spec": changes this account's password on Battle.net from
+    /// exactly as typed to all lowercase — the form Blizzard's game clients send — then saves the
+    /// lowercase version as this bot's password. For an account whose password was set with
+    /// capitals by this bot (which always sent passwords as typed), after which a real game client
+    /// could never log into it. Reconnects to do it, since a password change is sent in place of
+    /// the logon, not after it.
+    /// </summary>
+    public async Task NormalizePasswordAsync()
+    {
+        if (NormalizePasswordUnavailableReason is { } reason)
+        {
+            LogError(reason);
+            return;
+        }
+
+        var lowercase = BattlenetPassword.RetryCasing(Config.Password, Config.Product)!;
+        LogInfo("Normalizing password: reconnecting to change it on Battle.net from as typed to all lowercase...");
+        await DisconnectAsync().ConfigureAwait(false);
+        _auth.ChangePasswordRequested = true;
+        _auth.NewPassword = lowercase;
+        await ConnectAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>SID_CHANGEPASSWORD reply: a single BOOL. On success the bot's own saved password follows the account's new one, then it reconnects to log on with it.</summary>
+    private async Task HandleChangePasswordReplyAsync(byte[] frame)
+    {
+        var reader = BncsConnection.GetPayloadReader(frame);
+        var succeeded = reader.ReadDword() != 0;
+        var newPassword = _auth.NewPassword;
+
+        if (!succeeded || newPassword.Length == 0)
+        {
+            LogError("Battle.net refused the password change. Either this bot's password (as typed) isn't the account's " +
+                     "current password — if it only logs in after retrying in lowercase, the account is already normalized " +
+                     "and you just need to retype the password in lowercase in the bot's settings — or the account doesn't exist.");
+            await DisconnectAsync().ConfigureAwait(false);
+            return;
+        }
+
+        Config.Password = newPassword;
+        ConfigPersistNeeded?.Invoke();
+        LogInfo("Password normalized: Battle.net now expects it in all lowercase, and this bot's saved password has been updated to match. Reconnecting...");
+        await DisconnectAsync().ConfigureAwait(false);
+        await ConnectAsync().ConfigureAwait(false);
     }
 
     private async Task HandleLegacyCreateAccountReplyAsync()

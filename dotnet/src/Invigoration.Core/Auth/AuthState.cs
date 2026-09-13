@@ -45,6 +45,12 @@ public sealed class AuthState
     public bool ChangePasswordRequested { get; set; }
 
     public string NewPassword { get; set; } = "";
+
+    /// <summary>The exact password string the current logon hashed — the one typed, or its game-client casing after a retry (see BattlenetPassword). A D2 realm logon reuses whichever one the account logon succeeded with.</summary>
+    public string LogonPassword { get; set; } = "";
+
+    /// <summary>True once this logon has already retried with the password's casing changed, so a genuinely wrong password fails on the second rejection instead of looping.</summary>
+    public bool RetriedPasswordCasing { get; set; }
 }
 
 /// <summary>Which outcome a BNLS_HASHDATA round-trip is working towards.</summary>

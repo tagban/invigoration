@@ -18,6 +18,7 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Add Bot..." Click="OnAddBotNativeClick" />
                         <NativeMenuItem Header="Edit Selected Bot..." Click="OnEditBotNativeClick" />
+                        <NativeMenuItem Header="Normalize Selected Bot's Password..." Click="OnNormalizePasswordNativeClick" />
                         <NativeMenuItem Header="Remove Selected Bot" Click="OnRemoveBotNativeClick" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Add Hotline Tracker" Click="OnAddHotlineTrackerNativeClick" />
@@ -67,6 +68,7 @@
             <MenuItem Header="_File">
                 <MenuItem Header="_Add Bot..." Click="OnAddBotClick" />
                 <MenuItem Header="_Edit Selected Bot..." Click="OnEditBotClick" />
+                <MenuItem Header="_Normalize Selected Bot's Password..." Click="OnNormalizePasswordClick" />
                 <MenuItem Header="_Remove Selected Bot" Click="OnRemoveBotClick" />
                 <Separator />
                 <MenuItem Header="Add _Hotline Tracker" Click="OnAddHotlineTrackerClick" />

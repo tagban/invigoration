@@ -280,6 +280,10 @@ public sealed partial class BotEngine : IAsyncDisposable
     {
         _isIntentionalDisconnect = true;
         _autoReconnectCts?.Cancel();
+        // A password change only ever rides the connect that NormalizePasswordAsync starts — never
+        // left armed for some later, unrelated Connect.
+        _auth.ChangePasswordRequested = false;
+        _auth.NewPassword = "";
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
@@ -491,7 +495,6 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     private Task SendPasswordHashRequestAsync(string password)
     {
-        password = BattlenetPassword.Normalize(password, Config.Product);
         var writer = new PacketWriter()
             .WriteDword((uint)password.Length)
             .WriteDword(0)
