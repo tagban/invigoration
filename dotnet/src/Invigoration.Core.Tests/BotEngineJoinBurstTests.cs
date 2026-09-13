@@ -39,7 +39,9 @@ public class BotEngineJoinBurstTests
     public async Task JoinBurst_ExceedsThreshold_StopsApplyingRankBehaviorsUntilItSubsides()
     {
         var config = new BotConfig { ClanFeatureEnabled = true, BattlenetServer = "useast.battle.net", FloodProtectionDelayMs = 0 };
-        await using var engine = new BotEngine(config);
+        // In a channel, so rank-behavior sends really enter the shared send queue this test is about
+        // (an unconnected engine's chat is otherwise held back — see BotEngine.ChatSendBlockedReason).
+        await using var engine = BotEngineChatGateTests.MarkInChannel(new BotEngine(config));
         var username = $"test-{Guid.NewGuid():N}";
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
@@ -75,7 +77,9 @@ public class BotEngineJoinBurstTests
     public async Task JoinsUnderThreshold_NeverSuppressRankBehaviors()
     {
         var config = new BotConfig { ClanFeatureEnabled = true, BattlenetServer = "useast.battle.net", FloodProtectionDelayMs = 0 };
-        await using var engine = new BotEngine(config);
+        // In a channel, so rank-behavior sends really enter the shared send queue this test is about
+        // (an unconnected engine's chat is otherwise held back — see BotEngine.ChatSendBlockedReason).
+        await using var engine = BotEngineChatGateTests.MarkInChannel(new BotEngine(config));
         var username = $"test-{Guid.NewGuid():N}";
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });

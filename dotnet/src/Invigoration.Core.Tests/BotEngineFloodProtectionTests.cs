@@ -12,6 +12,10 @@ namespace Invigoration.Core.Tests;
 /// </summary>
 public class BotEngineFloodProtectionTests
 {
+    // Chat is only sent once logged on and in a channel (see BotEngine.ChatSendBlockedReason), so
+    // put each unconnected test engine in that state; the socket send itself still no-ops.
+    private static BotEngine ChatReady(BotEngine engine) => BotEngineChatGateTests.MarkInChannel(engine);
+
     [Fact]
     public async Task SendChatCommandAsync_EnforcesMinimumDelayBetweenSends()
     {
@@ -19,7 +23,7 @@ public class BotEngineFloodProtectionTests
         // unconnected, but the flood-protection delay in SendChatCommandAsync
         // still runs before that no-op, so timing is testable in isolation.
         var config = new BotConfig { FloodProtectionDelayMs = 300 };
-        await using var engine = new BotEngine(config);
+        await using var engine = ChatReady(new BotEngine(config));
 
         // Prime the shared gate so the delta below is caused by THIS test's
         // own delay, not leftover state from another test that ran first.
@@ -43,8 +47,8 @@ public class BotEngineFloodProtectionTests
         // per-connection, for this to be caught.
         var configA = new BotConfig { FloodProtectionDelayMs = 300 };
         var configB = new BotConfig { FloodProtectionDelayMs = 300 };
-        await using var engineA = new BotEngine(configA);
-        await using var engineB = new BotEngine(configB);
+        await using var engineA = ChatReady(new BotEngine(configA));
+        await using var engineB = ChatReady(new BotEngine(configB));
 
         await engineA.SendChatCommandAsync("priming");
 
@@ -61,7 +65,7 @@ public class BotEngineFloodProtectionTests
     public async Task SendChatCommandAsync_ConcurrentCalls_AreSerializedThroughTheDelay()
     {
         var config = new BotConfig { FloodProtectionDelayMs = 200 };
-        await using var engine = new BotEngine(config);
+        await using var engine = ChatReady(new BotEngine(config));
 
         await engine.SendChatCommandAsync("priming");
 

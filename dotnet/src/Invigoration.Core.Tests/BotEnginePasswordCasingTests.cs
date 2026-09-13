@@ -55,10 +55,10 @@ public class BotEnginePasswordCasingTests
             return harness;
         }
 
-        /// <summary>Connects the engine's BNLS side and walks the authorize exchange, stopping before the version-byte reply so nothing moves on to BNCS.</summary>
-        public async Task AcceptBnlsAsync()
+        /// <summary>Accepts the engine's BNLS connection — starting it, unless the engine is already reconnecting on its own — and walks the authorize exchange, stopping before the version-byte reply so nothing moves on to BNCS.</summary>
+        public async Task AcceptBnlsAsync(bool startConnect = true)
         {
-            var connect = Engine.ConnectAsync();
+            var connect = startConnect ? Engine.ConnectAsync() : Task.CompletedTask;
             _server?.Dispose();
             _server = await _listener.AcceptTcpClientAsync();
             Bnls = _server.GetStream();
@@ -186,7 +186,7 @@ public class BotEnginePasswordCasingTests
         h.Auth.NewPassword = "huntertwo";
 
         var reply = h.InvokeAsync("HandleChangePasswordReplyAsync", ChangePasswordReply(true));
-        await h.AcceptBnlsAsync(); // the reconnect
+        await h.AcceptBnlsAsync(startConnect: false); // the engine's own reconnect
         await reply;
 
         Assert.Equal("huntertwo", h.Config.Password);

@@ -46,7 +46,9 @@ public class BotEngineJoinFloodStressTests
     public async Task RealisticBurst_MeasureWallClockTimeToSettle()
     {
         var config = new BotConfig { ClanFeatureEnabled = true, BattlenetServer = "useast.battle.net" };
-        await using var engine = new BotEngine(config);
+        // In a channel, so rank-behavior sends really enter the shared send queue this test is about
+        // (an unconnected engine's chat is otherwise held back — see BotEngine.ChatSendBlockedReason).
+        await using var engine = BotEngineChatGateTests.MarkInChannel(new BotEngine(config));
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
 

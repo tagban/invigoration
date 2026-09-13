@@ -36,6 +36,21 @@ public class TriviaGroupRegistryTests
         Assert.Same(lower, upper);
     }
 
+    // Regression: blank is "not linked" (BotConfig.TriviaGroup), but it used to match every other
+    // blank-group bot — i.e. every bot at its default — so one bot's trivia round was relayed into
+    // all of them, including bots on servers that disconnect over chat sent before joining a channel.
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public async Task GetGroupPeers_BlankGroup_LinksNoOne(string blank)
+    {
+        await using var a = new BotEngine(new BotConfig { TriviaGroup = blank });
+        await using var b = new BotEngine(new BotConfig { TriviaGroup = blank });
+        await using var c = new BotEngine(new BotConfig { TriviaGroup = "" });
+
+        Assert.Empty(TriviaGroupRegistry.GetGroupPeers(blank, a));
+    }
+
     [Fact]
     public async Task GetGroupPeers_FindsOtherEnginesInSameGroup_ExcludingSelf()
     {

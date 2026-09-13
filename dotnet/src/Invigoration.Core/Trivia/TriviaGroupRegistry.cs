@@ -55,9 +55,20 @@ public static class TriviaGroupRegistry
         }
     }
 
-    /// <summary>Every other live engine currently naming this same group (case-insensitive), excluding the caller.</summary>
+    /// <summary>Every other live engine currently naming this same group (case-insensitive), excluding the caller. None for a blank group — blank means "not linked", per BotConfig.TriviaGroup.</summary>
+    /// <remarks>
+    /// The blank check is load-bearing. Without it, every bot left at the default empty group
+    /// "matched" every other one, so a round on any bot relayed each question and hint into every
+    /// other bot's channel — including bots that were mid-reconnect and not in a channel yet,
+    /// which BNETDocs' Atlas answers by closing the connection.
+    /// </remarks>
     public static IReadOnlyList<BotEngine> GetGroupPeers(string groupName, BotEngine self)
     {
+        if (string.IsNullOrWhiteSpace(groupName))
+        {
+            return [];
+        }
+
         lock (SyncRoot)
         {
             return LiveEngines.Where(e => !ReferenceEquals(e, self) && groupName.Equals(e.Config.TriviaGroup, StringComparison.OrdinalIgnoreCase))

@@ -125,7 +125,18 @@ public sealed partial class BotEngine : IAsyncDisposable
             StopKeepAlive();
             StopIdleWatcher();
             _friends.Clear();
+            _auth.LoggedOnToBncs = false;
+            _session.CurrentChannelName = "";
             LogError($"Battle.net disconnected{(ex is null ? "." : $": {ex.Message}")}");
+            if (!_isIntentionalDisconnect && _lastBncsSend is { } last)
+            {
+                // A server that closes the socket over a packet it didn't like (Atlas does, with no
+                // reason sent) leaves nothing else to go on — the last thing this bot sent is the
+                // likeliest culprit, so name it.
+                var ago = (DateTime.UtcNow - last.SentUtc).TotalSeconds;
+                LogWarning($"Last packet sent before the drop: {last.Id} ({last.Length} bytes), {ago:0.0}s earlier.");
+            }
+
             BncsDisconnected?.Invoke(ex);
             MaybeScheduleAutoReconnect();
         };
@@ -309,10 +320,56 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// shared across every bot in the process (see ChatSendGate), not just
     /// this connection, so several of the user's own linked bots sending
     /// around the same moment still queue up rather than bursting together.
+    ///
+    /// Classic BNCS chat is also held back until the server can take it, and split to fit: see
+    /// ChatSendBlockedReason and ChatLineSplitter. Both exist because BNETDocs' Atlas closes the
+    /// connection over chat it considers invalid rather than ignoring it.
     /// </summary>
     public async Task SendChatCommandAsync(string text, byte? sc2ChannelOverride = null)
     {
+        if (string.IsNullOrEmpty(text))
+        {
+            return;
+        }
+
+        var isStimpak = BncsProduct.IsStimpakBacked(Config.Product);
+        var isSlashCommand = text[0] == '/';
+        if (!isStimpak && ChatSendBlockedReason(isSlashCommand) is { } reason)
+        {
+            LogWarning($"Not sent ({reason}): {text}");
+            return;
+        }
+
         NoteChatActivity();
+        var outgoing = isSlashCommand ? text : ApplyTextEffects(text);
+        outgoing = RewriteWhisperTargetForDiabloII(outgoing);
+
+        var lines = isStimpak ? [outgoing] : ChatLineSplitter.Split(outgoing);
+        foreach (var line in lines)
+        {
+            await SendChatLineAsync(line, isSlashCommand, isStimpak, sc2ChannelOverride).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
+    /// Why classic BNCS chat can't be sent right now, or null when it can. Nothing goes out before
+    /// logon; plain (non-command) text also waits for a channel. Real Battle.net and PvPGN just
+    /// ignore chat sent too early, but Atlas treats it as a protocol violation and disconnects —
+    /// which turned a trivia round relayed into a still-reconnecting bot into a disconnect loop.
+    /// Whispers and other slash commands don't need a channel.
+    /// </summary>
+    private string? ChatSendBlockedReason(bool isSlashCommand)
+    {
+        if (!_auth.LoggedOnToBncs)
+        {
+            return "not logged on to Battle.net";
+        }
+
+        return !isSlashCommand && string.IsNullOrEmpty(_session.CurrentChannelName) ? "not in a channel yet" : null;
+    }
+
+    private async Task SendChatLineAsync(string outgoing, bool isSlashCommand, bool isStimpak, byte? sc2ChannelOverride)
+    {
         await ChatSendGate.WaitAsync().ConfigureAwait(false);
         try
         {
@@ -322,13 +379,16 @@ public sealed partial class BotEngine : IAsyncDisposable
                 await Task.Delay((int)waitMs).ConfigureAwait(false);
             }
 
+            // The flood delay can be long enough for the connection to drop in the meantime.
+            if (!isStimpak && ChatSendBlockedReason(isSlashCommand) is { } reason)
+            {
+                LogWarning($"Not sent ({reason}): {outgoing}");
+                return;
+            }
+
             _nextChatSendAllowedUtc = DateTime.UtcNow.AddMilliseconds(Math.Max(0, Config.FloodProtectionDelayMs));
 
-            var isSlashCommand = text.Length > 0 && text[0] == '/';
-            var outgoing = isSlashCommand ? text : ApplyTextEffects(text);
-            outgoing = RewriteWhisperTargetForDiabloII(outgoing);
-
-            if (BncsProduct.IsStimpakBacked(Config.Product))
+            if (isStimpak)
             {
                 await SendSc2Async(outgoing, sc2ChannelOverride).ConfigureAwait(false);
             }
@@ -346,7 +406,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             // Config.Username is a classic-BNCS-only field — Stimpak logs in via OAuth, not a
             // username/password Config ever populates), and once for real once the server's own
             // echo arrived with the correct name and clan tag.
-            if (!isSlashCommand && !BncsProduct.IsStimpakBacked(Config.Product))
+            if (!isSlashCommand && !isStimpak)
             {
                 var segments = new List<ChatLogSegment> { new(Palette.SelfUserName, $"{Config.Username}: ") };
                 segments.AddRange(ChatColorFormatter.Parse(outgoing, Palette.White, Palette));
@@ -502,9 +562,12 @@ public sealed partial class BotEngine : IAsyncDisposable
         return SendBnlsAsync(writer, BnlsPacketId.BNLS_HASHDATA);
     }
 
+    private (BncsPacketId Id, int Length, DateTime SentUtc)? _lastBncsSend;
+
     private Task SendBncsAsync(PacketWriter writer, BncsPacketId id)
     {
         var packet = writer.ToBncsPacket(id);
+        _lastBncsSend = (id, packet.Length, DateTime.UtcNow);
         LogDebug($"BNCS send 0x{(byte)id:X2} ({id}), {packet.Length} bytes: {ToHexDump(packet)}");
         return _bncs.SendAsync(packet);
     }
