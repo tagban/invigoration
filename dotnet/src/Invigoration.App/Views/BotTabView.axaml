@@ -169,12 +169,6 @@
             <CheckBox Content="Debug logging" IsChecked="{Binding DebugMode}" Margin="16,0,0,0" />
         </StackPanel>
 
-        <!-- D2 Style: a near-black ground behind the chat and input (rows 1-2), so the gutter
-             between the frame and its contents reads as one dark recessed panel. Declared before
-             the chat so it paints underneath. -->
-        <Border Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="4,0,4,4"
-                Background="#050404" IsVisible="{Binding Config.UseD2ChatLayout}" />
-
         <!-- Chat log: one continuous SelectableTextBlock (built up in code-behind)
              so drag-select and Ctrl+C work across whole lines and multiple
              lines at once, not just within a single colored segment. Classic
@@ -270,7 +264,9 @@
 
              Everything here sits in the gutter the chat and input leave for it (their D2 margins:
              18 on the sides and bottom, 26 at the top for the name plate) — nothing is drawn over
-             chat text, and IsHitTestVisible="False" means it never takes a click either. Vector
+             chat text, and IsHitTestVisible="False" means it never takes a click either. That
+             gutter deliberately shows the app's own dark gray rather than a black backing, so it
+             reads as the window around the panel instead of as dead space inside it. Vector
              shapes rather than bitmaps, so it scales with the window and ships no art. -->
         <Panel Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="4,0,4,4"
                IsVisible="{Binding Config.UseD2ChatLayout}" IsHitTestVisible="False">
