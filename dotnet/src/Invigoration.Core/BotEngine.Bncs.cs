@@ -118,7 +118,7 @@ public sealed partial class BotEngine
     {
         if (BncsProduct.UsesNewLoginSystem(Config.Product))
         {
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
             return;
         }
@@ -145,7 +145,7 @@ public sealed partial class BotEngine
         if (status == 0)
         {
             LogInfo("Account created! Connecting with your new account...");
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
             return;
         }
@@ -173,7 +173,7 @@ public sealed partial class BotEngine
         if (status == 1)
         {
             LogWarning("Account doesn't exist, attempting to create it.");
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CREATEACCOUNT).ConfigureAwait(false);
             return;
         }

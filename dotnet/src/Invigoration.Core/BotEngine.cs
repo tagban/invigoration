@@ -491,6 +491,7 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     private Task SendPasswordHashRequestAsync(string password)
     {
+        password = BattlenetPassword.Normalize(password, Config.Product);
         var writer = new PacketWriter()
             .WriteDword((uint)password.Length)
             .WriteDword(0)
