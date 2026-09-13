@@ -31,6 +31,8 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(ShowLadderScore))]
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
     [NotifyPropertyChangedFor(nameof(StatStringDescription))]
+    [NotifyPropertyChangedFor(nameof(D2PortraitImage))]
+    [NotifyPropertyChangedFor(nameof(HasD2Portrait))]
     public partial string StatString { get; set; } = "";
 
     /// <summary>The local bot's own 4-char wire-order product code (BotConfig.Product) — pushed in by BotTabViewModel.UpsertUser at row construction, same reason as UseClassicIconStyle below (this row's DataContext has no reachable path back up to the tab). Used only to decide whether this row counts as "same game as you" for UsernameBrush.</summary>
@@ -55,7 +57,14 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
     public partial bool UseClassicIconStyle { get; set; }
 
-    public Bitmap? ProductIconImage => GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags));
+    /// <summary>A Diablo II character's real Battle.net portrait — class, hardcore/dead/ladder markings and act progress, cut from D2DV.pcx/D2XP.pcx (see D2PortraitLoader) — or null for anything that isn't a D2 character (other games, or D2 on an Open character).</summary>
+    public Bitmap? D2PortraitImage => D2PortraitLoader.Get(StatString);
+
+    public bool HasD2Portrait => D2PortraitImage is not null;
+
+    /// <summary>The game-icon slot: a D2 character's portrait tile when they have no rank badge (the same "badge wins, otherwise show what the game knows about them" rule ChatIcon.GetProductIconKey applies to every other game's ladder icons), otherwise the product/ladder icon.</summary>
+    public Bitmap? ProductIconImage =>
+        (StatusIconImage is null ? D2PortraitImage : null) ?? GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags));
 
     public Bitmap? StatusIconImage => GameIconLoader.Get(ChatIcon.GetStatusIconKey(Flags));
 
@@ -99,6 +108,8 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     public void RefreshIcons()
     {
         OnPropertyChanged(nameof(ProductIconImage));
+        OnPropertyChanged(nameof(D2PortraitImage));
+        OnPropertyChanged(nameof(HasD2Portrait));
         OnPropertyChanged(nameof(StatusIconImage));
         OnPropertyChanged(nameof(DisplayIconImage));
         OnPropertyChanged(nameof(ShowSeparateStatusIcon));

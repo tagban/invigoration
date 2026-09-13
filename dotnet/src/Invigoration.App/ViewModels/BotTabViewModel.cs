@@ -281,7 +281,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     private Task DisconnectAsync() => Engine.DisconnectAsync();
 
     /// <summary>
-    /// Diablo II's chat gem — the little jewel sitting above the character strip in D2 Style
+    /// Diablo II's chat gem — the little jewel set in a socket beside the Send button in D2 Style
     /// (shown only in that layout). Blue when activated, red when not. Purely local flavor: it
     /// toggles its own color and prints one line into this bot's own chat log, and deliberately
     /// sends nothing to Battle.net, per explicit request.

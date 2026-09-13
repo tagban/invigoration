@@ -137,48 +137,23 @@ public static class StatStringParser
         var header = stats.Length > 4 ? stats[..4] : stats;
         var label = header == "VD2D" ? "Diablo II" : "Diablo II Lord of Destruction";
 
-        if (stats.Length == 4)
+        if (!D2Character.TryParse(stats, out var character))
         {
             return $"{label}: (Open Character).";
         }
 
-        var firstComma = stats.IndexOf(',', 4);
-        if (firstComma < 0)
-        {
-            return $"{label}: (Open Character).";
-        }
-
-        var realm = stats[4..firstComma];
-        var secondComma = stats.IndexOf(',', firstComma + 1);
-        if (secondComma < 0)
-        {
-            return $"{label}: (Open Character).";
-        }
-
-        var name = stats[(firstComma + 1)..secondComma];
-        var p = stats[(secondComma + 1)..];
-        if (p.Length <= 27)
-        {
-            return $"{label}: (Open Character).";
-        }
-
-        var charClass = (byte)(p[13] - 1);
-        if (charClass > 6)
-        {
-            charClass = 7;
-        }
-
+        var charClass = character.ClassIndex is >= 0 and <= 6 ? character.ClassIndex : 7;
         var female = charClass is 0 or 1 or 6;
-        var charLevel = (byte)p[25];
-        var hardcore = ((byte)p[26] & 0x4) != 0;
-        var dead = ((byte)p[26] & 0x8) != 0;
-        var tier = ((byte)p[27] & 0x18) >> 3;
-        var isExpansion = header == "PX2D" && ((byte)p[26] & 0x20) != 0;
+        var hardcore = character.Hardcore;
 
-        string title = "";
-        if (isExpansion)
+        // TitleTier counts completed difficulties from the act byte. It used to be read straight
+        // off bits 0x18 of that byte, which only lines up with the classic game's four acts per
+        // difficulty — an expansion character in Nightmare Act IV/V or Hell Act IV/V was already
+        // titled for the next difficulty up.
+        string title;
+        if (character.Expansion)
         {
-            title = tier switch
+            title = character.TitleTier switch
             {
                 1 => hardcore ? "Destroyer" : "Slayer",
                 2 => hardcore ? "Conquerer" : "Champion",
@@ -188,7 +163,7 @@ public static class StatStringParser
         }
         else
         {
-            title = tier switch
+            title = character.TitleTier switch
             {
                 1 => female ? (hardcore ? "Countess" : "Dame") : (hardcore ? "Count" : "Sir"),
                 2 => female ? (hardcore ? "Duchess" : "Lady") : (hardcore ? "Duke" : "Lord"),
@@ -198,9 +173,9 @@ public static class StatStringParser
         }
 
         var titlePrefix = title.Length > 0 ? title + " " : "";
-        var deadPrefix = hardcore && dead ? "dead " : "";
+        var deadPrefix = hardcore && character.Dead ? "dead " : "";
         var levelWord = hardcore ? "hardcore level" : "level";
 
-        return $"{label}: ({titlePrefix}{name} a {deadPrefix}{levelWord} {charLevel} {D2Classes[charClass]} on realm {realm}).";
+        return $"{label}: ({titlePrefix}{character.Name} a {deadPrefix}{levelWord} {character.Level} {D2Classes[charClass]} on realm {character.Realm}).";
     }
 }

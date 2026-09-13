@@ -50,14 +50,53 @@ public class StatStringParserTests
         var p = new char[28];
         p[13] = (char)4; // charclass raw 4 -> charclass 3 (paladin, male)
         p[25] = (char)99;
-        p[26] = (char)0x20; // ladder flag set (expansion title path)
-        p[27] = (char)(1 << 3); // tier 1 -> "Slayer" (not hardcore)
+        p[26] = (char)0x20; // expansion character
+        p[27] = (char)0x8A; // Nightmare Act I — Normal completed -> "Slayer" (not hardcore)
 
         var stats = "PX2D" + "Europe," + "Hero," + new string(p);
 
         var result = StatStringParser.Parse(stats);
 
         Assert.Equal("Diablo II Lord of Destruction: (Slayer Hero a level 99 paladin on realm Europe).", result);
+    }
+
+    // Regression: the title tier used to come straight from bits 0x18 of the act byte, which
+    // matches the classic game's four acts per difficulty but not the expansion's five — so a
+    // character still in Nightmare Act IV/V (0x90) was already called a Champion.
+    [Theory]
+    [InlineData(0x86, "Hero a level 99 paladin")]
+    [InlineData(0x90, "Slayer Hero a level 99 paladin")]
+    [InlineData(0x94, "Champion Hero a level 99 paladin")]
+    [InlineData(0x9A, "Champion Hero a level 99 paladin")]
+    [InlineData(0x9E, "Patriarch Hero a level 99 paladin")]
+    public void Parse_D2ExpansionCharacter_TitleFollowsCompletedDifficulties(int actByte, string expected)
+    {
+        var p = new char[28];
+        p[13] = (char)4;
+        p[25] = (char)99;
+        p[26] = (char)0x20;
+        p[27] = (char)actByte;
+
+        var result = StatStringParser.Parse("PX2D" + "Europe," + "Hero," + new string(p));
+
+        Assert.Equal($"Diablo II Lord of Destruction: ({expected} on realm Europe).", result);
+    }
+
+    [Theory]
+    [InlineData(0x86, "Hero a level 50 paladin")]
+    [InlineData(0x88, "Sir Hero a level 50 paladin")]
+    [InlineData(0x96, "Lord Hero a level 50 paladin")]
+    [InlineData(0x98, "Baron Hero a level 50 paladin")]
+    public void Parse_D2ClassicCharacter_TitleFollowsCompletedDifficulties(int actByte, string expected)
+    {
+        var p = new char[28];
+        p[13] = (char)4;
+        p[25] = (char)50;
+        p[27] = (char)actByte;
+
+        var result = StatStringParser.Parse("VD2D" + "USEast," + "Hero," + new string(p));
+
+        Assert.Equal($"Diablo II: ({expected} on realm USEast).", result);
     }
 
     [Fact]
