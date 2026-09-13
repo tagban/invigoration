@@ -28,6 +28,28 @@
                 </DrawingGroup>
             </DrawingBrush.Drawing>
         </DrawingBrush>
+        <!-- Warcraft II: dense pitting and short scratches, so panels read as worn and gritty. -->
+        <DrawingBrush x:Key="Grit" TileMode="Tile" DestinationRect="0,0,13,11" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 13 V 11 H 0 Z" />
+                    <GeometryDrawing Brush="#88000000" Geometry="M 1,1 h 1 v 1 h -1 Z M 5,0 h 1 v 1 h -1 Z M 9,2 h 2 v 1 h -2 Z M 3,4 h 1 v 1 h -1 Z M 7,5 h 1 v 2 h -1 Z M 11,6 h 1 v 1 h -1 Z M 0,8 h 1 v 1 h -1 Z M 4,9 h 3 v 1 h -3 Z M 10,9 h 1 v 1 h -1 Z M 12,3 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#3AFFFFFF" Geometry="M 2,2 h 1 v 1 h -1 Z M 8,1 h 1 v 1 h -1 Z M 5,6 h 1 v 1 h -1 Z M 10,7 h 1 v 1 h -1 Z M 1,10 h 1 v 1 h -1 Z M 12,10 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#40000000" Geometry="M 6,3 h 4 v 1 h -4 Z M 1,6 h 3 v 1 h -3 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+        <!-- A coarser second layer of pits and blotches on a different tile size, so the grit doesn't read as an obvious repeating pattern. -->
+        <DrawingBrush x:Key="GritCoarse" TileMode="Tile" DestinationRect="0,0,29,23" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 29 V 23 H 0 Z" />
+                    <GeometryDrawing Brush="#58000000" Geometry="M 3,2 h 3 v 2 h -3 Z M 17,4 h 2 v 3 h -2 Z M 24,11 h 3 v 2 h -3 Z M 8,14 h 2 v 2 h -2 Z M 13,19 h 4 v 1 h -4 Z M 0,17 h 2 v 2 h -2 Z M 21,20 h 2 v 1 h -2 Z" />
+                    <GeometryDrawing Brush="#30FFFFFF" Geometry="M 6,4 h 1 v 1 h -1 Z M 19,7 h 1 v 1 h -1 Z M 10,16 h 1 v 1 h -1 Z M 27,13 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#38000000" Geometry="M 11,8 h 6 v 1 h -6 Z M 22,1 h 5 v 1 h -5 Z M 2,11 h 4 v 1 h -4 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
     </UserControl.Resources>
 
     <Panel>
@@ -53,8 +75,20 @@
             <Ellipse Width="5" Height="5" Fill="{Binding AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" />
         </Panel>
 
-        <!-- Warcraft: an oak beam with a gold line and iron rivets. -->
-        <Panel IsVisible="{Binding IsWarcraftFrame}">
+        <!-- Warcraft II: a pitted, beveled bar with rivets at the ends and center. -->
+        <Panel IsVisible="{Binding IsWarcraftIIFrame}">
+            <Border Background="{Binding BandBrush}" BorderBrush="#000000" BorderThickness="0,1" />
+            <Border Background="{StaticResource Grit}" Margin="0,1" />
+            <Border Background="{StaticResource GritCoarse}" Margin="0,1" />
+            <Border BorderBrush="{Binding BevelBrush}" BorderThickness="0,1,0,0" Margin="0,1,0,0" />
+            <Border BorderBrush="#A0000000" BorderThickness="0,0,0,1" Margin="0,0,0,1" />
+            <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0" />
+            <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0" />
+        </Panel>
+
+        <!-- Warcraft III: a dark wood beam with a trim line and iron rivets. -->
+        <Panel IsVisible="{Binding IsWarcraftIIIFrame}">
             <Border Background="{Binding BandBrush}" BorderBrush="#0E0804" BorderThickness="0,1" />
             <Border Background="{StaticResource WoodGrain}" Margin="0,1" />
             <Border Height="1" VerticalAlignment="Center" Background="{Binding TrimBrush}" Margin="14,0" />

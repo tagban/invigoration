@@ -65,7 +65,8 @@ public sealed partial class ThemeManagerViewModel : ObservableObject, IThemedSur
         new(ThemeFrameStyle.None, "None (plain)"),
         new(ThemeFrameStyle.DiabloII, "Diablo II: carved stone and gold"),
         new(ThemeFrameStyle.StarCraft, "StarCraft: steel console"),
-        new(ThemeFrameStyle.Warcraft, "Warcraft: oak and iron"),
+        new(ThemeFrameStyle.WarcraftII, "Warcraft II: gritty, chiseled and riveted"),
+        new(ThemeFrameStyle.Warcraft, "Warcraft III: dark wood and dark iron"),
     ];
 
     public IReadOnlyList<ThemeChoice<ThemeLayout>> LayoutChoices { get; } =

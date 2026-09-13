@@ -57,14 +57,18 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
     public partial bool UseClassicIconStyle { get; set; }
 
-    /// <summary>A Diablo II character's real Battle.net portrait — class, hardcore/dead/ladder markings and act progress, cut from D2DV.pcx/D2XP.pcx (see D2PortraitLoader) — or null for anything that isn't a D2 character (other games, or D2 on an Open character).</summary>
+    /// <summary>A Diablo II character's real Battle.net portrait — class, hardcore/dead/ladder markings and act progress, cut from D2DV.pcx/D2XP.pcx (see D2PortraitLoader) — or null for anything that isn't a D2 character (other games, or D2 on an Open character). Shown only in a character-dock theme's portrait strip (BotTabView's dock tile).</summary>
     public Bitmap? D2PortraitImage => D2PortraitLoader.Get(StatString);
 
     public bool HasD2Portrait => D2PortraitImage is not null;
 
-    /// <summary>The game-icon slot: a D2 character's portrait tile when they have no rank badge (the same "badge wins, otherwise show what the game knows about them" rule ChatIcon.GetProductIconKey applies to every other game's ladder icons), otherwise the product/ladder icon.</summary>
-    public Bitmap? ProductIconImage =>
-        (StatusIconImage is null ? D2PortraitImage : null) ?? GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags));
+    /// <summary>
+    /// The game-icon slot in the regular user list: the product/ladder icon from whichever icon set
+    /// the bot uses (WC3, Battle.net 2.0 or classic). Deliberately never the D2 portrait tile — per
+    /// request, those "moving avatars" belong to the Diablo II character dock only, and a D2 user
+    /// in the regular list falls back to the set's own Diablo II icon like it always did.
+    /// </summary>
+    public Bitmap? ProductIconImage => GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags));
 
     public Bitmap? StatusIconImage => GameIconLoader.Get(ChatIcon.GetStatusIconKey(Flags));
 

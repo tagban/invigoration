@@ -78,7 +78,9 @@ public sealed partial class ChatThemeViewModel : ObservableObject
 
     public bool IsStarCraftFrame => Theme.Frame == ThemeFrameStyle.StarCraft;
 
-    public bool IsWarcraftFrame => Theme.Frame == ThemeFrameStyle.Warcraft;
+    public bool IsWarcraftIIFrame => Theme.Frame == ThemeFrameStyle.WarcraftII;
+
+    public bool IsWarcraftIIIFrame => Theme.Frame == ThemeFrameStyle.Warcraft;
 
     public bool UsesCharacterDock => Theme.Layout == ThemeLayout.CharacterDock;
 

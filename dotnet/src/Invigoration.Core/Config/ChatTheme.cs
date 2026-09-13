@@ -15,8 +15,11 @@ public enum ThemeFrameStyle
     /// <summary>Beveled steel console with chamfered corners, status lights and a glowing accent line, after StarCraft's Terran interface.</summary>
     StarCraft,
 
-    /// <summary>Oak planks bound by iron brackets and gold trim, with a hanging name sign, after Warcraft's menus.</summary>
+    /// <summary>Dark wood planks bound by blackened-iron brackets and straps, with a nailed name sign, after Warcraft III's menus. (Named plain "Warcraft" because it predates the Warcraft II design; saved themes keep that name.)</summary>
     Warcraft,
+
+    /// <summary>Gritty, weathered panels with chunky chiseled bevels and riveted iron corner plates, after Warcraft II's menus.</summary>
+    WarcraftII,
 }
 
 /// <summary>Where a themed bot's Users/Friends/Clan panel sits.</summary>

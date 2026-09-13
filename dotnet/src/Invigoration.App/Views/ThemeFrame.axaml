@@ -46,6 +46,28 @@
                 </DrawingGroup>
             </DrawingBrush.Drawing>
         </DrawingBrush>
+        <!-- Warcraft II: dense pitting and short scratches, so panels read as worn and gritty. -->
+        <DrawingBrush x:Key="Grit" TileMode="Tile" DestinationRect="0,0,13,11" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 13 V 11 H 0 Z" />
+                    <GeometryDrawing Brush="#88000000" Geometry="M 1,1 h 1 v 1 h -1 Z M 5,0 h 1 v 1 h -1 Z M 9,2 h 2 v 1 h -2 Z M 3,4 h 1 v 1 h -1 Z M 7,5 h 1 v 2 h -1 Z M 11,6 h 1 v 1 h -1 Z M 0,8 h 1 v 1 h -1 Z M 4,9 h 3 v 1 h -3 Z M 10,9 h 1 v 1 h -1 Z M 12,3 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#3AFFFFFF" Geometry="M 2,2 h 1 v 1 h -1 Z M 8,1 h 1 v 1 h -1 Z M 5,6 h 1 v 1 h -1 Z M 10,7 h 1 v 1 h -1 Z M 1,10 h 1 v 1 h -1 Z M 12,10 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#40000000" Geometry="M 6,3 h 4 v 1 h -4 Z M 1,6 h 3 v 1 h -3 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+        <!-- A coarser second layer of pits and blotches on a different tile size, so the grit doesn't read as an obvious repeating pattern. -->
+        <DrawingBrush x:Key="GritCoarse" TileMode="Tile" DestinationRect="0,0,29,23" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 29 V 23 H 0 Z" />
+                    <GeometryDrawing Brush="#58000000" Geometry="M 3,2 h 3 v 2 h -3 Z M 17,4 h 2 v 3 h -2 Z M 24,11 h 3 v 2 h -3 Z M 8,14 h 2 v 2 h -2 Z M 13,19 h 4 v 1 h -4 Z M 0,17 h 2 v 2 h -2 Z M 21,20 h 2 v 1 h -2 Z" />
+                    <GeometryDrawing Brush="#30FFFFFF" Geometry="M 6,4 h 1 v 1 h -1 Z M 19,7 h 1 v 1 h -1 Z M 10,16 h 1 v 1 h -1 Z M 27,13 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#38000000" Geometry="M 11,8 h 6 v 1 h -6 Z M 22,1 h 5 v 1 h -5 Z M 2,11 h 4 v 1 h -4 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
     </UserControl.Resources>
 
     <UserControl.Styles>
@@ -109,7 +131,29 @@
                 </ControlTemplate>
             </Setter>
         </Style>
-        <!-- Warcraft: an iron L-bracket with three rivets, drawn for the top-left corner and mirrored. -->
+        <!-- Warcraft II: a battered, riveted iron plate over each corner (symmetric, so no mirroring). -->
+        <Style Selector="ContentControl.wc2corner">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Panel>
+                        <Border Background="{Binding MetalPlateBrush}" BorderBrush="#000000" BorderThickness="1" />
+                        <Border Margin="1" Background="{StaticResource Grit}" />
+                        <Border Margin="1" Background="{StaticResource GritCoarse}" />
+                        <Border Margin="1" BorderBrush="#50FFFFFF" BorderThickness="1,1,0,0" />
+                        <Border Margin="1" BorderBrush="#90000000" BorderThickness="0,0,1,1" />
+                        <Canvas Width="24" Height="24">
+                            <Ellipse Canvas.Left="3" Canvas.Top="3" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                            <Ellipse Canvas.Left="16" Canvas.Top="3" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                            <Ellipse Canvas.Left="3" Canvas.Top="16" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                            <Ellipse Canvas.Left="16" Canvas.Top="16" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                        </Canvas>
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- Warcraft III: an iron L-bracket with three rivets, drawn for the top-left corner and mirrored. -->
         <Style Selector="ContentControl.wccorner">
             <Setter Property="Width" Value="38" />
             <Setter Property="Height" Value="38" />
@@ -125,7 +169,7 @@
                 </ControlTemplate>
             </Setter>
         </Style>
-        <!-- Warcraft: a short iron strap wrapped around the wood band, with one rivet. -->
+        <!-- Warcraft III: a short iron strap wrapped around the wood band, with one rivet. -->
         <Style Selector="ContentControl.wcstrap">
             <Setter Property="Template">
                 <ControlTemplate x:DataType="vm:ChatThemeViewModel">
@@ -239,8 +283,56 @@
             </Grid>
         </Panel>
 
-        <!-- ================= Warcraft: oak planks, iron brackets, gold trim ================= -->
-        <Panel IsVisible="{Binding IsWarcraftFrame}">
+        <!-- ================= Warcraft II: gritty weathered panels, chiseled bevels, riveted iron ================= -->
+        <Panel IsVisible="{Binding IsWarcraftIIFrame}">
+            <Border BorderBrush="#000000" BorderThickness="1" />
+            <Border Margin="1" BorderBrush="{Binding BandBrush}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{StaticResource Grit}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{StaticResource GritCoarse}" BorderThickness="10" />
+            <!-- Chunky raised bevel on the outside edge of the band... -->
+            <Border Margin="1" BorderBrush="{Binding BevelBrush}" BorderThickness="2,2,0,0" />
+            <Border Margin="1" BorderBrush="#A0000000" BorderThickness="0,0,2,2" />
+            <!-- ...and a sunken one on the inside edge, so the chat sits in a chiseled recess. -->
+            <Border Margin="9" BorderBrush="#A0000000" BorderThickness="2,2,0,0" />
+            <Border Margin="9" BorderBrush="{Binding BevelBrush}" BorderThickness="0,0,2,2" Opacity="0.75" />
+            <Border Margin="11" BorderBrush="{Binding TrimShadeSolidBrush}" BorderThickness="1" />
+
+            <ContentControl Classes="stud" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="70,1,0,0" />
+            <ContentControl Classes="stud" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,70,0" />
+            <ContentControl Classes="stud" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="70,0,0,1" />
+            <ContentControl Classes="stud" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,70,1" />
+            <ContentControl Classes="stud" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="1,0,0,0" />
+            <ContentControl Classes="stud" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,1,0" />
+
+            <ContentControl Classes="wc2corner" HorizontalAlignment="Left" VerticalAlignment="Top" />
+            <ContentControl Classes="wc2corner" HorizontalAlignment="Right" VerticalAlignment="Top" />
+            <ContentControl Classes="wc2corner" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+            <ContentControl Classes="wc2corner" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+
+            <!-- Name plaque: a raised, pitted slab with rivets and drop-shadowed lettering. -->
+            <Border HorizontalAlignment="Center" VerticalAlignment="Top" Height="24" MinWidth="170"
+                    IsVisible="{Binding ShowNamePlate}" Background="{Binding CapBrush}" BorderBrush="#000000" BorderThickness="1">
+                <Panel>
+                    <Border Background="{StaticResource Grit}" />
+                    <Border Background="{StaticResource GritCoarse}" />
+                    <Border BorderBrush="{Binding BevelBrush}" BorderThickness="2,2,0,0" />
+                    <Border BorderBrush="#A0000000" BorderThickness="0,0,2,2" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="6,0">
+                        <ContentControl Grid.Column="0" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
+                        <Panel Grid.Column="1" Margin="12,0" HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding ChannelName}" Foreground="#000000" FontFamily="{Binding HeaderFontFamily}"
+                                       FontSize="13" FontWeight="Bold" Margin="1,1,0,0" />
+                            <TextBlock Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                                       FontSize="13" FontWeight="Bold" Margin="0,0,1,1" />
+                        </Panel>
+                        <ContentControl Grid.Column="2" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
+                    </Grid>
+                </Panel>
+            </Border>
+        </Panel>
+
+        <!-- ================= Warcraft III: dark wood planks, blackened-iron brackets and trim ================= -->
+        <Panel IsVisible="{Binding IsWarcraftIIIFrame}">
             <Border BorderBrush="#0E0804" BorderThickness="1" />
             <Border Margin="1" BorderBrush="{Binding BandBrush}" BorderThickness="10" />
             <Border Margin="1" BorderBrush="{StaticResource WoodGrain}" BorderThickness="10" />
@@ -261,7 +353,7 @@
             <ContentControl Classes="wccorner" HorizontalAlignment="Left" VerticalAlignment="Bottom" RenderTransform="scaleY(-1)" />
             <ContentControl Classes="wccorner" HorizontalAlignment="Right" VerticalAlignment="Bottom" RenderTransform="scale(-1,-1)" />
 
-            <!-- Name sign: a gold-edged plank nailed across the top band. -->
+            <!-- Name sign: a trim-edged plank nailed across the top band. -->
             <Border HorizontalAlignment="Center" VerticalAlignment="Top" Height="24" MinWidth="170"
                     IsVisible="{Binding ShowNamePlate}"
                     Background="{Binding CapBrush}" BorderBrush="#0E0804" BorderThickness="1" CornerRadius="2">

@@ -29,10 +29,10 @@ public class ThemeLibraryTests : IDisposable
     }
 
     [Fact]
-    public void BuiltIns_AreDefaultDiabloStarCraftWarcraft_InThatOrder()
+    public void BuiltIns_AreDefaultDiabloStarCraftWarcraftIIWarcraftIII_InThatOrder()
     {
         Assert.Equal(
-            [ThemeLibrary.DefaultId, ThemeLibrary.DiabloIIId, ThemeLibrary.StarCraftId, ThemeLibrary.WarcraftId],
+            [ThemeLibrary.DefaultId, ThemeLibrary.DiabloIIId, ThemeLibrary.StarCraftId, ThemeLibrary.WarcraftIIId, ThemeLibrary.WarcraftIIIId],
             ThemeLibrary.All().Select(t => t.Id));
         Assert.All(ThemeLibrary.BuiltIns, t => Assert.True(t.IsBuiltIn));
     }
@@ -43,7 +43,8 @@ public class ThemeLibraryTests : IDisposable
         Assert.Equal(ThemeFrameStyle.None, ThemeLibrary.Resolve(ThemeLibrary.DefaultId).Frame);
         Assert.Equal(ThemeFrameStyle.DiabloII, ThemeLibrary.Resolve(ThemeLibrary.DiabloIIId).Frame);
         Assert.Equal(ThemeFrameStyle.StarCraft, ThemeLibrary.Resolve(ThemeLibrary.StarCraftId).Frame);
-        Assert.Equal(ThemeFrameStyle.Warcraft, ThemeLibrary.Resolve(ThemeLibrary.WarcraftId).Frame);
+        Assert.Equal(ThemeFrameStyle.WarcraftII, ThemeLibrary.Resolve(ThemeLibrary.WarcraftIIId).Frame);
+        Assert.Equal(ThemeFrameStyle.Warcraft, ThemeLibrary.Resolve(ThemeLibrary.WarcraftIIIId).Frame);
         Assert.Equal(ThemeLayout.CharacterDock, ThemeLibrary.Resolve(ThemeLibrary.DiabloIIId).Layout);
     }
 
@@ -60,7 +61,7 @@ public class ThemeLibraryTests : IDisposable
     [Theory]
     [InlineData("", false, ThemeLibrary.DefaultId)]
     [InlineData("", true, ThemeLibrary.DiabloIIId)]
-    [InlineData(ThemeLibrary.WarcraftId, true, ThemeLibrary.WarcraftId)]
+    [InlineData(ThemeLibrary.WarcraftIIIId, true, ThemeLibrary.WarcraftIIIId)]
     [InlineData(ThemeLibrary.StarCraftId, false, ThemeLibrary.StarCraftId)]
     public void ThemeIdFor_MigratesTheOldD2StyleSwitch_ButAnExplicitThemeWins(string themeId, bool useD2, string expected)
     {
@@ -122,17 +123,17 @@ public class ThemeLibraryTests : IDisposable
     [Fact]
     public void BuiltIns_CantBeSavedOverOrDeleted()
     {
-        var builtIn = ThemeLibrary.Resolve(ThemeLibrary.WarcraftId);
+        var builtIn = ThemeLibrary.Resolve(ThemeLibrary.WarcraftIIIId);
 
         Assert.Throws<InvalidOperationException>(() => ThemeLibrary.Save(builtIn));
 
         // Even a custom theme that claims a built-in's id.
         var impostor = ThemeLibrary.Duplicate(builtIn, "Impostor");
-        impostor.Id = ThemeLibrary.WarcraftId;
+        impostor.Id = ThemeLibrary.WarcraftIIIId;
         Assert.Throws<InvalidOperationException>(() => ThemeLibrary.Save(impostor));
 
-        ThemeLibrary.Delete(ThemeLibrary.WarcraftId);
-        Assert.Equal(ThemeLibrary.WarcraftId, ThemeLibrary.Resolve(ThemeLibrary.WarcraftId).Id);
+        ThemeLibrary.Delete(ThemeLibrary.WarcraftIIIId);
+        Assert.Equal(ThemeLibrary.WarcraftIIIId, ThemeLibrary.Resolve(ThemeLibrary.WarcraftIIIId).Id);
     }
 
     [Fact]
@@ -167,10 +168,17 @@ public class ThemeLibraryTests : IDisposable
         Assert.Contains(ThemeLibrary.All(), t => t.Id == good.Id);
     }
 
+    // A bot set to the original single Warcraft theme ("warcraft") must keep working — it's Warcraft III now.
+    [Fact]
+    public void TheOriginalWarcraftId_IsWarcraftIII()
+    {
+        Assert.Equal("Warcraft III", ThemeLibrary.ResolveFor(new BotConfig { ThemeId = "warcraft" }).Name);
+    }
+
     [Fact]
     public void WarcraftTheme_HasItsOwnPalette()
     {
-        Assert.Equal(ChatColorScheme.Warcraft, ThemeLibrary.Resolve(ThemeLibrary.WarcraftId).ColorScheme);
+        Assert.Equal(ChatColorScheme.Warcraft, ThemeLibrary.Resolve(ThemeLibrary.WarcraftIIIId).ColorScheme);
         Assert.Same(ChatPalette.Warcraft, ChatPalette.ForScheme(new BotConfig { ChatColorScheme = ChatColorScheme.Warcraft }));
     }
 }

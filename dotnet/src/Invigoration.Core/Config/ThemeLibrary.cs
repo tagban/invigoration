@@ -5,7 +5,7 @@ using Invigoration.Core.Chat;
 namespace Invigoration.Core.Config;
 
 /// <summary>
-/// Every theme a bot can pick: the four built-ins (Default, Diablo II, StarCraft, Warcraft), which
+/// Every theme a bot can pick: the built-ins (Default, Diablo II, StarCraft, Warcraft II, Warcraft III), which
 /// live in code so they update with the app, plus custom themes saved as one .json file each in
 /// %AppData%/Invigoration/Themes — made by duplicating any theme in Customize → Manage Themes, and
 /// shareable by copying the file, the same way color schemes work (ColorSchemeLibrary).
@@ -15,7 +15,10 @@ public static class ThemeLibrary
     public const string DefaultId = "default";
     public const string DiabloIIId = "diablo2";
     public const string StarCraftId = "starcraft";
-    public const string WarcraftId = "warcraft";
+    public const string WarcraftIIId = "warcraft2";
+
+    /// <summary>"warcraft" rather than "warcraft3": this was the only Warcraft theme before Warcraft II got its own, so bots already set to it land on Warcraft III.</summary>
+    public const string WarcraftIIIId = "warcraft";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -70,16 +73,31 @@ public static class ThemeLibrary
             HeaderFont = "Menlo,Consolas,Courier New",
             Materials = new() { Band = 0x4C5866, BandShade = 0x14191F, Trim = 0x8C9BA8, TrimShade = 0x39434D, Metal = 0xA9B4BE, Accent = 0x4FD8FF, Well = 0x050B12 },
         },
+        // Warcraft II: weathered and gritty — dull browns, worn bronze trim and battered iron, with
+        // WC2's bright gold-yellow menu lettering.
         new()
         {
-            Id = WarcraftId,
-            Name = "Warcraft",
+            Id = WarcraftIIId,
+            Name = "Warcraft II",
+            IsBuiltIn = true,
+            Frame = ThemeFrameStyle.WarcraftII,
+            Layout = ThemeLayout.Standard,
+            ColorScheme = ChatColorScheme.Warcraft,
+            HeaderFont = "Georgia,Times New Roman",
+            Materials = new() { Band = 0x6A5440, BandShade = 0x241A11, Trim = 0x8C6C3E, TrimShade = 0x3A2B18, Metal = 0x77726A, Accent = 0xF2CF4A, Well = 0x0E0A06 },
+        },
+        // Warcraft III: dark wood with dark metal accents — walnut planks, blackened-iron trim and
+        // hardware, and a muted gold for lettering so it still reads against all that dark.
+        new()
+        {
+            Id = WarcraftIIIId,
+            Name = "Warcraft III",
             IsBuiltIn = true,
             Frame = ThemeFrameStyle.Warcraft,
             Layout = ThemeLayout.Standard,
             ColorScheme = ChatColorScheme.Warcraft,
             HeaderFont = "Palatino,Palatino Linotype,Book Antiqua,Georgia",
-            Materials = new() { Band = 0x7A5634, BandShade = 0x2A1A0E, Trim = 0xD2AA4E, TrimShade = 0x7A5A1E, Metal = 0x62666C, Accent = 0xF0C75E, Well = 0x110B06 },
+            Materials = new() { Band = 0x3E2B1C, BandShade = 0x0E0805, Trim = 0x5C5751, TrimShade = 0x1F1D1B, Metal = 0x4A4C50, Accent = 0xD9BE7C, Well = 0x0A0705 },
         },
     ];
 
