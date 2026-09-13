@@ -11,147 +11,22 @@
              x:Class="Invigoration.App.Views.BotTabView"
              x:DataType="vm:BotTabViewModel">
 
-    <!-- D2 Style's palette of materials, shared by the frame around the chat and the restyled
-         input row: dark weathered stone, a speckle laid over it so the bands read as carved rock
-         rather than flat paint, and the tarnished gold Diablo II trims its menus with. -->
-    <UserControl.Resources>
-        <LinearGradientBrush x:Key="D2StoneBrush" StartPoint="0%,0%" EndPoint="100%,100%">
-            <GradientStop Color="#4A4238" Offset="0" />
-            <GradientStop Color="#2B2620" Offset="0.45" />
-            <GradientStop Color="#181511" Offset="1" />
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="D2CapBrush" StartPoint="0%,0%" EndPoint="100%,100%">
-            <GradientStop Color="#6A5E4E" Offset="0" />
-            <GradientStop Color="#3A332A" Offset="0.5" />
-            <GradientStop Color="#1E1A15" Offset="1" />
-        </LinearGradientBrush>
-        <LinearGradientBrush x:Key="D2GoldBrush" StartPoint="0%,0%" EndPoint="0%,100%">
-            <GradientStop Color="#E3C67E" Offset="0" />
-            <GradientStop Color="#A8894C" Offset="0.5" />
-            <GradientStop Color="#6B5430" Offset="1" />
-        </LinearGradientBrush>
-        <DrawingBrush x:Key="D2GrainBrush" TileMode="Tile" DestinationRect="0,0,9,9" Stretch="None">
-            <DrawingBrush.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 9 V 9 H 0 Z" />
-                    <GeometryDrawing Brush="#1FFFFFFF" Geometry="M 1,1 h 1 v 1 h -1 Z M 6,3 h 1 v 1 h -1 Z M 3,7 h 1 v 1 h -1 Z" />
-                    <GeometryDrawing Brush="#40000000" Geometry="M 4,0 h 2 v 1 h -2 Z M 0,5 h 1 v 2 h -1 Z M 7,6 h 1 v 1 h -1 Z M 5,5 h 1 v 1 h -1 Z" />
-                </DrawingGroup>
-            </DrawingBrush.Drawing>
-        </DrawingBrush>
-    </UserControl.Resources>
-
+    <!-- A themed input row (see ThemeStyles.axaml) — the frame itself is ThemeFrame/ThemeDivider below. -->
     <UserControl.Styles>
-        <!-- A square cast-metal corner block with a gold diamond rivet, stamped onto each corner of
-             the D2 frame. A templated ContentControl so the four corners share one definition. -->
-        <Style Selector="ContentControl.d2cap">
-            <Setter Property="Width" Value="20" />
-            <Setter Property="Height" Value="20" />
-            <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Panel>
-                        <Border Background="{StaticResource D2CapBrush}" BorderBrush="#000000" BorderThickness="1" />
-                        <Border Margin="2" BorderBrush="{StaticResource D2GoldBrush}" BorderThickness="1" />
-                        <Path Data="M 5,0 L 10,5 L 5,10 L 0,5 Z" Fill="{StaticResource D2GoldBrush}"
-                              Stroke="#000000" StrokeThickness="1"
-                              HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Panel>
-                </ControlTemplate>
-            </Setter>
-        </Style>
-        <!-- A small domed rivet set into the stone bands between the corners. -->
-        <Style Selector="ContentControl.d2stud">
-            <Setter Property="Width" Value="8" />
-            <Setter Property="Height" Value="8" />
-            <Setter Property="IsHitTestVisible" Value="False" />
-            <Setter Property="Template">
-                <ControlTemplate>
-                    <Ellipse Stroke="#000000" StrokeThickness="1">
-                        <Ellipse.Fill>
-                            <RadialGradientBrush GradientOrigin="30%,30%" Center="40%,40%">
-                                <GradientStop Color="#F0DCA0" Offset="0" />
-                                <GradientStop Color="#9C7D44" Offset="0.55" />
-                                <GradientStop Color="#3E3020" Offset="1" />
-                            </RadialGradientBrush>
-                        </Ellipse.Fill>
-                    </Ellipse>
-                </ControlTemplate>
-            </Setter>
-        </Style>
-
-        <!-- D2 Style's input row: a black text well with a gold rim, and a stone Send button with
-             gold serif lettering. Fluent restyles both controls per state from inside their
-             templates, so each state is overridden there too — otherwise hovering or focusing
-             snaps them back to the stock theme. -->
-        <Style Selector="TextBox.d2">
-            <Setter Property="Foreground" Value="#E6DCC4" />
-            <Setter Property="CaretBrush" Value="#E3C67E" />
-            <Setter Property="SelectionBrush" Value="#806B4A2A" />
-        </Style>
-        <Style Selector="TextBox.d2 /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#050404" />
-            <Setter Property="BorderBrush" Value="#6B5430" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="0" />
-        </Style>
-        <Style Selector="TextBox.d2:pointerover /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#0A0807" />
-            <Setter Property="BorderBrush" Value="#A8894C" />
-        </Style>
-        <Style Selector="TextBox.d2:focus /template/ Border#PART_BorderElement">
-            <Setter Property="Background" Value="#050404" />
-            <Setter Property="BorderBrush" Value="#E3C67E" />
-            <Setter Property="BorderThickness" Value="1" />
-        </Style>
-        <Style Selector="TextBox.d2:focus">
-            <Setter Property="Foreground" Value="#E6DCC4" />
-        </Style>
-        <Style Selector="TextBox.d2 /template/ TextBlock#PART_Placeholder">
-            <Setter Property="Foreground" Value="#7D715C" />
-        </Style>
-
-        <Style Selector="Button.d2">
-            <Setter Property="FontFamily" Value="Georgia,Times New Roman" />
-            <Setter Property="FontWeight" Value="Bold" />
-            <Setter Property="Padding" Value="16,5" />
-        </Style>
-        <Style Selector="Button.d2 /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource D2CapBrush}" />
-            <Setter Property="BorderBrush" Value="{StaticResource D2GoldBrush}" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="0" />
-            <Setter Property="Foreground" Value="#D8BE7A" />
-        </Style>
-        <Style Selector="Button.d2:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="{StaticResource D2StoneBrush}" />
-            <Setter Property="BorderBrush" Value="#F0DCA0" />
-            <Setter Property="Foreground" Value="#F6E6B4" />
-        </Style>
-        <Style Selector="Button.d2:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="#14110E" />
-            <Setter Property="Foreground" Value="#B39A5E" />
-        </Style>
-
-        <!-- The chat gem sits in its own socket; no button chrome in any state. -->
-        <Style Selector="Button.d2gem /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-            <Setter Property="BorderThickness" Value="0" />
-        </Style>
-        <Style Selector="Button.d2gem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
-        <Style Selector="Button.d2gem:pressed /template/ ContentPresenter#PART_ContentPresenter">
-            <Setter Property="Background" Value="Transparent" />
-        </Style>
+        <StyleInclude Source="avares://Invigoration.App/Views/ThemeStyles.axaml" />
     </UserControl.Styles>
 
-    <!-- Rows: 0 connect bar, 1 chat. Normal layout puts the input in row 3 and leaves row 2
-         empty (Auto collapses it). D2 Style (BotConfig.UseD2ChatLayout) moves the input up into
-         row 2, directly under the chat, so one frame can wrap both, and docks the
-         Users/Friends/Clan panel in row 3 beneath that instead of in column 2. The chat log spans
-         the full width there. Same controls in both layouts, just different Grid coordinates —
-         no second copy of anything. -->
+    <!-- Rows: 0 connect bar, 1 chat, 2 input when a theme frames it or docks the user list,
+         3 input otherwise or the character dock. Every coordinate that moves with the bot's theme
+         (BotConfig.ThemeId) comes from ChatThemeViewModel's layout properties:
+         - Default (no frame): chat left, Users/Friends/Clan panel in column 2, input in row 3
+           across the full width; row 2 stays empty and Auto collapses it.
+         - A framed theme (StarCraft, Warcraft): the input moves up under the chat in column 0 so
+           one frame can wrap both, and the panel spans rows 1-2 alongside.
+         - The character dock (Diablo II): chat and input span the full width, and the panel docks
+           along the bottom in row 3 as a portrait strip.
+         Same controls in every layout, only their Grid coordinates change — no second copy of
+         anything. -->
     <Grid RowDefinitions="Auto,*,Auto,Auto">
         <Grid.ColumnDefinitions>
             <ColumnDefinition Width="*" MinWidth="200" />
@@ -175,8 +50,7 @@
              BNCS/Chat-Telnet only — a SupportsMultiChannel bot (SC2/SC:R/WC3:R)
              uses the per-channel sub-tabs below instead. -->
         <ScrollViewer Grid.Row="1" Grid.Column="0" Name="ChatScroll" Background="{Binding BackgroundBrush}"
-                      Grid.ColumnSpan="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
-                      Margin="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToThicknessConverter.Instance}, ConverterParameter='18,26,18,4|0'}"
+                      Grid.ColumnSpan="{Binding Theme.ChatColumnSpan}" Margin="{Binding Theme.ChatMargin}"
                       IsVisible="{Binding !SupportsMultiChannel}">
             <!-- Explicit FontSize/LineHeight (not left to the theme default) so AppendLine's inline
                  icon has a known, controllable line box to center inside — a 20px icon on an
@@ -192,8 +66,7 @@
              ChannelTabView, resolved via the same global ViewLocator MainWindow.axaml's own
              bot-tab TabControl relies on) and its own roster (see the Users tab below). -->
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*" IsVisible="{Binding SupportsMultiChannel}"
-              Grid.ColumnSpan="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
-              Margin="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToThicknessConverter.Instance}, ConverterParameter='18,26,18,4|0'}"
+              Grid.ColumnSpan="{Binding Theme.ChatColumnSpan}" Margin="{Binding Theme.ChatMargin}"
               Background="{Binding BackgroundBrush}">
             <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,0">
                 <Button Content="+" Padding="8,2" FontSize="12" ToolTip.Tip="Join another channel">
@@ -251,86 +124,36 @@
             </TabControl>
         </Grid>
 
-        <!-- Column splitter only makes sense while the panel is actually in column 2; D2 Style
-             docks it below the chat instead, where a column-resizer would drag nothing. -->
+        <!-- Column splitter only makes sense while the panel is actually in column 2; the character
+             dock puts it below the chat instead, where a column-resizer would drag nothing. -->
         <GridSplitter Grid.Row="1" Grid.Column="1" Width="4" Background="#3A3A3A"
+                      Grid.RowSpan="{Binding Theme.SplitterRowSpan}"
                       HorizontalAlignment="Stretch" ResizeDirection="Columns"
-                      IsVisible="{Binding !Config.UseD2ChatLayout}" />
+                      IsVisible="{Binding Theme.ShowSplitter}" />
 
-        <!-- D2 Style's frame, modeled on Diablo II's own Battle.net chat screen: a heavy band of
-             carved stone trimmed in tarnished gold, square rivet blocks on the corners, studs along
-             the long runs, and the channel name on a plate across the top. It wraps the chat AND
-             the input row below it (rows 1-2), with a matching stone divider between the two.
-
-             Everything here sits in the gutter the chat and input leave for it (their D2 margins:
-             18 on the sides and bottom, 26 at the top for the name plate) — nothing is drawn over
-             chat text, and IsHitTestVisible="False" means it never takes a click either. That
-             gutter deliberately shows the app's own dark gray rather than a black backing, so it
-             reads as the window around the panel instead of as dead space inside it. Vector
-             shapes rather than bitmaps, so it scales with the window and ships no art. -->
-        <Panel Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="4,0,4,4"
-               IsVisible="{Binding Config.UseD2ChatLayout}" IsHitTestVisible="False">
-            <!-- The band, outside in: black outline, stone with grain over it, a lit bevel edge on
-                 the top-left, the gold inlay, then a black shadow line against the contents. -->
-            <Border BorderBrush="#000000" BorderThickness="1" />
-            <Border Margin="1" BorderBrush="{StaticResource D2StoneBrush}" BorderThickness="10" />
-            <Border Margin="1" BorderBrush="{StaticResource D2GrainBrush}" BorderThickness="10" />
-            <Border Margin="1" BorderBrush="#6E6352" BorderThickness="1,1,0,0" />
-            <Border Margin="10" BorderBrush="{StaticResource D2GoldBrush}" BorderThickness="1" />
-            <Border Margin="11" BorderBrush="#000000" BorderThickness="1" />
-
-            <!-- Studs centred on the band: two along the top and bottom runs, one on each side. -->
-            <ContentControl Classes="d2stud" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="64,2,0,0" />
-            <ContentControl Classes="d2stud" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,64,0" />
-            <ContentControl Classes="d2stud" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="64,0,0,2" />
-            <ContentControl Classes="d2stud" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,64,2" />
-            <ContentControl Classes="d2stud" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0" />
-            <ContentControl Classes="d2stud" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,2,0" />
-
-            <ContentControl Classes="d2cap" HorizontalAlignment="Left" VerticalAlignment="Top" />
-            <ContentControl Classes="d2cap" HorizontalAlignment="Right" VerticalAlignment="Top" />
-            <ContentControl Classes="d2cap" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
-            <ContentControl Classes="d2cap" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
-
-            <!-- Name plate: a stone bar with pointed ends, gold-edged, carrying the channel name in
-                 gold serif. Only once there's a channel to name. The ends are filled and stroked
-                 as separate shapes so no seam line is drawn where they meet the bar. -->
-            <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Height="24" ColumnDefinitions="14,Auto,14"
-                  IsVisible="{Binding CurrentChannelName, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
-                <Path Grid.Column="0" Data="M 14.5,0 L 0,12 L 14.5,24 Z" Fill="{StaticResource D2CapBrush}" />
-                <Path Grid.Column="0" Data="M 14,0.5 L 0.5,12 L 14,23.5" Stroke="{StaticResource D2GoldBrush}" StrokeThickness="1" />
-                <Border Grid.Column="1" Background="{StaticResource D2CapBrush}" BorderBrush="{StaticResource D2GoldBrush}"
-                        BorderThickness="0,1" Padding="16,0" MinWidth="150">
-                    <TextBlock Text="{Binding CurrentChannelName}" Foreground="#D8BE7A" FontFamily="Georgia,Times New Roman"
-                               FontSize="13" FontWeight="Bold" LetterSpacing="1"
-                               HorizontalAlignment="Center" VerticalAlignment="Center" />
-                </Border>
-                <Path Grid.Column="2" Data="M -0.5,0 L 14,12 L -0.5,24 Z" Fill="{StaticResource D2CapBrush}" />
-                <Path Grid.Column="2" Data="M 0,0.5 L 13.5,12 L 0,23.5" Stroke="{StaticResource D2GoldBrush}" StrokeThickness="1" />
-            </Grid>
+        <!-- The theme's frame (ThemeFrame) around the chat and input, and the bar between them
+             (ThemeDivider). Each sits in the gutter the chat and input leave for it — see
+             ThemeFrame's own remarks — so neither ever covers text or takes a click. The wrapping
+             Panels carry the Grid placement because the controls themselves take the theme as
+             their DataContext. -->
+        <Panel Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="{Binding Theme.FrameColumnSpan}" Margin="4,0,4,4"
+               IsVisible="{Binding Theme.HasFrame}" IsHitTestVisible="False">
+            <views:ThemeFrame DataContext="{Binding Theme}" />
         </Panel>
-
-        <!-- D2 Style: the stone divider between the chat and the input row, running the full width
-             of the frame so it joins the side bands. -->
-        <Panel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Margin="4,2,4,0" Height="9" VerticalAlignment="Top"
-               IsVisible="{Binding Config.UseD2ChatLayout}" IsHitTestVisible="False">
-            <Border Background="{StaticResource D2StoneBrush}" BorderBrush="#000000" BorderThickness="0,1" />
-            <Border Background="{StaticResource D2GrainBrush}" Margin="0,1" />
-            <Border Height="1" VerticalAlignment="Center" Background="{StaticResource D2GoldBrush}" Margin="12,0" />
-            <ContentControl Classes="d2stud" HorizontalAlignment="Center" VerticalAlignment="Center" Width="7" Height="7" />
+        <Panel Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="{Binding Theme.FrameColumnSpan}" Margin="4,2,4,0" VerticalAlignment="Top"
+               IsVisible="{Binding Theme.HasFrame}" IsHitTestVisible="False">
+            <views:ThemeDivider DataContext="{Binding Theme}" />
         </Panel>
 
         <!-- Users in the current channel, friends list, and (per-game) clan roster. Normally the
-             right-hand column; in D2 Style (BotConfig.UseD2ChatLayout) the same control moves to
-             the bottom dock (row 3, full width, under the framed chat and input) and gets a height cap so it reads as a strip
+             right-hand column; with a character-dock theme (Diablo II) the same control moves to
+             the bottom dock (row 3, full width, under the chat and input) and gets a height cap so it reads as a strip
              under the chat rather than eating half the tab. The 100000 "cap" in Normal layout is
              just an unreachable number standing in for "no cap" — Grid row sizing handles it
              there. -->
-        <TabControl Grid.Row="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
-                    Grid.Column="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='0|2'}"
-                    Grid.ColumnSpan="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='3|1'}"
-                    MaxHeight="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='190|100000'}"
-                    Margin="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToThicknessConverter.Instance}, ConverterParameter='8,2,8,8|0,4,8,8'}"
+        <TabControl Grid.Row="{Binding Theme.UsersRow}" Grid.Column="{Binding Theme.UsersColumn}"
+                    Grid.ColumnSpan="{Binding Theme.UsersColumnSpan}" Grid.RowSpan="{Binding Theme.UsersRowSpan}"
+                    MaxHeight="{Binding Theme.UsersMaxHeight}" Margin="{Binding Theme.UsersMargin}"
                     Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="6" Padding="0">
             <TabControl.Styles>
                 <!-- Compact header text (this panel is otherwise all small/dense text — Fluent's default TabItem
@@ -366,7 +189,7 @@
                          have quietly undone all of the load-testing work that made that survivable. -->
                     <ListBox.ItemsPanel>
                         <ItemsPanelTemplate>
-                            <VirtualizingStackPanel Orientation="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToOrientationConverter.Instance}}" />
+                            <VirtualizingStackPanel Orientation="{Binding Theme.UserListOrientation}" />
                         </ItemsPanelTemplate>
                     </ListBox.ItemsPanel>
                     <ListBox.Styles>
@@ -622,15 +445,14 @@
 
         </TabControl>
 
-        <!-- Input. Row 3 in Normal layout; D2 Style lifts it to row 2, inside the frame directly
-             under the chat, with the frame's divider above it (hence the taller top margin) and
-             the chat gem set in a socket at the end of the row. -->
-        <Grid Grid.Column="0" Grid.ColumnSpan="3" ColumnDefinitions="*,Auto,Auto"
-              Grid.Row="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToDoubleConverter.Instance}, ConverterParameter='2|3'}"
-              Margin="{Binding Config.UseD2ChatLayout, Converter={x:Static conv:BoolToThicknessConverter.Instance}, ConverterParameter='18,17,18,18|8'}">
+        <!-- Input. Row 3 by default; a framed or docked theme lifts it to row 2 directly under the
+             chat, with the frame's divider above it (hence the framed top margin), and a theme
+             can set Diablo II's chat gem in a socket at the end of the row. -->
+        <Grid Grid.Row="{Binding Theme.InputRow}" Grid.Column="0" Grid.ColumnSpan="{Binding Theme.InputColumnSpan}"
+              Margin="{Binding Theme.InputMargin}" ColumnDefinitions="*,Auto,Auto">
             <!-- Tinted with the scheme's Highlight color, thickening on focus, so it's obvious this box has focus before you type. -->
             <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message or /command..."
-                     Classes="chatInput" Classes.d2="{Binding Config.UseD2ChatLayout}"
+                     Classes="chatInput" Classes.themed="{Binding Theme.HasFrame}"
                      BorderBrush="{Binding HighlightBrush}" BorderThickness="1">
                 <TextBox.Styles>
                     <Style Selector="TextBox.chatInput:focus">
@@ -639,14 +461,14 @@
                 </TextBox.Styles>
             </TextBox>
             <Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}" Margin="8,0,0,0"
-                    Classes.d2="{Binding Config.UseD2ChatLayout}" VerticalAlignment="Stretch" />
+                    Classes.themed="{Binding Theme.HasFrame}" VerticalAlignment="Stretch" />
 
-            <!-- Diablo II's chat gem, set in a gold-rimmed socket beside Send. Click toggles blue
+            <!-- Diablo II's chat gem, set in a trim-rimmed socket beside Send. Click toggles blue
                  (activated) / red (deactivated) and prints one line into this bot's own chat log —
                  local flavor only, nothing goes to Battle.net. A soft glow of its own color sits
                  behind the stone while it's lit. Part of the input row's own layout, not an
                  overlay, so it can't cover anything. -->
-            <Button Grid.Column="2" Classes="d2gem" IsVisible="{Binding Config.UseD2ChatLayout}"
+            <Button Grid.Column="2" Classes="themegem" IsVisible="{Binding Theme.ShowChatGem}"
                     Command="{Binding ToggleChatGemCommand}" ToolTip.Tip="{Binding ChatGemTooltip}"
                     Margin="6,0,0,0" Padding="0" Background="Transparent" BorderThickness="0"
                     VerticalAlignment="Center" Cursor="Hand">
@@ -657,9 +479,9 @@
                             <BlurEffect Radius="8" />
                         </Ellipse.Effect>
                     </Ellipse>
-                    <Ellipse Width="38" Height="28" Fill="#0A0807" Stroke="#000000" StrokeThickness="1" />
-                    <Ellipse Width="36" Height="26" Stroke="{StaticResource D2GoldBrush}" StrokeThickness="2" />
-                    <Ellipse Width="29" Height="20" Stroke="#3A3226" StrokeThickness="1" />
+                    <Ellipse Width="38" Height="28" Fill="{Binding Theme.WellBrush}" Stroke="#000000" StrokeThickness="1" />
+                    <Ellipse Width="36" Height="26" Stroke="{Binding Theme.TrimBrush}" StrokeThickness="2" />
+                    <Ellipse Width="29" Height="20" Stroke="#40000000" StrokeThickness="1" />
                     <!-- Faceted stone: a diamond in the palette's blue/red with a lighter sliver
                          for the upper facet, so it follows the bot's color scheme. -->
                     <Panel Width="22" Height="14">

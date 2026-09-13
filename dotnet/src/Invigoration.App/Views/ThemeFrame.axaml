@@ -1,0 +1,282 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             x:Class="Invigoration.App.Views.ThemeFrame"
+             x:DataType="vm:ChatThemeViewModel"
+             IsHitTestVisible="False">
+
+    <!-- The ornamental frame a theme draws around a bot's chat and input (DataContext: that
+         theme's ChatThemeViewModel). One design per ThemeFrameStyle, each built only from the
+         theme's material brushes so the theme manager can recolor any of them.
+
+         Contract with whoever places this: it covers the whole chat + input area, and the content
+         underneath leaves it a gutter (ChatThemeViewModel.ChatMargin / InputMargin — 18 on the
+         sides and bottom, 26 across the top when there's a name plate). Every design draws inside
+         that gutter, so nothing here ever covers chat text, and the control never takes input.
+         Vector shapes, not bitmaps: they scale with the window and ship no art. -->
+
+    <UserControl.Resources>
+        <!-- Speckle laid over stone so the bands read as carved rock rather than flat paint. -->
+        <DrawingBrush x:Key="StoneGrain" TileMode="Tile" DestinationRect="0,0,9,9" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 9 V 9 H 0 Z" />
+                    <GeometryDrawing Brush="#1FFFFFFF" Geometry="M 1,1 h 1 v 1 h -1 Z M 6,3 h 1 v 1 h -1 Z M 3,7 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#40000000" Geometry="M 4,0 h 2 v 1 h -2 Z M 0,5 h 1 v 2 h -1 Z M 7,6 h 1 v 1 h -1 Z M 5,5 h 1 v 1 h -1 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+        <!-- Machined grip ticks across steel. -->
+        <DrawingBrush x:Key="SteelTicks" TileMode="Tile" DestinationRect="0,0,5,5" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 5 V 5 H 0 Z" />
+                    <GeometryDrawing Brush="#38000000" Geometry="M 0,0 h 1 v 5 h -1 Z" />
+                    <GeometryDrawing Brush="#14FFFFFF" Geometry="M 1,0 h 1 v 5 h -1 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+        <!-- Long, uneven streaks for wood grain. -->
+        <DrawingBrush x:Key="WoodGrain" TileMode="Tile" DestinationRect="0,0,53,11" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 53 V 11 H 0 Z" />
+                    <GeometryDrawing Brush="#3A000000" Geometry="M 0,2 h 23 v 1 h -23 Z M 29,6 h 19 v 1 h -19 Z M 8,9 h 31 v 1 h -31 Z M 44,1 h 9 v 1 h -9 Z" />
+                    <GeometryDrawing Brush="#16FFFFFF" Geometry="M 3,4 h 17 v 1 h -17 Z M 33,8 h 14 v 1 h -14 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+    </UserControl.Resources>
+
+    <UserControl.Styles>
+        <!-- Diablo II: square cast-metal corner block with a diamond rivet. -->
+        <Style Selector="ContentControl.d2cap">
+            <Setter Property="Width" Value="20" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Panel>
+                        <Border Background="{Binding CapBrush}" BorderBrush="#000000" BorderThickness="1" />
+                        <Border Margin="2" BorderBrush="{Binding TrimBrush}" BorderThickness="1" />
+                        <Path Data="M 5,0 L 10,5 L 5,10 L 0,5 Z" Fill="{Binding TrimBrush}" Stroke="#000000" StrokeThickness="1"
+                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- A domed rivet, shared by every design. -->
+        <Style Selector="ContentControl.stud">
+            <Setter Property="Width" Value="8" />
+            <Setter Property="Height" Value="8" />
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Ellipse Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="1" />
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- A small glowing status light. -->
+        <Style Selector="ContentControl.led">
+            <Setter Property="Width" Value="5" />
+            <Setter Property="Height" Value="5" />
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Panel>
+                        <Ellipse Fill="{Binding AccentGlowBrush}" Margin="-3">
+                            <Ellipse.Effect>
+                                <BlurEffect Radius="4" />
+                            </Ellipse.Effect>
+                        </Ellipse>
+                        <Ellipse Fill="{Binding AccentBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- StarCraft: steel corner plate, chamfered toward the content, with bolts and a status light. Drawn for the top-left corner and mirrored into the others. -->
+        <Style Selector="ContentControl.sccorner">
+            <Setter Property="Width" Value="32" />
+            <Setter Property="Height" Value="32" />
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Canvas Width="32" Height="32">
+                        <Path Data="M 0,0 H 32 V 17 L 17,32 H 0 Z" Fill="{Binding CapBrush}" Stroke="#000000" StrokeThickness="1" />
+                        <Path Data="M 2.5,29 V 2.5 H 29.5" Stroke="{Binding BevelBrush}" StrokeThickness="1" />
+                        <Path Data="M 30,17.5 L 17.5,30" Stroke="{Binding TrimSolidBrush}" StrokeThickness="1" />
+                        <Ellipse Canvas.Left="4" Canvas.Top="4" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                        <Ellipse Canvas.Left="4" Canvas.Top="20" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                        <Ellipse Canvas.Left="20" Canvas.Top="4" Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                        <ContentControl Classes="led" Canvas.Left="13" Canvas.Top="13" />
+                    </Canvas>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- Warcraft: an iron L-bracket with three rivets, drawn for the top-left corner and mirrored. -->
+        <Style Selector="ContentControl.wccorner">
+            <Setter Property="Width" Value="38" />
+            <Setter Property="Height" Value="38" />
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Canvas Width="38" Height="38">
+                        <Path Data="M 0,0 H 38 V 13 H 13 V 38 H 0 Z" Fill="{Binding MetalPlateBrush}" Stroke="#0A0A0A" StrokeThickness="1" />
+                        <Path Data="M 2,36 V 2 H 36" Stroke="#40FFFFFF" StrokeThickness="1" />
+                        <Ellipse Canvas.Left="3.5" Canvas.Top="3.5" Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                        <Ellipse Canvas.Left="26" Canvas.Top="3.5" Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                        <Ellipse Canvas.Left="3.5" Canvas.Top="26" Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" />
+                    </Canvas>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+        <!-- Warcraft: a short iron strap wrapped around the wood band, with one rivet. -->
+        <Style Selector="ContentControl.wcstrap">
+            <Setter Property="Template">
+                <ControlTemplate x:DataType="vm:ChatThemeViewModel">
+                    <Panel>
+                        <Border Background="{Binding MetalPlateBrush}" BorderBrush="#0A0A0A" BorderThickness="1" />
+                        <Ellipse Width="5" Height="5" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5"
+                                 HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Panel>
+                </ControlTemplate>
+            </Setter>
+        </Style>
+    </UserControl.Styles>
+
+    <Panel>
+        <!-- ================= Diablo II: carved stone, gold inlay, rivet blocks ================= -->
+        <Panel IsVisible="{Binding IsDiabloFrame}">
+            <!-- Outside in: black outline, stone with grain, a lit bevel on the top-left, the gold
+                 inlay, then a black shadow line against the contents. -->
+            <Border BorderBrush="#000000" BorderThickness="1" />
+            <Border Margin="1" BorderBrush="{Binding BandBrush}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{StaticResource StoneGrain}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{Binding BevelBrush}" BorderThickness="1,1,0,0" />
+            <Border Margin="10" BorderBrush="{Binding TrimBrush}" BorderThickness="1" />
+            <Border Margin="11" BorderBrush="#000000" BorderThickness="1" />
+
+            <ContentControl Classes="stud" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="64,2,0,0" />
+            <ContentControl Classes="stud" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,2,64,0" />
+            <ContentControl Classes="stud" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="64,0,0,2" />
+            <ContentControl Classes="stud" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,64,2" />
+            <ContentControl Classes="stud" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0" />
+            <ContentControl Classes="stud" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,2,0" />
+
+            <ContentControl Classes="d2cap" HorizontalAlignment="Left" VerticalAlignment="Top" />
+            <ContentControl Classes="d2cap" HorizontalAlignment="Right" VerticalAlignment="Top" />
+            <ContentControl Classes="d2cap" HorizontalAlignment="Left" VerticalAlignment="Bottom" />
+            <ContentControl Classes="d2cap" HorizontalAlignment="Right" VerticalAlignment="Bottom" />
+
+            <!-- Name plate: stone bar with pointed ends. Ends are filled and stroked as separate
+                 shapes so no seam is drawn where they meet the bar. -->
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Height="24" ColumnDefinitions="14,Auto,14"
+                  IsVisible="{Binding ShowNamePlate}">
+                <Path Grid.Column="0" Data="M 14.5,0 L 0,12 L 14.5,24 Z" Fill="{Binding CapBrush}" />
+                <Path Grid.Column="0" Data="M 14,0.5 L 0.5,12 L 14,23.5" Stroke="{Binding TrimBrush}" StrokeThickness="1" />
+                <Border Grid.Column="1" Background="{Binding CapBrush}" BorderBrush="{Binding TrimBrush}"
+                        BorderThickness="0,1" Padding="16,0" MinWidth="150">
+                    <TextBlock Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                               FontSize="13" FontWeight="Bold" LetterSpacing="1"
+                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                </Border>
+                <Path Grid.Column="2" Data="M -0.5,0 L 14,12 L -0.5,24 Z" Fill="{Binding CapBrush}" />
+                <Path Grid.Column="2" Data="M 0,0.5 L 13.5,12 L 0,23.5" Stroke="{Binding TrimBrush}" StrokeThickness="1" />
+            </Grid>
+        </Panel>
+
+        <!-- ================= StarCraft: steel console, glowing accent line, status lights ================= -->
+        <Panel IsVisible="{Binding IsStarCraftFrame}">
+            <Border BorderBrush="#000000" BorderThickness="1" />
+            <Border Margin="1" BorderBrush="{Binding BandBrush}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{StaticResource SteelTicks}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{Binding BevelBrush}" BorderThickness="1,1,0,0" />
+            <!-- The accent line, with a soft bloom behind it. -->
+            <Border Margin="9" BorderBrush="{Binding AccentGlowBrush}" BorderThickness="3">
+                <Border.Effect>
+                    <BlurEffect Radius="5" />
+                </Border.Effect>
+            </Border>
+            <Border Margin="10" BorderBrush="{Binding AccentBrush}" BorderThickness="1" />
+            <Border Margin="11" BorderBrush="#000000" BorderThickness="1" />
+
+            <!-- Vent slots on the side bands. -->
+            <StackPanel HorizontalAlignment="Left" VerticalAlignment="Center" Margin="2,0,0,0" Spacing="3">
+                <Border Width="7" Height="2" Background="#000000" />
+                <Border Width="7" Height="2" Background="#000000" />
+                <Border Width="7" Height="2" Background="#000000" />
+                <Border Width="7" Height="2" Background="#000000" />
+            </StackPanel>
+            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,2,0" Spacing="3">
+                <Border Width="7" Height="2" Background="#000000" />
+                <Border Width="7" Height="2" Background="#000000" />
+                <Border Width="7" Height="2" Background="#000000" />
+                <Border Width="7" Height="2" Background="#000000" />
+            </StackPanel>
+            <!-- A run of status lights along the bottom band. -->
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,48,3" Spacing="5">
+                <ContentControl Classes="led" />
+                <ContentControl Classes="led" />
+                <ContentControl Classes="led" />
+            </StackPanel>
+
+            <ContentControl Classes="sccorner" HorizontalAlignment="Left" VerticalAlignment="Top" />
+            <ContentControl Classes="sccorner" HorizontalAlignment="Right" VerticalAlignment="Top" RenderTransform="scaleX(-1)" />
+            <ContentControl Classes="sccorner" HorizontalAlignment="Left" VerticalAlignment="Bottom" RenderTransform="scaleY(-1)" />
+            <ContentControl Classes="sccorner" HorizontalAlignment="Right" VerticalAlignment="Bottom" RenderTransform="scale(-1,-1)" />
+
+            <!-- Name plate: a console tab that narrows toward the chat, lit on both ends. -->
+            <Grid HorizontalAlignment="Center" VerticalAlignment="Top" Height="23" ColumnDefinitions="16,Auto,16"
+                  IsVisible="{Binding ShowNamePlate}">
+                <Path Grid.Column="0" Data="M 0,0 L 16.5,0 L 16.5,23 L 16,23 Z" Fill="{Binding CapBrush}" />
+                <Path Grid.Column="0" Data="M 0.5,0 L 16,22.5" Stroke="{Binding AccentBrush}" StrokeThickness="1" />
+                <Border Grid.Column="1" Background="{Binding CapBrush}" BorderBrush="{Binding AccentBrush}"
+                        BorderThickness="0,0,0,1" Padding="10,0" MinWidth="150">
+                    <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
+                        <ContentControl Classes="led" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                                   FontSize="12" FontWeight="Bold" LetterSpacing="1.5" VerticalAlignment="Center" />
+                        <ContentControl Classes="led" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Border>
+                <Path Grid.Column="2" Data="M -0.5,0 L 16,0 L 0,23 L -0.5,23 Z" Fill="{Binding CapBrush}" />
+                <Path Grid.Column="2" Data="M 15.5,0 L 0,22.5" Stroke="{Binding AccentBrush}" StrokeThickness="1" />
+            </Grid>
+        </Panel>
+
+        <!-- ================= Warcraft: oak planks, iron brackets, gold trim ================= -->
+        <Panel IsVisible="{Binding IsWarcraftFrame}">
+            <Border BorderBrush="#0E0804" BorderThickness="1" />
+            <Border Margin="1" BorderBrush="{Binding BandBrush}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{StaticResource WoodGrain}" BorderThickness="10" />
+            <Border Margin="1" BorderBrush="{Binding BevelBrush}" BorderThickness="1,1,0,0" Opacity="0.6" />
+            <Border Margin="10" BorderBrush="{Binding TrimBrush}" BorderThickness="1" />
+            <Border Margin="11" BorderBrush="#0E0804" BorderThickness="1" />
+
+            <!-- Iron straps binding the planks: two across the top and bottom, one on each side. -->
+            <ContentControl Classes="wcstrap" Width="16" Height="12" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="84,0,0,0" />
+            <ContentControl Classes="wcstrap" Width="16" Height="12" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,0,84,0" />
+            <ContentControl Classes="wcstrap" Width="16" Height="12" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="84,0,0,0" />
+            <ContentControl Classes="wcstrap" Width="16" Height="12" HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,84,0" />
+            <ContentControl Classes="wcstrap" Width="12" Height="16" HorizontalAlignment="Left" VerticalAlignment="Center" />
+            <ContentControl Classes="wcstrap" Width="12" Height="16" HorizontalAlignment="Right" VerticalAlignment="Center" />
+
+            <ContentControl Classes="wccorner" HorizontalAlignment="Left" VerticalAlignment="Top" />
+            <ContentControl Classes="wccorner" HorizontalAlignment="Right" VerticalAlignment="Top" RenderTransform="scaleX(-1)" />
+            <ContentControl Classes="wccorner" HorizontalAlignment="Left" VerticalAlignment="Bottom" RenderTransform="scaleY(-1)" />
+            <ContentControl Classes="wccorner" HorizontalAlignment="Right" VerticalAlignment="Bottom" RenderTransform="scale(-1,-1)" />
+
+            <!-- Name sign: a gold-edged plank nailed across the top band. -->
+            <Border HorizontalAlignment="Center" VerticalAlignment="Top" Height="24" MinWidth="170"
+                    IsVisible="{Binding ShowNamePlate}"
+                    Background="{Binding CapBrush}" BorderBrush="#0E0804" BorderThickness="1" CornerRadius="2">
+                <Panel>
+                    <Border Background="{StaticResource WoodGrain}" CornerRadius="2" />
+                    <Border Margin="2" BorderBrush="{Binding TrimBrush}" BorderThickness="1" CornerRadius="1" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" Margin="7,0">
+                        <ContentControl Grid.Column="0" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="1" Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                                   FontSize="13" FontWeight="Bold" LetterSpacing="0.5" Margin="12,0"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        <ContentControl Grid.Column="2" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
+                    </Grid>
+                </Panel>
+            </Border>
+        </Panel>
+    </Panel>
+</UserControl>

@@ -337,6 +337,11 @@ public partial class MainWindow : Window
 
     private async Task ShowColorManager() => await new ColorManagerWindow().ShowDialog(this);
 
+    private async void OnManageThemesClick(object? sender, RoutedEventArgs e) => await ShowThemeManager();
+    private async void OnManageThemesNativeClick(object? sender, EventArgs e) => await ShowThemeManager();
+
+    private async Task ShowThemeManager() => await new ThemeManagerWindow().ShowDialog(this);
+
     private async void OnManageBattlenetProfilesClick(object? sender, RoutedEventArgs e) => await ShowBattlenetProfiles();
     private async void OnManageBattlenetProfilesNativeClick(object? sender, EventArgs e) => await ShowBattlenetProfiles();
 

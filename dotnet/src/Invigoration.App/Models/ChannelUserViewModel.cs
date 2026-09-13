@@ -45,7 +45,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
     public partial ChatPalette Palette { get; set; } = ChatPalette.Invigoration;
 
-    /// <summary>Mirrors BotConfig.UseD2ChatLayout — pushed in alongside BotProduct/Palette, same reason. Drives both this row's arrangement (portrait above name, no ping — see BotTabView.axaml) and which name-coloring rule UsernameBrush uses.</summary>
+    /// <summary>Whether the bot's theme docks users as a character strip (ChatThemeViewModel.UsesCharacterDock) — pushed in alongside BotProduct/Palette, same reason. Drives both this row's arrangement (portrait above name, no ping — see BotTabView.axaml) and which name-coloring rule UsernameBrush uses.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
     public partial bool UseD2Layout { get; set; }

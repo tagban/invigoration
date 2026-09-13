@@ -1,0 +1,66 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             x:Class="Invigoration.App.Views.ThemeDivider"
+             x:DataType="vm:ChatThemeViewModel"
+             Height="9" IsHitTestVisible="False">
+
+    <!-- The bar a theme's frame draws between the chat and the input row, running the frame's full
+         width so it joins the side bands. Placed at the top of the input row, in the gutter that
+         row's InputMargin leaves above it. Same materials as ThemeFrame. -->
+
+    <UserControl.Resources>
+        <DrawingBrush x:Key="StoneGrain" TileMode="Tile" DestinationRect="0,0,9,9" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 9 V 9 H 0 Z" />
+                    <GeometryDrawing Brush="#1FFFFFFF" Geometry="M 1,1 h 1 v 1 h -1 Z M 6,3 h 1 v 1 h -1 Z M 3,7 h 1 v 1 h -1 Z" />
+                    <GeometryDrawing Brush="#40000000" Geometry="M 4,0 h 2 v 1 h -2 Z M 0,5 h 1 v 2 h -1 Z M 7,6 h 1 v 1 h -1 Z M 5,5 h 1 v 1 h -1 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+        <DrawingBrush x:Key="WoodGrain" TileMode="Tile" DestinationRect="0,0,53,11" Stretch="None">
+            <DrawingBrush.Drawing>
+                <DrawingGroup>
+                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 53 V 11 H 0 Z" />
+                    <GeometryDrawing Brush="#3A000000" Geometry="M 0,2 h 23 v 1 h -23 Z M 29,6 h 19 v 1 h -19 Z M 8,9 h 31 v 1 h -31 Z" />
+                    <GeometryDrawing Brush="#16FFFFFF" Geometry="M 3,4 h 17 v 1 h -17 Z M 33,8 h 14 v 1 h -14 Z" />
+                </DrawingGroup>
+            </DrawingBrush.Drawing>
+        </DrawingBrush>
+    </UserControl.Resources>
+
+    <Panel>
+        <!-- Diablo II: stone bar, gold line, a rivet at the center. -->
+        <Panel IsVisible="{Binding IsDiabloFrame}">
+            <Border Background="{Binding BandBrush}" BorderBrush="#000000" BorderThickness="0,1" />
+            <Border Background="{StaticResource StoneGrain}" Margin="0,1" />
+            <Border Height="1" VerticalAlignment="Center" Background="{Binding TrimBrush}" Margin="12,0" />
+            <Ellipse Width="7" Height="7" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="1"
+                     HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Panel>
+
+        <!-- StarCraft: steel bar with a glowing accent line and status lights at each end. -->
+        <Panel IsVisible="{Binding IsStarCraftFrame}">
+            <Border Background="{Binding BandBrush}" BorderBrush="#000000" BorderThickness="0,1" />
+            <Border Height="3" VerticalAlignment="Center" Background="{Binding AccentGlowBrush}" Margin="12,0">
+                <Border.Effect>
+                    <BlurEffect Radius="3" />
+                </Border.Effect>
+            </Border>
+            <Border Height="1" VerticalAlignment="Center" Background="{Binding AccentBrush}" Margin="16,0" />
+            <Ellipse Width="5" Height="5" Fill="{Binding AccentBrush}" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="4,0,0,0" />
+            <Ellipse Width="5" Height="5" Fill="{Binding AccentBrush}" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,4,0" />
+        </Panel>
+
+        <!-- Warcraft: an oak beam with a gold line and iron rivets. -->
+        <Panel IsVisible="{Binding IsWarcraftFrame}">
+            <Border Background="{Binding BandBrush}" BorderBrush="#0E0804" BorderThickness="0,1" />
+            <Border Background="{StaticResource WoodGrain}" Margin="0,1" />
+            <Border Height="1" VerticalAlignment="Center" Background="{Binding TrimBrush}" Margin="14,0" />
+            <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Left" VerticalAlignment="Center" Margin="3,0,0,0" />
+            <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0" />
+        </Panel>
+    </Panel>
+</UserControl>

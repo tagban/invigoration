@@ -256,6 +256,15 @@ public sealed class BotConfig
     public bool UseD2ChatLayout { get; set; }
 
     /// <summary>
+    /// Which theme this bot's tab loads with (see ThemeLibrary): a built-in id ("default",
+    /// "diablo2", "starcraft", "warcraft") or a custom theme's. Blank on a config saved before
+    /// themes existed, which ThemeLibrary.ThemeIdFor reads as Diablo II when UseD2ChatLayout was on
+    /// and Default otherwise — UseD2ChatLayout is kept in step (ThemeLibrary.AssignTo) purely so an
+    /// older build reading the same file still lays the bot out the same way.
+    /// </summary>
+    public string ThemeId { get; set; } = "";
+
+    /// <summary>
     /// How many times D2 Style's chat gem has been switched ON for this bot (activations only,
     /// not deactivations — see BotTabViewModel.ToggleChatGem). Persisted with the rest of the
     /// bot's config so the tally survives restarts. Purely a local counter today: nothing reads

@@ -12,4 +12,7 @@ public enum ChatColorScheme
 
     /// <summary>Every role hand-picked by the user, stored in BotConfig.CustomColors.</summary>
     Custom,
+
+    /// <summary>Warm parchment and gold on dark oak, for the Warcraft theme. Invigoration's own, not ported from bnubot. Added after Custom so existing saved values keep their meaning.</summary>
+    Warcraft,
 }

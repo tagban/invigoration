@@ -217,6 +217,7 @@ public partial class ConfigViewModel : ObservableObject
         new(ChatColorScheme.Invigoration, "Invigoration (classic)"),
         new(ChatColorScheme.StarCraft, "BNU`Bot StarCraft"),
         new(ChatColorScheme.DiabloII, "BNU`Bot Diablo"),
+        new(ChatColorScheme.Warcraft, "Warcraft"),
         new(ChatColorScheme.Custom, "Custom..."),
     ];
 
@@ -287,7 +288,8 @@ public partial class ConfigViewModel : ObservableObject
         HomeChannel = config.HomeChannel;
         ColorScheme = config.ChatColorScheme;
         CustomSchemeName = config.CustomColorSchemeName;
-        UseD2ChatLayout = config.UseD2ChatLayout;
+        var themeId = ThemeLibrary.ResolveFor(config).Id;
+        SelectedTheme = AvailableThemes.FirstOrDefault(t => t.Id == themeId) ?? AvailableThemes[0];
         IconSetName = string.IsNullOrEmpty(config.IconSetName) ? DefaultIconSetLabel : config.IconSetName;
         RefreshServerSuggestions();
         RefreshLibrarySchemes();
@@ -295,30 +297,37 @@ public partial class ConfigViewModel : ObservableObject
         RefreshAvailableProfiles(config.BattlenetCredentialProfileId);
 
         // Everything above is just loading saved values into the editor; only edits the user
-        // makes from here on should trigger the "turning D2 Style on also switches the colors"
+        // makes from here on should trigger the "picking a theme also switches the colors"
         // convenience below.
         _loaded = true;
     }
 
     private bool _loaded;
 
+    /// <summary>Every theme this bot can load with — the built-ins, then any custom ones from Customize → Manage Themes.</summary>
+    public IReadOnlyList<ChatTheme> AvailableThemes { get; } = ThemeLibrary.All();
+
     /// <summary>
-    /// Mirrors BotConfig.UseD2ChatLayout, but as a real ViewModel property rather than a direct
-    /// Config binding so switching it on can also default the chat colors to the Diablo II
-    /// scheme (per explicit request — D2 Style should look like D2 out of the box, not just
-    /// rearrange the panels). Only a default, not a lock: the color dropdown right above stays
+    /// This bot's theme (BotConfig.ThemeId). Picking one also switches the chat colors to the
+    /// theme's own scheme when it has one — a Diablo II theme should look like Diablo II out of the
+    /// box, not just rearrange the panels. Only a default, not a lock: the color dropdown stays
     /// editable, and reopening this window later won't re-force the scheme on a bot that already
-    /// had D2 Style saved — see the _loaded guard.
+    /// had its theme saved — see the _loaded guard.
     /// </summary>
     [ObservableProperty]
-    public partial bool UseD2ChatLayout { get; set; }
+    public partial ChatTheme? SelectedTheme { get; set; }
 
-    partial void OnUseD2ChatLayoutChanged(bool value)
+    partial void OnSelectedThemeChanged(ChatTheme? value)
     {
-        Config.UseD2ChatLayout = value;
-        if (value && _loaded)
+        if (value is null)
         {
-            ColorScheme = ChatColorScheme.DiabloII;
+            return;
+        }
+
+        ThemeLibrary.AssignTo(Config, value);
+        if (_loaded && value.ColorScheme is { } scheme)
+        {
+            ColorScheme = scheme;
         }
     }
 

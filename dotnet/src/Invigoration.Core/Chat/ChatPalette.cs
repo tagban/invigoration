@@ -213,10 +213,39 @@ public sealed class ChatPalette
         Yellow = new RgbColor(0xCE, 0xCE, 0x51), // same as Speaker/Debug above
     };
 
+    /// <summary>
+    /// The Warcraft theme's palette — Invigoration's own, not one of bnubot's: parchment-toned text
+    /// and gold channel lines on dark oak, with the status colors warmed to match while staying
+    /// distinct from one another.
+    /// </summary>
+    public static readonly ChatPalette Warcraft = new()
+    {
+        Background = new RgbColor(0x16, 0x10, 0x0A),
+        White = new RgbColor(0xE8, 0xDC, 0xC2),
+        Channel = new RgbColor(0xE6, 0xB8, 0x4A),
+        Info = new RgbColor(0x8F, 0xC0, 0x6A),
+        Error = new RgbColor(0xE0, 0x5A, 0x3C),
+        Debug = new RgbColor(0xC8, 0xA8, 0x6A),
+        Gray = new RgbColor(0x86, 0x78, 0x66),
+        SelfUserName = new RgbColor(0x6F, 0xC8, 0xD8),
+        Whisper = new RgbColor(0xA8, 0x98, 0x80),
+        Highlight = new RgbColor(0xD2, 0xAA, 0x4E),
+        Red = new RgbColor(0xE0, 0x5A, 0x3C),
+        Green = new RgbColor(0x8F, 0xC0, 0x6A),
+        Cyan = new RgbColor(0x6F, 0xC8, 0xD8),
+        Speaker = new RgbColor(0xF0, 0xC7, 0x5E),
+        Guest = new RgbColor(0xC0, 0x8C, 0xE0),
+        UserNameDefault = new RgbColor(0xF0, 0xC7, 0x5E),
+        EmoteDefault = new RgbColor(0xC8, 0xA8, 0x6A),
+        Blue = new RgbColor(0x6F, 0xA8, 0xE8),
+        Yellow = new RgbColor(0xF0, 0xC7, 0x5E),
+    };
+
     public static ChatPalette ForScheme(Config.BotConfig config) => config.ChatColorScheme switch
     {
         ChatColorScheme.StarCraft => StarCraft,
         ChatColorScheme.DiabloII => DiabloII,
+        ChatColorScheme.Warcraft => Warcraft,
         ChatColorScheme.Custom => FromCustom(config.CustomColors),
         _ => Invigoration,
     };

@@ -160,9 +160,16 @@
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
                                Text="A small icon before each chat/emote line, from the speaker's own tracked game (classic BNCS) — a Stimpak-backed bot (SC2/SC:R/WC3:R) shows this bot's own product icon for every speaker instead, since that protocol doesn't report which game each person is actually using." />
 
-                    <CheckBox Content="D2 Style layout (user list along the bottom)" IsChecked="{Binding UseD2ChatLayout}" Margin="0,8,0,0" />
+                    <TextBlock Text="Theme" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,10,0,0" />
+                    <ComboBox ItemsSource="{Binding AvailableThemes}" SelectedItem="{Binding SelectedTheme}" HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                                <TextBlock Text="{Binding Name}" />
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
                     <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
-                               Text="Off (default) is the Normal layout: chat on the left, the Users/Friends/Clan panel down the right-hand side. On, this bot's tab loads Diablo II lobby style instead — that same panel docks as a short strip along the bottom with each user shown as a portrait with their name under it (no ping), the chat log takes the full width above it, and a clickable chat gem sits between the two. Turning this on also switches the color scheme above to Diablo II; you can change it back afterward if you'd rather keep your own." />
+                               Text="How this bot's tab looks. Default is the plain layout: chat on the left, the Users/Friends/Clan panel down the right. Diablo II frames the chat in carved stone with a clickable chat gem, and docks that panel as a strip of character portraits along the bottom. StarCraft (steel console) and Warcraft (oak and iron) frame the chat and keep the panel on the right. Picking a theme also switches the color scheme above to match; change it back afterward if you'd rather keep your own. Make your own themes in Customize → Manage Themes." />
 
                     <TextBlock Text="Idle Message" FontWeight="Bold" FontSize="11" Opacity="0.8" Margin="0,10,0,0" />
                     <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8">

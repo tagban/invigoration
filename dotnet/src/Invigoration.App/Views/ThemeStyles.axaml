@@ -1,0 +1,87 @@
+<Styles xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="using:Invigoration.App.ViewModels">
+
+    <!-- A themed input row: the text box becomes a well in the theme's own color with a trim-colored
+         rim, the Send button a plate from the theme's frame materials with its accent-colored label
+         in the theme's header font, and the chat gem sits in a trim-rimmed socket. Applied through
+         the "themed" and "themegem" classes, only while the theme has a frame. Shared by BotTabView
+         and the theme manager's preview; both DataContexts implement IThemedSurface.
+
+         Fluent restyles these controls per state from inside their templates, so each state is
+         overridden there too — otherwise hovering or focusing snaps them back to the stock look. -->
+
+    <Style Selector="TextBox.themed" x:DataType="vm:IThemedSurface">
+        <Setter Property="Foreground" Value="#E6DCC4" />
+        <Setter Property="CaretBrush" Value="{Binding Theme.AccentBrush}" />
+    </Style>
+    <Style Selector="TextBox.themed /template/ Border#PART_BorderElement" x:DataType="vm:IThemedSurface">
+        <Setter Property="Background" Value="{Binding Theme.WellBrush}" />
+        <Setter Property="BorderBrush" Value="{Binding Theme.TrimShadeSolidBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
+    </Style>
+    <Style Selector="TextBox.themed:pointerover /template/ Border#PART_BorderElement" x:DataType="vm:IThemedSurface">
+        <Setter Property="Background" Value="{Binding Theme.WellBrush}" />
+        <Setter Property="BorderBrush" Value="{Binding Theme.TrimSolidBrush}" />
+    </Style>
+    <Style Selector="TextBox.themed:focus /template/ Border#PART_BorderElement" x:DataType="vm:IThemedSurface">
+        <Setter Property="Background" Value="{Binding Theme.WellBrush}" />
+        <Setter Property="BorderBrush" Value="{Binding Theme.AccentBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+    </Style>
+    <Style Selector="TextBox.themed:focus">
+        <Setter Property="Foreground" Value="#E6DCC4" />
+    </Style>
+    <Style Selector="TextBox.themed /template/ TextBlock#PART_Placeholder">
+        <Setter Property="Foreground" Value="#7D7466" />
+    </Style>
+
+    <!-- The theme's brushes go on the Button itself, per state: inside Fluent's template the
+         ContentPresenter's DataContext is the button's content (the "Send" text), not the bot, so a
+         theme binding set on that part directly finds nothing. The template part just reads the
+         Button's own values back, overriding the stock per-state theme resources. -->
+    <Style Selector="Button.themed" x:DataType="vm:IThemedSurface">
+        <Setter Property="FontFamily" Value="{Binding Theme.HeaderFontFamily}" />
+        <Setter Property="FontWeight" Value="Bold" />
+        <Setter Property="Padding" Value="16,5" />
+        <Setter Property="Background" Value="{Binding Theme.CapBrush}" />
+        <Setter Property="BorderBrush" Value="{Binding Theme.TrimBrush}" />
+        <Setter Property="Foreground" Value="{Binding Theme.AccentBrush}" />
+    </Style>
+    <Style Selector="Button.themed:pointerover" x:DataType="vm:IThemedSurface">
+        <Setter Property="Background" Value="{Binding Theme.BandBrush}" />
+        <Setter Property="BorderBrush" Value="{Binding Theme.AccentBrush}" />
+    </Style>
+    <Style Selector="Button.themed:pressed" x:DataType="vm:IThemedSurface">
+        <Setter Property="Background" Value="{Binding Theme.WellBrush}" />
+    </Style>
+    <Style Selector="Button.themed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+        <Setter Property="BorderBrush" Value="{TemplateBinding BorderBrush}" />
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="0" />
+    </Style>
+    <Style Selector="Button.themed:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+        <Setter Property="BorderBrush" Value="{TemplateBinding BorderBrush}" />
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+    </Style>
+    <Style Selector="Button.themed:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="{TemplateBinding Background}" />
+        <Setter Property="Foreground" Value="{TemplateBinding Foreground}" />
+    </Style>
+
+    <!-- The chat gem button: no button chrome in any state, just its socket. -->
+    <Style Selector="Button.themegem /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+        <Setter Property="BorderThickness" Value="0" />
+    </Style>
+    <Style Selector="Button.themegem:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+    <Style Selector="Button.themegem:pressed /template/ ContentPresenter#PART_ContentPresenter">
+        <Setter Property="Background" Value="Transparent" />
+    </Style>
+</Styles>

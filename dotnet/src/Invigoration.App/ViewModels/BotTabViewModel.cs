@@ -16,9 +16,30 @@ using Stimpak;
 namespace Invigoration.App.ViewModels;
 
 /// <summary>One bot tab: wraps a BotEngine and projects its events onto observable collections for binding.</summary>
-public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
+public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedSurface
 {
     public BotEngine Engine { get; }
+
+    /// <summary>
+    /// This bot's theme (BotConfig.ThemeId, resolved through ThemeLibrary) as the brushes and layout
+    /// coordinates BotTabView draws with. Rebuilt whenever it could have changed: the bot's config
+    /// is replaced, or a custom theme is saved or deleted in the theme manager.
+    /// </summary>
+    [ObservableProperty]
+    public partial ChatThemeViewModel Theme { get; set; } = new(ThemeLibrary.BuiltIns[0]);
+
+    partial void OnThemeChanged(ChatThemeViewModel value)
+    {
+        value.ChannelName = CurrentChannelName;
+        foreach (var user in ChannelUsers)
+        {
+            user.UseD2Layout = value.UsesCharacterDock;
+        }
+    }
+
+    private void RefreshTheme() => Theme = new ChatThemeViewModel(ThemeLibrary.ResolveFor(Config));
+
+    private void OnThemesChanged() => Dispatcher.UIThread.Post(RefreshTheme);
 
     public BotConfig Config => Engine.Config;
 
@@ -154,6 +175,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         OnPropertyChanged(nameof(BackgroundBrush));
         OnPropertyChanged(nameof(SupportsFriends));
         OnPropertyChanged(nameof(SupportsClan));
+        RefreshTheme();
     }
 
     public BotTabViewModel(BotEngine engine)
@@ -187,7 +209,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine.Sc2PublicChannelsReceived += OnSc2PublicChannelsReceived;
         IconOverrideStore.OverridesChanged += OnIconOverrideChanged;
         Invigoration.Core.Clan.ClanRosterStore.RosterChanged += OnClanRosterChanged;
+        ThemeLibrary.ThemesChanged += OnThemesChanged;
         RefreshClanRoster();
+        RefreshTheme();
     }
 
     private void OnClanRosterChanged() => Dispatcher.UIThread.Post(() =>
@@ -281,8 +305,8 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     private Task DisconnectAsync() => Engine.DisconnectAsync();
 
     /// <summary>
-    /// Diablo II's chat gem — the little jewel set in a socket beside the Send button in D2 Style
-    /// (shown only in that layout). Blue when activated, red when not. Purely local flavor: it
+    /// Diablo II's chat gem — the little jewel set in a socket beside the Send button, shown when
+    /// the bot's theme turns it on (ChatTheme.ShowChatGem; the built-in Diablo II theme does). Blue when activated, red when not. Purely local flavor: it
     /// toggles its own color and prints one line into this bot's own chat log, and deliberately
     /// sends nothing to Battle.net, per explicit request.
     /// </summary>
@@ -564,7 +588,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
     private void OnSelectedChannelUsersChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e) =>
         OnPropertyChanged(nameof(UsersTabHeader));
 
-    partial void OnCurrentChannelNameChanged(string value) => OnPropertyChanged(nameof(UsersTabHeader));
+    partial void OnCurrentChannelNameChanged(string value)
+    {
+        OnPropertyChanged(nameof(UsersTabHeader));
+        Theme.ChannelName = value;
+    }
 
     [RelayCommand]
     private void LeaveChannel(ChannelTabViewModel tab) => Engine.LeaveSc2Channel(tab.ChannelIndex);
@@ -797,7 +825,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
                 UseClassicIconStyle = Config.ClassicUserIconStyle,
                 BotProduct = Config.Product,
                 Palette = Engine.Palette,
-                UseD2Layout = Config.UseD2ChatLayout,
+                UseD2Layout = Theme.UsesCharacterDock,
             };
             _channelUsersByName[e.Username] = user;
         }
@@ -888,6 +916,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable
         Engine.Sc2PublicChannelsReceived -= OnSc2PublicChannelsReceived;
         IconOverrideStore.OverridesChanged -= OnIconOverrideChanged;
         Invigoration.Core.Clan.ClanRosterStore.RosterChanged -= OnClanRosterChanged;
+        ThemeLibrary.ThemesChanged -= OnThemesChanged;
         return Engine.DisposeAsync();
     }
 }
