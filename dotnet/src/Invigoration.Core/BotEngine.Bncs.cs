@@ -485,7 +485,9 @@ public sealed partial class BotEngine
             }
         }
 
-        if (chatEvent.Type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Whisper)
+        // Discord speakers aren't Battle.net accounts, so they don't belong on the clan roster.
+        if (chatEvent.Type is ChatEventType.Talk or ChatEventType.Emote or ChatEventType.Whisper &&
+            chatEvent.Origin != ChatEventOrigin.Discord)
         {
             var defaultRank = Config.ClanFeatureEnabled ? Config.DefaultRank : null;
             _lastKnownProduct.TryGetValue(chatEvent.Username, out var product);

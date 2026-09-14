@@ -87,17 +87,36 @@ public sealed partial class BotEngine
         }
     }
 
+    /// <summary>
+    /// How a Discord user is named everywhere on this side of the bridge: "[Discord] name". It's
+    /// both the label people see and the identity the bot reasons with — and because Battle.net
+    /// account names can't contain spaces, it can never collide with a real account. That matters:
+    /// Discord names are self-chosen, so under their bare name someone could register a Discord
+    /// account matching the bot master's Battle.net name and run master commands through the
+    /// relay, or score trivia points and roster rank as someone else.
+    /// </summary>
+    public static string DiscordSpeakerName(string discordUsername) => $"[Discord] {discordUsername}";
+
+    /// <summary>Only real Battle.net chat goes out to Discord — never a message that came in from Discord in the first place, which would post the user's own message back at them.</summary>
+    internal static bool ShouldRelayToDiscord(ChatEvent chatEvent, bool relayBattlenetToDiscord) =>
+        relayBattlenetToDiscord &&
+        chatEvent.Origin != ChatEventOrigin.Discord &&
+        chatEvent.Type is ChatEventType.Talk or ChatEventType.Emote;
+
     private async Task HandleDiscordMessageAsync(string username, string content)
     {
+        var speaker = DiscordSpeakerName(username);
+
         // Fed through the same pipeline BNCS/Chat-Telnet/SC2 Talk events use — trivia matching
         // and trigger-prefixed command dispatch, in particular — so a Discord user can answer a
-        // running trivia round (or run an authorized command) the same as anyone in the actual
-        // Battle.net channel. No ChannelIndex: Discord isn't a joined SC2 channel, so this
+        // running trivia round, or use the commands open to everyone (help, trivia score), the
+        // same as anyone in the actual Battle.net channel. Commands that need the bot master or a
+        // rank never authorize for a "[Discord] name" speaker (see DiscordSpeakerName). No ChannelIndex: Discord isn't a joined SC2 channel, so this
         // always passes HandleChatEvent's channel-isolation gate, same as a whisper does.
         // Deliberately independent of RelayDiscordToBattlenet below — whether the bot *reacts*
         // to a Discord message and whether that message is *visibly echoed* into Battle.net
         // chat are separate toggles.
-        await HandleChatEvent(new ChatEvent(ChatEventType.Talk, username, 0, 0, content, Origin: ChatEventOrigin.Discord)).ConfigureAwait(false);
+        await HandleChatEvent(new ChatEvent(ChatEventType.Talk, speaker, 0, 0, content, Origin: ChatEventOrigin.Discord)).ConfigureAwait(false);
 
         if (!Config.Discord.RelayDiscordToBattlenet)
         {
@@ -111,13 +130,16 @@ public sealed partial class BotEngine
         }
 
         _nextDiscordToBattlenetAllowedUtc = DateTime.UtcNow.AddSeconds(Math.Max(0, Config.Discord.RelayDelaySeconds));
-        await SendChatCommandAsync($"[Discord] {username}: {content}").ConfigureAwait(false);
+
+        // No local echo: the Discord message already shows in this bot's chat log once, as
+        // "[Discord] name: message", from the HandleChatEvent above. Echoing the relay too is
+        // what used to print it a second time as "<bot>: [Discord] name: message".
+        await SendChatCommandAsync($"{speaker}: {content}", sc2ChannelOverride: null, echoLocally: false).ConfigureAwait(false);
     }
 
     private async void OnChatMessageForDiscordRelay(ChatEvent chatEvent)
     {
-        if (_discordBridge is not { } bridge || !Config.Discord.RelayBattlenetToDiscord ||
-            chatEvent.Type is not (ChatEventType.Talk or ChatEventType.Emote))
+        if (_discordBridge is not { } bridge || !ShouldRelayToDiscord(chatEvent, Config.Discord.RelayBattlenetToDiscord))
         {
             return;
         }

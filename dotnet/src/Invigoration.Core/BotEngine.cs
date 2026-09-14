@@ -325,7 +325,11 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// ChatSendBlockedReason and ChatLineSplitter. Both exist because BNETDocs' Atlas closes the
     /// connection over chat it considers invalid rather than ignoring it.
     /// </summary>
-    public async Task SendChatCommandAsync(string text, byte? sc2ChannelOverride = null)
+    public Task SendChatCommandAsync(string text, byte? sc2ChannelOverride = null) =>
+        SendChatCommandAsync(text, sc2ChannelOverride, echoLocally: true);
+
+    /// <param name="echoLocally">False when the line is already shown in this bot's chat log some other way — a Discord relay, whose original message was displayed as it arrived.</param>
+    internal async Task SendChatCommandAsync(string text, byte? sc2ChannelOverride, bool echoLocally)
     {
         if (string.IsNullOrEmpty(text))
         {
@@ -347,7 +351,7 @@ public sealed partial class BotEngine : IAsyncDisposable
         var lines = isStimpak ? [outgoing] : ChatLineSplitter.Split(outgoing);
         foreach (var line in lines)
         {
-            await SendChatLineAsync(line, isSlashCommand, isStimpak, sc2ChannelOverride).ConfigureAwait(false);
+            await SendChatLineAsync(line, isSlashCommand, isStimpak, sc2ChannelOverride, echoLocally).ConfigureAwait(false);
         }
     }
 
@@ -368,7 +372,7 @@ public sealed partial class BotEngine : IAsyncDisposable
         return !isSlashCommand && string.IsNullOrEmpty(_session.CurrentChannelName) ? "not in a channel yet" : null;
     }
 
-    private async Task SendChatLineAsync(string outgoing, bool isSlashCommand, bool isStimpak, byte? sc2ChannelOverride)
+    private async Task SendChatLineAsync(string outgoing, bool isSlashCommand, bool isStimpak, byte? sc2ChannelOverride, bool echoLocally)
     {
         await ChatSendGate.WaitAsync().ConfigureAwait(false);
         try
@@ -406,7 +410,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             // Config.Username is a classic-BNCS-only field — Stimpak logs in via OAuth, not a
             // username/password Config ever populates), and once for real once the server's own
             // echo arrived with the correct name and clan tag.
-            if (!isSlashCommand && !isStimpak)
+            if (!isSlashCommand && !isStimpak && echoLocally)
             {
                 var segments = new List<ChatLogSegment> { new(Palette.SelfUserName, $"{Config.Username}: ") };
                 segments.AddRange(ChatColorFormatter.Parse(outgoing, Palette.White, Palette));

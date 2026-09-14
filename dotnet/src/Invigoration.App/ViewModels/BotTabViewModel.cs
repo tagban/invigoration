@@ -776,7 +776,11 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
                 break;
 
             case ChatEventType.Talk:
-                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette), ResolveUserIcon(e.Username)));
+                // A Discord relay's speaker is already named "[Discord] name" (BotEngine.DiscordSpeakerName) and gets the Discord icon rather than a game icon it doesn't have.
+                var icon = e.Origin == ChatEventOrigin.Discord
+                    ? (Config.ShowUserIconsInChat ? GameIconLoader.Get("discord-relay") : null)
+                    : ResolveUserIcon(e.Username);
+                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette), icon));
                 break;
 
             case ChatEventType.Emote:
