@@ -282,8 +282,8 @@
                                  the grass with the name under it, and nothing else — no ping, no rank
                                  badge. The figure is the Battle.net chat avatar D2 drew for them (the
                                  Moderator with his ban hammer, a StarCraft marine, the hooded Unknown...,
-                                 see ChatAvatar); a live D2 character shows their Battle.net portrait tile
-                                 until full dressed figures are drawn. Fixed width so the strip reads as an
+                                 see ChatAvatar); a live D2 character stands in as the Unknown avatar
+                                 until dressed figures can be drawn. Fixed width so the strip reads as an
                                  even lineup; long names ellipsize. The name color follows D2's own
                                  sparser rule (see ChannelUserViewModel.UsernameBrush). -->
                             <StackPanel IsVisible="{Binding UseD2Layout}" Width="96" Margin="2,2"
@@ -295,10 +295,6 @@
                                     <views:SpriteAnimationView Animation="{Binding DockAvatar}" Phase="{Binding AnimationPhase}"
                                                                Width="78" Height="88" HorizontalAlignment="Center"
                                                                IsVisible="{Binding ShowsDockAvatar}" />
-                                    <Image Source="{Binding D2PortraitImage}" Width="84" Height="42" Stretch="Fill"
-                                           RenderOptions.BitmapInterpolationMode="None" HorizontalAlignment="Center"
-                                           VerticalAlignment="Bottom" Margin="0,0,0,6"
-                                           IsVisible="{Binding ShowsDockPortrait}" />
                                     <Image Source="{Binding DisplayIconImage}" MaxWidth="44" MaxHeight="44"
                                            Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Bottom" Margin="0,0,0,6"
                                            IsVisible="{Binding ShowsDockIcon}" />

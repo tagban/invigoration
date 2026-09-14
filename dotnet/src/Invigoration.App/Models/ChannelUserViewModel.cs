@@ -20,7 +20,6 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
     [NotifyPropertyChangedFor(nameof(DockAvatar))]
     [NotifyPropertyChangedFor(nameof(ShowsDockAvatar))]
-    [NotifyPropertyChangedFor(nameof(ShowsDockPortrait))]
     [NotifyPropertyChangedFor(nameof(ShowsDockIcon))]
     public partial uint Flags { get; set; }
 
@@ -39,7 +38,6 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(HasD2Portrait))]
     [NotifyPropertyChangedFor(nameof(DockAvatar))]
     [NotifyPropertyChangedFor(nameof(ShowsDockAvatar))]
-    [NotifyPropertyChangedFor(nameof(ShowsDockPortrait))]
     [NotifyPropertyChangedFor(nameof(ShowsDockIcon))]
     [NotifyPropertyChangedFor(nameof(DockName))]
     public partial string StatString { get; set; } = "";
@@ -73,16 +71,19 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
 
     // --- Character dock (Diablo II lobby strip) ---
 
-    /// <summary>The Battle.net chat avatar D2's lobby would draw for this user — Moderator, Blizzard Rep, a StarCraft marine, the hooded Unknown... (see ChatAvatar for the rules) — or null for a live D2 character, who's drawn as themselves.</summary>
-    public SpriteAnimation? DockAvatar => ChatAvatarLoader.Get(ChatAvatar.For(Flags, StatString));
+    /// <summary>
+    /// The Battle.net chat avatar D2's lobby would draw for this user — Moderator, Blizzard Rep, a
+    /// StarCraft marine, the hooded Unknown... (see ChatAvatar for the rules). A live D2 character
+    /// should be drawn as themselves, dressed in their gear, but that needs the gear art that isn't
+    /// available yet (docs/D2-CHARACTER-ART-PLAN.md) — until then they stand in as the Unknown
+    /// avatar, per request, rather than as a small portrait tile.
+    /// </summary>
+    public SpriteAnimation? DockAvatar => ChatAvatarLoader.Get(ChatAvatar.For(Flags, StatString) ?? ChatAvatar.Unknown);
 
     public bool ShowsDockAvatar => DockAvatar is not null;
 
-    /// <summary>A live D2 character, shown (for now) by their Battle.net portrait tile; the full dressed figure needs D2's own character art.</summary>
-    public bool ShowsDockPortrait => ChatAvatar.For(Flags, StatString) is null && HasD2Portrait;
-
-    /// <summary>Last resort when neither an avatar nor a portrait is available (e.g. an avatar asset failed to load).</summary>
-    public bool ShowsDockIcon => !ShowsDockAvatar && !ShowsDockPortrait;
+    /// <summary>Last resort when the avatar can't be shown (its asset failed to load).</summary>
+    public bool ShowsDockIcon => !ShowsDockAvatar;
 
     /// <summary>How the lobby labels this user: a D2 character's title and name ("Matriarch Kilua"), otherwise the account name.</summary>
     public string DockName => Core.StatString.D2Character.TryParse(StatString, out var character) ? character.TitledName : Username;
