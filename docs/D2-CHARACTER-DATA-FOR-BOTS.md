@@ -219,13 +219,77 @@ Invigoration's C# version (`D2CharacterPack` in `Invigoration.Core`) produces fr
 the example's, pixel for pixel. A drawn character is small — roughly 30–40 × 70–80 pixels once
 cropped to the figure — so it sits comfortably next to the classic 78 × 88 chat avatars.
 
-## 6. Checklist
+## 6. Everyone the pack can't draw: the classic chat avatars
+
+Diablo II's lobby drew a figure for **everyone** in the channel, not only realm characters, and a
+channel always has people the pack can't draw: Open characters, dead hardcore characters, players on
+other games, the channel's operator. As with every Battle.net icon, the server only says *who*
+someone is (their flags and statstring); the client picks the picture. Check in this order and stop
+at the first match:
+
+| # | When | Show |
+|---|---|---|
+| 1 | flags & `0x01` (Blizzard representative) | Blizzard Rep |
+| 2 | flags & `0x08` (Battle.net administrator) | Sysop |
+| 3 | flags & `0x02` (channel operator) | Moderator — the one with the hammer |
+| 4 | flags & `0x04` (speaker) | Speaker |
+| 5 | flags & `0x2000`, `0x8000` or `0x100000` (tournament official) | Referee ¹ |
+| 6 | statstring starts `VD2D` or `PX2D`, but is just the product or has no full 33-byte portrait (an **Open** character) | Unknown |
+| 7 | a D2 realm character with status & `0x0C` == `0x0C` (**dead hardcore**) | Dead Hardcore |
+| 8 | any other D2 realm character | **the character, drawn from the pack** (section 5) — or Unknown if the pack isn't downloaded or has nothing to draw |
+| 9 | `RATS`, `RTSJ`, `RHSS` (StarCraft, Japanese and shareware) | StarCraft |
+| 10 | `PXES` | Brood War |
+| 11 | `NB2W` | Warcraft II |
+| 12 | `LTRD`, `RHSD` (Diablo, shareware) | Diablo |
+| 13 | `TAHC` (chat client) | Chat |
+| 14 | anything else — Warcraft III included | Unknown |
+
+¹ The Arreat Summit only says the Referee is "authorized for disputes"; tying it to the tournament
+official flags is Invigoration's inference.
+
+Rank comes first on purpose: a D2 player who has ops shows as the Moderator, as in the game. The
+product codes are the statstring's first four bytes, which are the product ID reversed (`STAR` →
+`RATS`).
+
+```python
+def lobby_figure(flags, statstring: bytes, pack=None):
+    """'character' (draw them with the pack), or which classic avatar to show."""
+    if flags & 0x01: return "blizzrep"
+    if flags & 0x08: return "sysop"
+    if flags & 0x02: return "moderator"
+    if flags & 0x04: return "speaker"
+    if flags & (0x2000 | 0x8000 | 0x100000): return "referee"
+    product = statstring[:4]
+    if product in (b"VD2D", b"PX2D"):
+        parts = statstring.split(b",", 2)
+        if len(parts) < 3 or len(parts[2]) < 33:
+            return "unknown"                       # Open character
+        if parts[2][26] & 0x0C == 0x0C:
+            return "deadhardcore"
+        return "character" if pack and pack.plan(statstring) else "unknown"
+    return {b"RATS": "starcraft", b"RTSJ": "starcraft", b"RHSS": "starcraft", b"PXES": "broodwar",
+            b"NB2W": "war2", b"LTRD": "diablo", b"RHSD": "diablo", b"TAHC": "chatclient"}.get(product, "unknown")
+```
+
+**The avatar pictures aren't in either file.** They're the animations The Arreat Summit shows on
+its Battle.net chat page (classic.battle.net/diablo2exp/basics/bnetchat.shtml); Invigoration keeps
+its own copies as strips of 78 × 88 frames. Bring your own, or show your bot's usual icon in their
+place.
+
+**Lining them up.** Stand every figure on one ground line: bottom-centre each frame in the same box.
+A drawn character is cropped to the figure, so its feet are its bottom row; the Arreat avatars' feet
+sit about 7 pixels above the bottom of their 88-pixel frames, so Invigoration adds that much clear
+space under drawn characters to match. Draw at actual size — shrink only a figure too big for its
+space, and never blur pixels when you don't have to.
+
+## 7. Checklist
 
 - [ ] Only request the files from servers that serve them; download once; store the file time.
 - [ ] Check `format` and `version` (both files), and bound sizes before allocating.
 - [ ] Handle the statstring as bytes.
 - [ ] "Nothing to draw" is a normal outcome: Open characters, dead hardcore characters, weapon class
-      0, a missing animation. Fall back to whatever your bot shows today.
+      0, a missing animation. Show the classic avatar instead (section 6), and check rank before
+      drawing anyone.
 - [ ] Read only the zip entries the manifest names.
 - [ ] The art comes from Blizzard's game via the server operator's own install. Serve and cache it
       for your users; don't bundle it into a public repository.

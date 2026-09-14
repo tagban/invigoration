@@ -198,6 +198,25 @@ def realm_statstring(cls_raw, gear, tints=None, status=0xA0, act=0x9E):
         p[14 + i] = (tints or [0xFF] * 11)[i]
     return b"PX2DUSEast,Kilua," + bytes(p)
 
+def lobby_figure(flags, statstring: bytes, pack=None):
+    """'character' (draw them with the pack), or which classic chat avatar to show instead."""
+    if flags & 0x01: return "blizzrep"
+    if flags & 0x08: return "sysop"
+    if flags & 0x02: return "moderator"
+    if flags & 0x04: return "speaker"
+    if flags & (0x2000 | 0x8000 | 0x100000): return "referee"
+    product = statstring[:4]
+    if product in (b"VD2D", b"PX2D"):
+        parts = statstring.split(b",", 2)
+        if len(parts) < 3 or len(parts[2]) < 33:
+            return "unknown"                       # Open character
+        if parts[2][26] & 0x0C == 0x0C:
+            return "deadhardcore"
+        return "character" if pack and pack.plan(statstring) else "unknown"
+    return {b"RATS": "starcraft", b"RTSJ": "starcraft", b"RHSS": "starcraft", b"PXES": "broodwar",
+            b"NB2W": "war2", b"LTRD": "diablo", b"RHSD": "diablo", b"TAHC": "chatclient"}.get(product, "unknown")
+
+
 if __name__ == "__main__":
     host = sys.argv[1] if len(sys.argv) > 1 else "us.bnet.cc"
     out_dir = sys.argv[2] if len(sys.argv) > 2 else "out"
@@ -217,6 +236,12 @@ if __name__ == "__main__":
         # Hardcore Barbarian wearing nothing (hardcore stands in the NU stance)
         "barbarian_hc": realm_statstring(5, [0xFF] * 11, status=0xA4),
     }
+    # Who gets drawn, and who gets a classic chat avatar instead.
+    for flags, statstring in [(0, samples["paladin"]), (0x02, samples["paladin"]), (0, b"PX2D"),
+                              (0, realm_statstring(5, [0xFF] * 11, status=0xAC)), (0, b"RATS 0 0 0 0 0"),
+                              (0, b"3RAW 1R3W 12 ")]:
+        print(f"flags {flags:#x}, {statstring[:4].decode()}: {lobby_figure(flags, statstring, pack)}")
+
     for name, statstring in samples.items():
         result = pack.frames(statstring)
         if result is None:
