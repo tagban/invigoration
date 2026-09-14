@@ -29,7 +29,7 @@ public enum D2EquipmentDownloadResult
 /// <para><c>d2-equipment.json</c> (<see cref="D2EquipmentMap"/>) — what the equipment bytes of a
 /// character's statstring mean. Required: it's what opting in fetches first.</para>
 /// <para><c>d2-characters.zip</c> — the character art pack, fetched alongside when the server has
-/// it. Stored as-is and checked to be a readable zip; drawing from it comes later.</para>
+/// it. Stored as-is and checked to be a readable zip; the App draws characters from it (D2CharacterLoader, via StatString.D2CharacterPack).</para>
 /// <para>Each file's server file time is kept, so a bot connected to a trusted server can ask
 /// SID_GETFILETIME and fetch only what's newer (BotEngine.D2Data.cs) — including the art pack
 /// arriving for the first time on a server that didn't have it when the user opted in. A "no" to

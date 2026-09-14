@@ -55,6 +55,9 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     /// <summary>Whether the bot's theme docks users as a character strip (ChatThemeViewModel.UsesCharacterDock) — pushed in alongside BotProduct/Palette, same reason. Drives both this row's arrangement (portrait above name, no ping — see BotTabView.axaml) and which name-coloring rule UsernameBrush uses.</summary>
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(UsernameBrush))]
+    [NotifyPropertyChangedFor(nameof(DockAvatar))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockAvatar))]
+    [NotifyPropertyChangedFor(nameof(ShowsDockIcon))]
     public partial bool UseD2Layout { get; set; }
 
     /// <summary>Mirrors BotConfig.ClassicUserIconStyle — pushed in by BotTabViewModel (see UpsertUser/ApplyClassicUserIconStyle) rather than read from Config directly, since this row's own DataContext has no reachable path back up to it (the same ancestor-binding pitfall noted throughout BotTabView.axaml).</summary>
@@ -72,13 +75,16 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     // --- Character dock (Diablo II lobby strip) ---
 
     /// <summary>
-    /// The Battle.net chat avatar D2's lobby would draw for this user — Moderator, Blizzard Rep, a
-    /// StarCraft marine, the hooded Unknown... (see ChatAvatar for the rules). A live D2 character
-    /// should be drawn as themselves, dressed in their gear, but that needs the gear art that isn't
-    /// available yet (docs/D2-CHARACTER-ART-PLAN.md) — until then they stand in as the Unknown
-    /// avatar, per request, rather than as a small portrait tile.
+    /// The figure D2's lobby would draw for this user: the Battle.net chat avatar for their rank or
+    /// client — Moderator, Blizzard Rep, a StarCraft marine, the hooded Unknown... (see ChatAvatar
+    /// for the rules) — or, for a live D2 realm character, the character themselves in their own
+    /// gear, once the character pack has been downloaded (D2CharacterLoader). Without the pack, or
+    /// for gear it can't draw, they stand in as the Unknown avatar. Characters are only composed
+    /// while the dock is actually in use, so other themes never pay for it.
     /// </summary>
-    public SpriteAnimation? DockAvatar => ChatAvatarLoader.Get(ChatAvatar.For(Flags, StatString) ?? ChatAvatar.Unknown);
+    public SpriteAnimation? DockAvatar => ChatAvatar.For(Flags, StatString) is { } avatar
+        ? ChatAvatarLoader.Get(avatar)
+        : (UseD2Layout ? D2CharacterLoader.Get(StatString) : null) ?? ChatAvatarLoader.Get(ChatAvatar.Unknown);
 
     public bool ShowsDockAvatar => DockAvatar is not null;
 
@@ -130,8 +136,14 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
         }
     }
 
-    /// <summary>Re-reads the tooltip text — after the gear list is downloaded, which changes what it says without the statstring changing.</summary>
-    public void RefreshDescription() => OnPropertyChanged(nameof(StatStringDescription));
+    /// <summary>Re-reads the tooltip text and the dock figure — after Diablo II data is downloaded, which changes both without the statstring changing.</summary>
+    public void RefreshD2Data()
+    {
+        OnPropertyChanged(nameof(StatStringDescription));
+        OnPropertyChanged(nameof(DockAvatar));
+        OnPropertyChanged(nameof(ShowsDockAvatar));
+        OnPropertyChanged(nameof(ShowsDockIcon));
+    }
 
     private bool IsSameProduct => StatString.Length >= 4 && BotProduct.Length >= 4 &&
                                    StatString.AsSpan(0, 4).SequenceEqual(BotProduct.AsSpan(0, 4));

@@ -8,7 +8,7 @@ using Invigoration.App.Models;
 namespace Invigoration.App.Views;
 
 /// <summary>
-/// Plays a <see cref="SpriteAnimation"/>, pixel-exact. Every instance runs off one shared clock that
+/// Plays a <see cref="SpriteAnimation"/>, pixel-exact at the bottom middle of its space. Every instance runs off one shared clock that
 /// only ticks while at least one is on screen, and only redraws when its frame actually changes — the
 /// character dock is a virtualizing list, so this stays cheap however many people are in the channel.
 /// <see cref="Phase"/> offsets where in the loop an instance starts, so a crowd of the same avatar
@@ -78,9 +78,16 @@ public sealed class SpriteAnimationView : Control
 
         _shownFrame = a.FrameAt(Clock.ElapsedMilliseconds + Phase);
         var source = new Rect(_shownFrame * a.FrameWidth, 0, a.FrameWidth, a.FrameHeight);
-        using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = Avalonia.Media.Imaging.BitmapInterpolationMode.None }))
+
+        // Actual size, standing at the bottom middle, so figures of different sizes share one ground
+        // line; one too big for the space is shrunk to fit rather than cut off.
+        var scale = Math.Min(1, Math.Min(Bounds.Width / a.FrameWidth, Bounds.Height / a.FrameHeight));
+        var size = new Size(a.FrameWidth * scale, a.FrameHeight * scale);
+        var destination = new Rect(new Point((Bounds.Width - size.Width) / 2, Bounds.Height - size.Height), size);
+        var interpolation = scale < 1 ? Avalonia.Media.Imaging.BitmapInterpolationMode.HighQuality : Avalonia.Media.Imaging.BitmapInterpolationMode.None;
+        using (context.PushRenderOptions(new RenderOptions { BitmapInterpolationMode = interpolation }))
         {
-            context.DrawImage(a.Sheet, source, new Rect(Bounds.Size));
+            context.DrawImage(a.Sheet, source, destination);
         }
     }
 

@@ -282,8 +282,8 @@
                                  the grass with the name under it, and nothing else — no ping, no rank
                                  badge. The figure is the Battle.net chat avatar D2 drew for them (the
                                  Moderator with his ban hammer, a StarCraft marine, the hooded Unknown...,
-                                 see ChatAvatar); a live D2 character stands in as the Unknown avatar
-                                 until dressed figures can be drawn. Fixed width so the strip reads as an
+                                 see ChatAvatar), or a live D2 character dressed in their own gear once
+                                 the character pack is downloaded (D2CharacterLoader). Fixed width so the strip reads as an
                                  even lineup; long names ellipsize. The name color follows D2's own
                                  sparser rule (see ChannelUserViewModel.UsernameBrush). -->
                             <StackPanel IsVisible="{Binding UseD2Layout}" Width="96" Margin="2,2"

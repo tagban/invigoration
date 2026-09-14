@@ -89,6 +89,9 @@ and never committed to either repo.
 - Nothing is sent but the file request; no identity beyond the normal connection.
 
 ### 5. Invigoration — draw
+**Done (2026-09-14):** `Invigoration.Core` `GifImage` + `D2CharacterPack` compose a character from the
+stored pack (verified pixel-exact against the reference renderer on the real pack), and the App's
+`D2CharacterLoader` feeds the dock's `SpriteAnimationView`. What was planned:
 - Pack reader and compositor: for a character, look up tokens and colors from their statstring,
   stack layers in COF order, apply colormaps, produce RGBA frames, and play them with the existing
   `SpriteAnimationView`.

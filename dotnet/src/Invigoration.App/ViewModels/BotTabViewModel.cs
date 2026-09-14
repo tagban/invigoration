@@ -46,7 +46,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     {
         foreach (var user in ChannelUsers)
         {
-            user.RefreshDescription();
+            user.RefreshD2Data();
         }
     });
 
