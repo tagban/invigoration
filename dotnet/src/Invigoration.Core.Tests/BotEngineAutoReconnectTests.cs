@@ -66,6 +66,96 @@ public class BotEngineAutoReconnectTests
 }
 
 /// <summary>
+/// After Battle.net turns the logon down — wrong password, closed account, bad CD key — reconnecting
+/// can only fail the same way, and a run of failed logons is what locks an account or address out.
+/// </summary>
+public class BotEngineLogonRejectionTests
+{
+    private const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
+
+    private static (BotEngine Engine, List<string> Logged) Start(string password)
+    {
+        var engine = new BotEngine(new BotConfig
+        {
+            AutoReconnect = true,
+            AutoReconnectDelaySeconds = 9999,
+            Product = Invigoration.Core.Protocol.BncsProduct.Warcraft2BNE,
+            Username = "Tagban",
+            Password = password,
+            BnlsServer = "127.0.0.1",
+            BnlsPort = 1,
+        });
+        var logged = new List<string>();
+        engine.Log += segments => { lock (logged) { logged.Add(string.Concat(segments.Select(s => s.Text))); } };
+        return (engine, logged);
+    }
+
+    private static Task Invoke(BotEngine engine, string handler, byte[] frame) =>
+        (Task)typeof(BotEngine).GetMethod(handler, Private)!.Invoke(engine, [frame])!;
+
+    private static void MaybeScheduleAutoReconnect(BotEngine engine) =>
+        typeof(BotEngine).GetMethod("MaybeScheduleAutoReconnect", Private)!.Invoke(engine, null);
+
+    private static byte[] Frame(Invigoration.Core.Protocol.BncsPacketId id, uint status) =>
+        new Invigoration.Core.Protocol.PacketWriter().WriteDword(status).ToBncsPacket(id);
+
+    [Theory]
+    [InlineData("HandleLogonResponse2Async", Invigoration.Core.Protocol.BncsPacketId.SID_LOGONRESPONSE2, 0x02u, "password is incorrect")]
+    [InlineData("HandleLogonResponse2Async", Invigoration.Core.Protocol.BncsPacketId.SID_LOGONRESPONSE2, 0x06u, "closed or banned")]
+    [InlineData("HandleAuthCheckAsync", Invigoration.Core.Protocol.BncsPacketId.SID_AUTH_CHECK, 0x0200u, "CD key is invalid")]
+    [InlineData("HandleAuthCheckAsync", Invigoration.Core.Protocol.BncsPacketId.SID_AUTH_CHECK, 0x0202u, "CD key is banned")]
+    public async Task ARejectedLogon_StopsAutoReconnect(string handler, Invigoration.Core.Protocol.BncsPacketId id, uint status, string reason)
+    {
+        var (engine, logged) = Start("huntertwo"); // already lowercase: no casing retry to wait for
+        await using var _ = engine;
+
+        await Invoke(engine, handler, Frame(id, status));
+        MaybeScheduleAutoReconnect(engine);
+        await Task.Delay(100);
+
+        Assert.Contains(logged, l => l.Contains("Auto-reconnect skipped", StringComparison.Ordinal) && l.Contains(reason, StringComparison.Ordinal));
+        Assert.DoesNotContain(logged, l => l.Contains("reconnecting in", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task ARejectionThatStillHasACasingRetry_DoesNotStopAutoReconnectYet()
+    {
+        var (engine, logged) = Start("HunterTWO");
+        await using var _ = engine;
+
+        try
+        {
+            // The retry reconnects; nothing listens on port 1, and only the decision matters here.
+            await Invoke(engine, "HandleLogonResponse2Async", Frame(Invigoration.Core.Protocol.BncsPacketId.SID_LOGONRESPONSE2, 0x02));
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+        }
+
+        Assert.Null(typeof(BotEngine).GetField("_logonRejection", Private)!.GetValue(engine));
+        Assert.DoesNotContain(logged, l => l.Contains("Auto-reconnect skipped", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConnectingAgain_ClearsTheRejection()
+    {
+        var (engine, logged) = Start("huntertwo");
+        await using var _ = engine;
+        await Invoke(engine, "HandleLogonResponse2Async", Frame(Invigoration.Core.Protocol.BncsPacketId.SID_LOGONRESPONSE2, 0x02));
+
+        try
+        {
+            await engine.ConnectAsync(); // nothing listens on port 1; only the reset matters here
+        }
+        catch (System.Net.Sockets.SocketException)
+        {
+        }
+
+        Assert.Null(typeof(BotEngine).GetField("_logonRejection", Private)!.GetValue(engine));
+    }
+}
+
+/// <summary>
 /// Regression: a bot with auto-reconnect on was being disconnected by its own client every
 /// AutoReconnectDelaySeconds after logging on, forever (seen live: 35s cycles, server log "client
 /// closed the connection"). A reconnect that fired after the bot was already back on replaced the

@@ -23,15 +23,6 @@ public sealed class AuthState
     public string ExeInfo { get; set; } = "";
     public uint VersionByte { get; set; }
 
-    /// <summary>Which multi-step BNLS_HASHDATA flow is in progress (was `HType`).</summary>
-    public HashPurpose HashPurpose { get; set; } = HashPurpose.None;
-
-    /// <summary>Stage counter within the current hash flow (was `CB`).</summary>
-    public int HashStage { get; set; }
-
-    /// <summary>Double-hashed *old* password, staged during a change-password flow before the new password is hashed.</summary>
-    public byte[] PendingOldPasswordDoubleHash { get; set; } = [];
-
     /// <summary>True once an account-creation attempt has been made this session, to avoid retry loops (was `AttemptedC`).</summary>
     public bool AttemptedAccountCreate { get; set; }
 
@@ -51,22 +42,4 @@ public sealed class AuthState
 
     /// <summary>True once this logon has already retried with the password's casing changed, so a genuinely wrong password fails on the second rejection instead of looping.</summary>
     public bool RetriedPasswordCasing { get; set; }
-}
-
-/// <summary>Which outcome a BNLS_HASHDATA round-trip is working towards.</summary>
-public enum HashPurpose
-{
-    None,
-
-    /// <summary>Old login system: single-hash then double-hash for SID_LOGONRESPONSE2.</summary>
-    AccountLogon,
-
-    /// <summary>D2 realm (character server) logon: same double-hash flow as AccountLogon, but sends SID_LOGONREALMEX at the end.</summary>
-    RealmLogon,
-
-    /// <summary>Old account-creation system: single hash only, for SID_CREATEACCOUNT.</summary>
-    AccountCreate,
-
-    /// <summary>Change-password flow: double-hash the old password, single-hash the new one, for SID_CHANGEPASSWORD.</summary>
-    ChangePassword,
 }

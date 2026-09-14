@@ -103,25 +103,32 @@ public sealed partial class BotEngine
                 break;
             case 0x0200:
                 LogError("Invalid CD key.");
+                _logonRejection = "Battle.net said the CD key is invalid.";
                 break;
             case 0x0201:
                 LogError("CD key is in use.");
                 break;
             case 0x0202:
                 LogError("Current CD key is banned from Battle.net.");
+                _logonRejection = "Battle.net said the CD key is banned.";
                 break;
             case 0x0203:
                 LogError("Incorrect CD key for this product. Please check your key and/or game.");
+                _logonRejection = "Battle.net said the CD key is for a different game.";
                 break;
         }
     }
 
     private async Task OnAuthCheckPassedAsync()
     {
-        // Every logon starts from the password exactly as typed; see BattlenetPassword for why a
-        // rejection then gets one retry in the game clients' casing.
-        _auth.LogonPassword = Config.Password;
-        _auth.RetriedPasswordCasing = false;
+        // The game clients' casing first (or as typed, for an account known to need it), and after
+        // a rejection one fresh connection in the other form — see BattlenetPassword.
+        var retrying = _retryOtherPasswordCasing;
+        _retryOtherPasswordCasing = false;
+        _auth.RetriedPasswordCasing = retrying;
+        _auth.LogonPassword = retrying && BattlenetPassword.OtherCasing(Config.Password, Config.Product, Config.PasswordSentAsTyped) is { } other
+            ? other
+            : BattlenetPassword.FirstAttempt(Config.Password, Config.Product, Config.PasswordSentAsTyped);
 
         if (BncsProduct.UsesNewLoginSystem(Config.Product))
         {
@@ -135,10 +142,15 @@ public sealed partial class BotEngine
             BncsPacketId.SID_UDPPINGRESPONSE).ConfigureAwait(false);
         await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_GETICONDATA).ConfigureAwait(false);
 
-        _auth.HashPurpose = _auth.ChangePasswordRequested ? HashPurpose.ChangePassword : HashPurpose.AccountLogon;
-        _auth.ChangePasswordRequested = false;
-        _auth.HashStage = 0;
-        await SendPasswordHashRequestAsync(_auth.LogonPassword).ConfigureAwait(false);
+        if (_auth.ChangePasswordRequested)
+        {
+            // Normalize Password changes an account whose password is the one as typed.
+            _auth.ChangePasswordRequested = false;
+            await SendChangePasswordAsync(Config.Password, _auth.NewPassword).ConfigureAwait(false);
+            return;
+        }
+
+        await SendLogonResponse2Async(_auth.LogonPassword).ConfigureAwait(false);
     }
 
     private async Task HandleAuthAccountCreateAsync(byte[] frame)
@@ -152,7 +164,7 @@ public sealed partial class BotEngine
         if (status == 0)
         {
             LogInfo("Account created! Connecting with your new account...");
-            _auth.LogonPassword = Config.Password;
+            _auth.LogonPassword = BattlenetPassword.Normalize(Config.Password, Config.Product);
             var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(_auth.LogonPassword);
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
             return;
@@ -181,7 +193,8 @@ public sealed partial class BotEngine
         if (status == 1)
         {
             LogWarning("Account doesn't exist, attempting to create it.");
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(Config.Password);
+            ForgetPasswordSentAsTyped();
+            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(BattlenetPassword.Normalize(Config.Password, Config.Product));
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CREATEACCOUNT).ConfigureAwait(false);
             return;
         }
@@ -198,17 +211,20 @@ public sealed partial class BotEngine
         {
             case 0x0000:
             case 0x000E: // success; server also wants an email address on file, ignored (matches original)
+                RememberWorkingPasswordCasing();
                 await OnLoggedOnAsync().ConfigureAwait(false);
                 break;
             case 0x0002:
                 if (!await TryRetryPasswordCasingAsync().ConfigureAwait(false))
                 {
                     LogError("Battle.net logon failed: incorrect password.");
+                    _logonRejection = "Battle.net said the password is incorrect.";
                 }
 
                 break;
             case 0x0006:
                 LogError("This account was closed or banned.");
+                _logonRejection = "Battle.net said this account is closed or banned.";
                 break;
         }
     }
@@ -223,9 +239,8 @@ public sealed partial class BotEngine
                 if (!_auth.AttemptedAccountCreate)
                 {
                     _auth.AttemptedAccountCreate = true;
-                    _auth.HashPurpose = HashPurpose.AccountCreate;
-                    _auth.HashStage = 0;
-                    await SendPasswordHashRequestAsync(Config.Password).ConfigureAwait(false);
+                    ForgetPasswordSentAsTyped();
+                    await SendCreateAccountAsync(BattlenetPassword.Normalize(Config.Password, Config.Product)).ConfigureAwait(false);
                 }
 
                 break;
@@ -233,13 +248,16 @@ public sealed partial class BotEngine
                 if (!await TryRetryPasswordCasingAsync().ConfigureAwait(false))
                 {
                     LogError("Battle.net logon failed, due to incorrect password.");
+                    _logonRejection = "Battle.net said the password is incorrect.";
                 }
 
                 break;
             case 0x06:
                 LogError("This account was closed or banned.");
+                _logonRejection = "Battle.net said this account is closed or banned.";
                 break;
             case 0x00:
+                RememberWorkingPasswordCasing();
                 if (Config.Realm.Length > 0 &&
                     _auth.WantsRealmLogon &&
                     Config.Product is BncsProduct.DiabloII or BncsProduct.DiabloIILoD)
@@ -307,45 +325,58 @@ public sealed partial class BotEngine
     /// that would make realm logon fail for every user. Fixed to hash the
     /// actual password (D2 realm logon reuses the main account password).
     /// </summary>
-    private Task HandleQueryRealmsReplyAsync()
-    {
-        _auth.HashPurpose = HashPurpose.RealmLogon;
-        _auth.HashStage = 0;
-        return SendPasswordHashRequestAsync(_auth.LogonPassword.Length > 0 ? _auth.LogonPassword : Config.Password);
-    }
+    private Task HandleQueryRealmsReplyAsync() =>
+        SendLogonRealmExAsync(_auth.LogonPassword.Length > 0 ? _auth.LogonPassword : Config.Password);
 
     /// <summary>
-    /// After the server rejects the password as incorrect, retries the logon once with it in the
-    /// casing Blizzard's game clients send (see BattlenetPassword) — the form an account made from
-    /// a real client, or a private server's signup page, has on file. Same connection, same
-    /// tokens; both logon systems accept a fresh attempt after a failure. False, with nothing
-    /// sent, when that retry has already happened or the password is already in that form.
+    /// After Battle.net calls the password incorrect, tries once more in its other casing — as typed
+    /// if the game clients' casing was refused, or the other way round — on a fresh connection, so
+    /// the second attempt is a whole new handshake rather than a repeat Battle.net might not check
+    /// the same way. False, with nothing done, when that retry has already happened or both forms
+    /// are the same string.
     /// </summary>
     private async Task<bool> TryRetryPasswordCasingAsync()
     {
-        if (_auth.RetriedPasswordCasing || BattlenetPassword.RetryCasing(Config.Password, Config.Product) is not { } retry)
+        if (_auth.RetriedPasswordCasing || BattlenetPassword.OtherCasing(Config.Password, Config.Product, Config.PasswordSentAsTyped) is null)
         {
             return false;
         }
 
-        _auth.RetriedPasswordCasing = true;
-        _auth.LogonPassword = retry;
         var casing = BncsProduct.UsesNewLoginSystem(Config.Product) ? "uppercase" : "lowercase";
-        LogWarning($"Password not accepted as typed — retrying in {casing}, the way the game client sends it.");
+        LogWarning(Config.PasswordSentAsTyped
+            ? $"Password not accepted as typed — reconnecting to try it in {casing}, the way the game client sends it."
+            : $"Password not accepted in {casing} — reconnecting to try it exactly as typed, for an account an older bot made.");
 
-        if (BncsProduct.UsesNewLoginSystem(Config.Product))
-        {
-            var writer = new PacketWriter().WriteNTString(Config.Username).WriteNTString(retry);
-            await SendBnlsAsync(writer, BnlsPacketId.BNLS_LOGONCHALLENGE).ConfigureAwait(false);
-        }
-        else
-        {
-            _auth.HashPurpose = HashPurpose.AccountLogon;
-            _auth.HashStage = 0;
-            await SendPasswordHashRequestAsync(retry).ConfigureAwait(false);
-        }
-
+        await DisconnectAsync().ConfigureAwait(false);
+        _retryOtherPasswordCasing = true;
+        await ConnectAsync().ConfigureAwait(false);
         return true;
+    }
+
+    /// <summary>After a logon that only got in on the retry, flips which casing this bot tries first and saves it, so the next logon gets in on the first attempt.</summary>
+    private void RememberWorkingPasswordCasing()
+    {
+        if (!_auth.RetriedPasswordCasing)
+        {
+            return;
+        }
+
+        _auth.RetriedPasswordCasing = false;
+        Config.PasswordSentAsTyped = !Config.PasswordSentAsTyped;
+        ConfigPersistNeeded?.Invoke();
+        LogInfo(Config.PasswordSentAsTyped
+            ? "Logged on with the password exactly as typed — this account was made that way. Remembered: it's sent as typed first from now on. (Normalize Password can switch the account to Battle.net's usual casing.)"
+            : "Logged on with the password in the game client's casing. Remembered: it's sent that way first from now on.");
+    }
+
+    /// <summary>A new account is made in the game clients' casing, so that's what to send first.</summary>
+    private void ForgetPasswordSentAsTyped()
+    {
+        if (Config.PasswordSentAsTyped)
+        {
+            Config.PasswordSentAsTyped = false;
+            ConfigPersistNeeded?.Invoke();
+        }
     }
 
     private async Task HandleLogonRealmExAsync(byte[] frame)
@@ -775,6 +806,7 @@ public sealed partial class BotEngine
         }
 
         Config.Password = newPassword;
+        Config.PasswordSentAsTyped = false;
         ConfigPersistNeeded?.Invoke();
         LogInfo("Password normalized: Battle.net now expects it in all lowercase, and this bot's saved password has been updated to match. Reconnecting...");
         await DisconnectAsync().ConfigureAwait(false);

@@ -8,23 +8,27 @@ using Invigoration.Core.Protocol;
 namespace Invigoration.Core.Tests;
 
 /// <summary>
-/// The logon's password casing: sent as typed first, retried once in the game clients' casing
-/// when the server calls it incorrect, and the "Normalize Password" change that makes the
-/// account itself lowercase. Handlers are driven directly (same reflection approach as
-/// BotEngineJoinBurstTests) against a loopback BNLS listener, so the retry's actual outgoing
-/// BNLS request can be read back and checked byte for byte.
+/// The logon's password casing: sent in the game clients' casing first, tried once more exactly as
+/// typed (on a fresh connection) when the server calls it incorrect, whichever worked remembered for
+/// next time, and the "Normalize Password" change that makes the account itself lowercase. Handlers are driven directly (same reflection approach as
+/// BotEngineJoinBurstTests) against loopback BNLS and BNCS listeners, so what the engine actually
+/// sends can be read back and checked byte for byte — including that the password itself never
+/// goes to BNLS, only its hashes to Battle.net.
 /// </summary>
 public class BotEnginePasswordCasingTests
 {
     private sealed class Harness : IAsyncDisposable
     {
         private readonly TcpListener _listener;
+        private readonly TcpListener _bncsListener = StartedListener();
         private TcpClient? _server;
+        private TcpClient? _bncsServer;
 
         public BotEngine Engine { get; }
         public BotConfig Config { get; }
         public List<string> Logs { get; } = [];
         public NetworkStream Bnls { get; private set; } = null!;
+        public NetworkStream Bncs { get; private set; } = null!;
 
         private Harness(TcpListener listener, BotConfig config)
         {
@@ -71,6 +75,46 @@ public class BotEnginePasswordCasingTests
             await ReadBnlsPacketAsync(); // BNLS_REQUESTVERSIONBYTE — deliberately left unanswered
         }
 
+        /// <summary>Connects the engine's BNCS socket to a loopback listener and reads past what every connection opens with (protocol byte, SID_AUTH_INFO), so the next packet read is whatever the test provokes.</summary>
+        public async Task ConnectBncsAsync()
+        {
+            var bncs = (Networking.FramedTcpClient)typeof(BotEngine).GetField("_bncs", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(Engine)!;
+            var accept = _bncsListener.AcceptTcpClientAsync();
+            await bncs.ConnectAsync("127.0.0.1", ((IPEndPoint)_bncsListener.LocalEndpoint).Port);
+            _bncsServer = await accept;
+            Bncs = _bncsServer.GetStream();
+
+            var protocolByte = new byte[1];
+            await Bncs.ReadExactlyAsync(protocolByte);
+            Assert.Equal(0x01, protocolByte[0]);
+            Assert.Equal((byte)BncsPacketId.SID_AUTH_INFO, (await ReadBncsPacketAsync())[1]);
+        }
+
+        public async Task<byte[]> ReadBncsPacketAsync()
+        {
+            using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+            var header = new byte[4];
+            await Bncs.ReadExactlyAsync(header, timeout.Token);
+            var packet = new byte[header[2] | (header[3] << 8)];
+            header.CopyTo(packet, 0);
+            await Bncs.ReadExactlyAsync(packet.AsMemory(4), timeout.Token);
+            return packet;
+        }
+
+        /// <summary>Whether anything at all has been sent to BNLS since the authorize exchange.</summary>
+        public async Task<bool> BnlsReceivedAnythingAsync()
+        {
+            await Task.Delay(150);
+            return Bnls.DataAvailable;
+        }
+
+        private static TcpListener StartedListener()
+        {
+            var listener = new TcpListener(IPAddress.Loopback, 0);
+            listener.Start();
+            return listener;
+        }
+
         public AuthState Auth => (AuthState)typeof(BotEngine).GetField("_auth", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(Engine)!;
 
         public Task InvokeAsync(string handler, byte[] frame) =>
@@ -99,7 +143,9 @@ public class BotEnginePasswordCasingTests
         {
             await Engine.DisposeAsync();
             _server?.Dispose();
+            _bncsServer?.Dispose();
             _listener.Stop();
+            _bncsListener.Stop();
         }
     }
 
@@ -109,43 +155,157 @@ public class BotEnginePasswordCasingTests
 
     private static byte[] ChangePasswordReply(bool success) => new PacketWriter().WriteDword(success ? 1u : 0u).ToBncsPacket(BncsPacketId.SID_CHANGEPASSWORD);
 
-    [Fact(Timeout = 10000)]
-    public async Task ClassicLogon_RejectedAsTyped_RetriesOnceInLowercase()
+    private const uint ClientToken = 0x12345678;
+    private const uint ServerToken = 0x9ABCDEF0;
+
+    private static byte[] AuthCheckPassed() => new PacketWriter().WriteDword(0).WriteDword(0).ToBncsPacket(BncsPacketId.SID_AUTH_CHECK);
+
+    /// <summary>Reads SID_UDPPINGRESPONSE and SID_GETICONDATA, then returns the logon packet's password proof (checking tokens and name on the way).</summary>
+    private static async Task<byte[]> ReadLogonProofAsync(Harness h)
     {
-        await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
-        h.Auth.LogonPassword = h.Config.Password;
+        Assert.Equal((byte)BncsPacketId.SID_UDPPINGRESPONSE, (await h.ReadBncsPacketAsync())[1]);
+        Assert.Equal((byte)BncsPacketId.SID_GETICONDATA, (await h.ReadBncsPacketAsync())[1]);
+        var logon = await h.ReadBncsPacketAsync();
+        Assert.Equal((byte)BncsPacketId.SID_LOGONRESPONSE2, logon[1]);
+        var reader = new PacketReader(logon, offset: 4);
+        Assert.Equal(ClientToken, reader.ReadDword());
+        Assert.Equal(ServerToken, reader.ReadDword());
+        var proof = reader.ReadRaw(20);
+        Assert.Equal("Tagban", reader.ReadNTString());
+        return proof;
+    }
 
-        await h.InvokeAsync("HandleLogonResponse2Async", LogonResponse2(0x02));
-
-        var retry = await h.ReadBnlsPacketAsync();
-        Assert.Equal((byte)BnlsPacketId.BNLS_HASHDATA, retry[2]);
-        var reader = new PacketReader(retry, offset: 3);
-        Assert.Equal(9u, reader.ReadDword());
-        Assert.Equal(0u, reader.ReadDword());
-        Assert.Equal("huntertwo", System.Text.Encoding.ASCII.GetString(reader.ReadRaw(9)));
-        Assert.Equal("huntertwo", h.Auth.LogonPassword);
-        Assert.True(h.Logged("retrying in lowercase"));
-        Assert.False(h.Logged("incorrect password"));
-
-        // A second rejection is a genuinely wrong password: report it, don't loop.
-        await h.InvokeAsync("HandleLogonResponse2Async", LogonResponse2(0x02));
-        Assert.True(h.Logged("incorrect password"));
+    private static async Task PassAuthCheckAsync(Harness h)
+    {
+        await h.ConnectBncsAsync();
+        h.Auth.ClientToken = ClientToken;
+        h.Auth.ServerToken = ServerToken;
+        await h.InvokeAsync("HandleAuthCheckAsync", AuthCheckPassed());
     }
 
     [Fact(Timeout = 10000)]
-    public async Task NlsLogon_RejectedAsTyped_RetriesOnceInUppercase()
+    public async Task ClassicLogon_SendsTheGameClientsCasingFirst_HashedLocally_NothingToBnls()
+    {
+        await using var h = await Harness.StartAsync(BncsProduct.Warcraft2BNE, "HunterTWO");
+
+        await PassAuthCheckAsync(h);
+
+        Assert.Equal(BattlenetPassword.Proof(ClientToken, ServerToken, "huntertwo"), await ReadLogonProofAsync(h));
+        Assert.False(await h.BnlsReceivedAnythingAsync());
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task ClassicLogon_RememberedAsTyped_SendsItAsTypedFirst()
+    {
+        await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
+        h.Config.PasswordSentAsTyped = true;
+
+        await PassAuthCheckAsync(h);
+
+        Assert.Equal(BattlenetPassword.Proof(ClientToken, ServerToken, "HunterTWO"), await ReadLogonProofAsync(h));
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task ClassicLogon_Rejected_TriesAsTypedOnAFreshConnection_AndRemembersWhatWorked()
+    {
+        await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
+        var persisted = 0;
+        h.Engine.ConfigPersistNeeded += () => persisted++;
+        await PassAuthCheckAsync(h);
+        await ReadLogonProofAsync(h); // lowercase
+
+        // Rejected: the engine disconnects and starts a whole new connection (BNLS first, as always).
+        var rejected = h.InvokeAsync("HandleLogonResponse2Async", LogonResponse2(0x02));
+        await h.AcceptBnlsAsync(startConnect: false);
+        await rejected;
+        Assert.True(h.Logged("reconnecting to try it exactly as typed"));
+        Assert.False(h.Logged("incorrect password"));
+
+        // That connection's logon is the password as typed.
+        await PassAuthCheckAsync(h);
+        Assert.Equal(BattlenetPassword.Proof(ClientToken, ServerToken, "HunterTWO"), await ReadLogonProofAsync(h));
+        Assert.Equal("HunterTWO", h.Auth.LogonPassword);
+
+        // It gets in: remembered, so the next logon starts as typed.
+        await h.InvokeAsync("HandleLogonResponse2Async", LogonResponse2(0x00));
+        Assert.True(h.Config.PasswordSentAsTyped);
+        Assert.Equal(1, persisted);
+        Assert.True(h.Logged("Remembered"));
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task ClassicLogon_RejectedBothWays_ReportsTheWrongPasswordWithoutLooping()
+    {
+        await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
+        h.Auth.RetriedPasswordCasing = true; // this connection already is the retry
+
+        await h.InvokeAsync("HandleLogonResponse2Async", LogonResponse2(0x02));
+
+        Assert.True(h.Logged("incorrect password"));
+        Assert.False(h.Config.PasswordSentAsTyped);
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task ClassicLogon_FirstTryGetsIn_ChangesNothing()
+    {
+        await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
+        var persisted = 0;
+        h.Engine.ConfigPersistNeeded += () => persisted++;
+
+        await h.InvokeAsync("HandleLogonResponse2Async", LogonResponse2(0x00));
+
+        Assert.False(h.Config.PasswordSentAsTyped);
+        Assert.Equal(0, persisted);
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task NormalizePassword_SendsTheOldProofAndTheNewHash_HashedLocally()
+    {
+        await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
+        await h.ConnectBncsAsync();
+        h.Auth.ClientToken = ClientToken;
+        h.Auth.ServerToken = ServerToken;
+        h.Auth.ChangePasswordRequested = true;
+        h.Auth.NewPassword = "huntertwo";
+
+        await h.InvokeAsync("HandleAuthCheckAsync", AuthCheckPassed());
+
+        await h.ReadBncsPacketAsync(); // SID_UDPPINGRESPONSE
+        await h.ReadBncsPacketAsync(); // SID_GETICONDATA
+        var change = await h.ReadBncsPacketAsync();
+        Assert.Equal((byte)BncsPacketId.SID_CHANGEPASSWORD, change[1]);
+        var reader = new PacketReader(change, offset: 4);
+        Assert.Equal(ClientToken, reader.ReadDword());
+        Assert.Equal(ServerToken, reader.ReadDword());
+        Assert.Equal(BattlenetPassword.Proof(ClientToken, ServerToken, "HunterTWO"), reader.ReadRaw(20));
+        Assert.Equal(BattlenetPassword.Hash("huntertwo"), reader.ReadRaw(20));
+        Assert.Equal("Tagban", reader.ReadNTString());
+        Assert.False(h.Auth.ChangePasswordRequested);
+        Assert.False(await h.BnlsReceivedAnythingAsync());
+    }
+
+    [Fact(Timeout = 10000)]
+    public async Task NlsLogon_SendsUppercaseFirst_AndARejectionReconnectsToTryAsTyped()
     {
         await using var h = await Harness.StartAsync(BncsProduct.Warcraft3TFT, "HunterTWO");
-        h.Auth.LogonPassword = h.Config.Password;
 
-        await h.InvokeAsync("HandleAuthAccountLogonProofAsync", AccountLogonProof(0x02));
-
-        var retry = await h.ReadBnlsPacketAsync();
-        Assert.Equal((byte)BnlsPacketId.BNLS_LOGONCHALLENGE, retry[2]);
-        var reader = new PacketReader(retry, offset: 3);
+        await h.InvokeAsync("HandleAuthCheckAsync", AuthCheckPassed());
+        var challenge = await h.ReadBnlsPacketAsync();
+        Assert.Equal((byte)BnlsPacketId.BNLS_LOGONCHALLENGE, challenge[2]);
+        var reader = new PacketReader(challenge, offset: 3);
         Assert.Equal("Tagban", reader.ReadNTString());
         Assert.Equal("HUNTERTWO", reader.ReadNTString());
-        Assert.True(h.Logged("retrying in uppercase"));
+
+        var rejected = h.InvokeAsync("HandleAuthAccountLogonProofAsync", AccountLogonProof(0x02));
+        await h.AcceptBnlsAsync(startConnect: false);
+        await rejected;
+        Assert.True(h.Logged("reconnecting to try it exactly as typed"));
+
+        await h.InvokeAsync("HandleAuthCheckAsync", AuthCheckPassed());
+        var retry = await h.ReadBnlsPacketAsync();
+        reader = new PacketReader(retry, offset: 3);
+        Assert.Equal("Tagban", reader.ReadNTString());
+        Assert.Equal("HunterTWO", reader.ReadNTString());
     }
 
     [Fact(Timeout = 10000)]
@@ -181,6 +341,7 @@ public class BotEnginePasswordCasingTests
     public async Task ChangePasswordReply_Success_SavesTheLowercasePasswordAndReconnects()
     {
         await using var h = await Harness.StartAsync(BncsProduct.Starcraft, "HunterTWO");
+        h.Config.PasswordSentAsTyped = true;
         var persisted = 0;
         h.Engine.ConfigPersistNeeded += () => persisted++;
         h.Auth.NewPassword = "huntertwo";
@@ -190,6 +351,7 @@ public class BotEnginePasswordCasingTests
         await reply;
 
         Assert.Equal("huntertwo", h.Config.Password);
+        Assert.False(h.Config.PasswordSentAsTyped);
         Assert.Equal(1, persisted);
         Assert.True(h.Logged("Password normalized"));
     }

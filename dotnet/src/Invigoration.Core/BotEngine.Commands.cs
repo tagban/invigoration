@@ -224,11 +224,13 @@ public sealed partial class BotEngine
 
             case "setusername":
                 Config.Username = rest;
+                Config.PasswordSentAsTyped = false; // learned for the old account, not this one
                 await Reply("Login username changed!").ConfigureAwait(false);
                 break;
 
             case "setpass":
                 Config.Password = rest;
+                Config.PasswordSentAsTyped = false;
                 await Reply("Login password changed!").ConfigureAwait(false);
                 break;
 

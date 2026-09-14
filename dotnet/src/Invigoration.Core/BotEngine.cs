@@ -156,6 +156,17 @@ public sealed partial class BotEngine : IAsyncDisposable
     }
 
     private bool _isIntentionalDisconnect;
+
+    /// <summary>
+    /// Why Battle.net turned this bot's logon down — wrong password, closed account, bad or banned
+    /// CD key — or null. Auto-reconnect stands down while it's set: reconnecting can only be turned
+    /// down the same way, and a stream of failed logons is what gets an account or address locked
+    /// out. Cleared by the next ConnectAsync, which after a rejection only the user can start.
+    /// </summary>
+    private string? _logonRejection;
+
+    /// <summary>Set while reconnecting to try the password in its other casing (TryRetryPasswordCasingAsync); read and cleared by the next SID_AUTH_CHECK success. Survives that reconnect on purpose, and any deliberate disconnect clears it.</summary>
+    private bool _retryOtherPasswordCasing;
     private CancellationTokenSource? _autoReconnectCts;
 
     /// <summary>1 while the logon sequence is deliberately closing a live BNCS connection to replace it (BotEngine.Bnls.cs), so the Disconnected that close produces isn't mistaken for a drop. Cleared by that Disconnected, or by the new connection coming up if the old one's report was superseded.</summary>
@@ -182,6 +193,12 @@ public sealed partial class BotEngine : IAsyncDisposable
 
         if (_isIntentionalDisconnect || !Config.AutoReconnect)
         {
+            return;
+        }
+
+        if (_logonRejection is { } rejection)
+        {
+            LogWarning($"Auto-reconnect skipped: {rejection} Reconnecting would only be refused the same way — fix it, then connect.");
             return;
         }
 
@@ -282,6 +299,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         _isIntentionalDisconnect = false;
+        _logonRejection = null;
         StartDiscordBridgeIfEnabled();
 
         if (BncsProduct.IsStimpakBacked(Config.Product))
@@ -314,6 +332,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     public async Task DisconnectAsync()
     {
         _isIntentionalDisconnect = true;
+        _retryOtherPasswordCasing = false;
         _autoReconnectCts?.Cancel();
         // A password change only ever rides the connect that NormalizePasswordAsync starts — never
         // left armed for some later, unrelated Connect.
@@ -584,14 +603,36 @@ public sealed partial class BotEngine : IAsyncDisposable
         }
     }
 
-    private Task SendPasswordHashRequestAsync(string password)
-    {
-        var writer = new PacketWriter()
-            .WriteDword((uint)password.Length)
-            .WriteDword(0)
-            .WriteAscii(password);
-        return SendBnlsAsync(writer, BnlsPacketId.BNLS_HASHDATA);
-    }
+    // The classic logon's password packets. Every hash is computed here (BattlenetPassword.Hash /
+    // Proof) — the password never goes to BNLS.
+
+    private Task SendLogonResponse2Async(string password) => SendBncsAsync(
+        new PacketWriter()
+            .WriteDword(_auth.ClientToken)
+            .WriteDword(_auth.ServerToken)
+            .WriteBytes(BattlenetPassword.Proof(_auth.ClientToken, _auth.ServerToken, password))
+            .WriteNTString(Config.Username),
+        BncsPacketId.SID_LOGONRESPONSE2);
+
+    private Task SendLogonRealmExAsync(string password) => SendBncsAsync(
+        new PacketWriter()
+            .WriteDword(_auth.ClientToken)
+            .WriteBytes(BattlenetPassword.Proof(_auth.ClientToken, _auth.ServerToken, password))
+            .WriteNTString(Config.Realm),
+        BncsPacketId.SID_LOGONREALMEX);
+
+    private Task SendCreateAccountAsync(string password) => SendBncsAsync(
+        new PacketWriter().WriteBytes(BattlenetPassword.Hash(password)).WriteNTString(Config.Username),
+        BncsPacketId.SID_CREATEACCOUNT);
+
+    private Task SendChangePasswordAsync(string oldPassword, string newPassword) => SendBncsAsync(
+        new PacketWriter()
+            .WriteDword(_auth.ClientToken)
+            .WriteDword(_auth.ServerToken)
+            .WriteBytes(BattlenetPassword.Proof(_auth.ClientToken, _auth.ServerToken, oldPassword))
+            .WriteBytes(BattlenetPassword.Hash(newPassword))
+            .WriteNTString(Config.Username),
+        BncsPacketId.SID_CHANGEPASSWORD);
 
     private (BncsPacketId Id, int Length, DateTime SentUtc)? _lastBncsSend;
 

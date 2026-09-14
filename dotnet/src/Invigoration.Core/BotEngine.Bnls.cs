@@ -22,7 +22,6 @@ public sealed partial class BotEngine
             BnlsPacketId.BNLS_CDKEY_EX => HandleCdKeyExReplyAsync(frame),
             BnlsPacketId.BNLS_CDKEY => HandleCdKeyReplyAsync(frame),
             BnlsPacketId.BNLS_AUTHORIZE => HandleAuthorizeReplyAsync(frame),
-            BnlsPacketId.BNLS_HASHDATA => HandleHashDataReplyAsync(frame),
             BnlsPacketId.BNLS_AUTHORIZEPROOF => HandleAuthorizeProofReplyAsync(),
             BnlsPacketId.BNLS_REQUESTVERSIONBYTE => HandleRequestVersionByteReplyAsync(frame),
             _ => Task.CompletedTask,
@@ -296,110 +295,5 @@ public sealed partial class BotEngine
         return text.StartsWith("0x", StringComparison.OrdinalIgnoreCase)
             ? uint.TryParse(text[2..], System.Globalization.NumberStyles.HexNumber, System.Globalization.CultureInfo.InvariantCulture, out value)
             : uint.TryParse(text, out value);
-    }
-
-    private async Task HandleHashDataReplyAsync(byte[] frame)
-    {
-        var reader = BnlsConnection.GetPayloadReader(frame);
-        var hashResult = reader.ReadRaw(reader.Remaining);
-
-        switch (_auth.HashPurpose)
-        {
-            case HashPurpose.AccountLogon:
-            case HashPurpose.RealmLogon:
-                await ContinueLogonHashFlowAsync(hashResult).ConfigureAwait(false);
-                break;
-
-            case HashPurpose.AccountCreate:
-                await SendBncsAsync(
-                    new PacketWriter().WriteBytes(hashResult).WriteNTString(Config.Username),
-                    BncsPacketId.SID_CREATEACCOUNT).ConfigureAwait(false);
-                break;
-
-            case HashPurpose.ChangePassword:
-                await ContinueChangePasswordHashFlowAsync(hashResult).ConfigureAwait(false);
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Old login system double-hash: stage 1 single-hashes the password (the
-    /// reply we just got); we re-hash [ClientToken][ServerToken][singleHash]
-    /// to get the double-hash BNCS actually wants, then send it as either
-    /// SID_LOGONRESPONSE2 (account logon) or SID_LOGONREALMEX (realm logon).
-    /// </summary>
-    private async Task ContinueLogonHashFlowAsync(byte[] hashResult)
-    {
-        _auth.HashStage++;
-
-        if (_auth.HashStage == 1)
-        {
-            var writer = new PacketWriter()
-                .WriteDword(0x1C)
-                .WriteDword(1)
-                .WriteDword(_auth.ClientToken)
-                .WriteDword(_auth.ServerToken)
-                .WriteBytes(hashResult);
-            await SendBnlsAsync(writer, BnlsPacketId.BNLS_HASHDATA).ConfigureAwait(false);
-            return;
-        }
-
-        if (_auth.HashStage != 2)
-        {
-            return;
-        }
-
-        _auth.HashStage = 0;
-        if (_auth.HashPurpose == HashPurpose.AccountLogon)
-        {
-            var writer = new PacketWriter()
-                .WriteDword(_auth.ClientToken)
-                .WriteDword(_auth.ServerToken)
-                .WriteBytes(hashResult)
-                .WriteNTString(Config.Username);
-            await SendBncsAsync(writer, BncsPacketId.SID_LOGONRESPONSE2).ConfigureAwait(false);
-        }
-        else
-        {
-            var writer = new PacketWriter()
-                .WriteDword(_auth.ClientToken)
-                .WriteBytes(hashResult)
-                .WriteNTString(Config.Realm);
-            await SendBncsAsync(writer, BncsPacketId.SID_LOGONREALMEX).ConfigureAwait(false);
-        }
-    }
-
-    private async Task ContinueChangePasswordHashFlowAsync(byte[] hashResult)
-    {
-        _auth.HashStage++;
-
-        switch (_auth.HashStage)
-        {
-            case 1:
-                var doubleHashRequest = new PacketWriter()
-                    .WriteDword(0x1C)
-                    .WriteDword(1)
-                    .WriteDword(_auth.ClientToken)
-                    .WriteDword(_auth.ServerToken)
-                    .WriteBytes(hashResult);
-                await SendBnlsAsync(doubleHashRequest, BnlsPacketId.BNLS_HASHDATA).ConfigureAwait(false);
-                break;
-
-            case 2:
-                _auth.PendingOldPasswordDoubleHash = hashResult;
-                await SendPasswordHashRequestAsync(_auth.NewPassword).ConfigureAwait(false);
-                break;
-
-            case 3:
-                var writer = new PacketWriter()
-                    .WriteDword(_auth.ClientToken)
-                    .WriteDword(_auth.ServerToken)
-                    .WriteBytes(_auth.PendingOldPasswordDoubleHash)
-                    .WriteBytes(hashResult)
-                    .WriteNTString(Config.Username);
-                await SendBncsAsync(writer, BncsPacketId.SID_CHANGEPASSWORD).ConfigureAwait(false);
-                _auth.HashStage = 0;
-                break;
-        }
     }
 }

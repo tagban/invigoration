@@ -34,6 +34,14 @@ public sealed class BotConfig
     [JsonConverter(typeof(ObfuscatedPasswordJsonConverter))]
     public string Password { get; set; } = "";
 
+    /// <summary>
+    /// True once this account has been seen to log on only with the password exactly as typed —
+    /// an account an older bot made, which sent passwords unchanged. The logon then starts as typed
+    /// instead of in the game clients' casing, so it gets in on the first try. Learned and saved by
+    /// the logon itself (see BattlenetPassword); Normalize Password clears it.
+    /// </summary>
+    public bool PasswordSentAsTyped { get; set; }
+
     // --- StarCraft II (modern Battle.net login, separate from the classic BNCS fields above) ---
 
     /// <summary>
