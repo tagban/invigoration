@@ -165,6 +165,11 @@ The zip holds:
 - `parts/<class>/<part>.gif` — one GIF per body part per look per stance, frames in animation
   order, **palette index 0 = transparent**.
 
+**Decode the GIFs to palette indices, not colours** — the tints work on indices. Watch for image
+libraries that convert frames to RGB behind your back: Pillow does it to every frame after the
+first unless told otherwise (the example sets `GifImagePlugin.LOADING_STRATEGY` for this), which
+leaves the first frame right and the rest garbled.
+
 Everything faces **direction 0**, and one animation tick is `tick_ms` (40 ms).
 
 ### Step by step
@@ -210,6 +215,9 @@ Let `g[c] = portrait[2 + c]` and `t[c] = portrait[14 + c]` for components `c = 0
    point, skipping index 0, colouring through `palette.bin`.
 
 That's the whole renderer; the example script is about 150 lines including the download.
+Invigoration's C# version (`D2CharacterPack` in `Invigoration.Core`) produces frames identical to
+the example's, pixel for pixel. A drawn character is small — roughly 30–40 × 70–80 pixels once
+cropped to the figure — so it sits comfortably next to the classic 78 × 88 chat avatars.
 
 ## 6. Checklist
 

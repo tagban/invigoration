@@ -9,7 +9,11 @@ Downloads d2-equipment.json and d2-characters.zip once (kept next to this script
 few sample characters to out/<name>.gif. See ../D2-CHARACTER-DATA-FOR-BOTS.md for the formats.
 """
 import io, json, os, socket, struct, sys, zipfile
-from PIL import Image
+from PIL import GifImagePlugin, Image
+
+# Pillow turns every GIF frame after the first into RGB(A) by default, which loses the palette
+# indices the tint tables work on. All pack GIFs share one palette, so keep them as indices.
+GifImagePlugin.LOADING_STRATEGY = GifImagePlugin.LoadingStrategy.RGB_AFTER_DIFFERENT_PALETTE_ONLY
 
 
 def bnftp_download(host, name, port=6112, timeout=60):
@@ -154,7 +158,9 @@ class CharacterPack:
             frames = []
             for i in range(part["frames"]):
                 img.seek(min(i, getattr(img, "n_frames", 1) - 1))
-                frames.append(img.copy())  # mode "P": palette indices, 0 = transparent
+                if img.mode != "P":
+                    raise ValueError(f"{part['file']} frame {i} isn't palette indices")
+                frames.append(img.copy())  # palette indices, 0 = transparent
             gifs[c] = frames
         # Canvas big enough for every part around the base point
         xs = [pt["left"] for pt, _ in layers.values()] + [pt["left"] + pt["width"] for pt, _ in layers.values()]
