@@ -271,6 +271,13 @@ public sealed partial class BotEngine
             _auth.VersionByte = bnlsVersionByte;
         }
 
+        if (_bncs.IsConnected)
+        {
+            // Replacing a live connection (a reconnect started while an earlier one had already
+            // got back on) — tell the Disconnected handler this close is ours.
+            Interlocked.Exchange(ref _replacingBncsConnection, 1);
+        }
+
         _bncs.Close();
         LogInfo($"Battle.net connecting to {Config.BattlenetServer}...");
         await _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, proxy: BuildProxyOptions()).ConfigureAwait(false);

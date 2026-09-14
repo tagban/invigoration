@@ -272,6 +272,9 @@ public sealed partial class BotEngine
     {
         LogInfo("Battle.net Logon Passed!");
         _auth.LoggedOnToBncs = true;
+
+        // Back on: any reconnect still counting down from an earlier drop has nothing left to do.
+        _autoReconnectCts?.Cancel();
         _auth.AttemptedAccountCreate = false;
         _connectedAt = DateTimeOffset.UtcNow;
 

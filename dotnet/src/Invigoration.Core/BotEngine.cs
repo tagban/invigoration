@@ -127,6 +127,17 @@ public sealed partial class BotEngine : IAsyncDisposable
             _friends.Clear();
             _auth.LoggedOnToBncs = false;
             _session.CurrentChannelName = "";
+
+            // The logon sequence closing a live connection to open its replacement (see
+            // _replacingBncsConnection) isn't a drop: no error, and above all no auto-reconnect —
+            // scheduling one here is what kept closing each new connection 35s after it logged on.
+            if (Interlocked.Exchange(ref _replacingBncsConnection, 0) == 1)
+            {
+                LogDebug("Replaced the previous Battle.net connection with a new one.");
+                BncsDisconnected?.Invoke(ex);
+                return;
+            }
+
             LogError($"Battle.net disconnected{(ex is null ? "." : $": {ex.Message}")}");
             if (!_isIntentionalDisconnect && _lastBncsSend is { } last)
             {
@@ -146,6 +157,9 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     private bool _isIntentionalDisconnect;
     private CancellationTokenSource? _autoReconnectCts;
+
+    /// <summary>1 while the logon sequence is deliberately closing a live BNCS connection to replace it (BotEngine.Bnls.cs), so the Disconnected that close produces isn't mistaken for a drop. Cleared by that Disconnected, or by the new connection coming up if the old one's report was superseded.</summary>
+    private int _replacingBncsConnection;
 
     /// <summary>
     /// Reconnects after an unexpected drop (never after DisconnectAsync was
@@ -181,6 +195,16 @@ public sealed partial class BotEngine : IAsyncDisposable
     {
         LogInfo($"Unexpected disconnect — reconnecting in {delaySeconds}s (auto-reconnect is on).");
         await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken).ConfigureAwait(false);
+
+        // Something else may have reconnected in the meantime (the Connect button, another
+        // recovery). Reconnecting on top of a live, logged-on session would tear it down — and
+        // that teardown used to schedule the next reconnect, looping forever.
+        if (_auth.LoggedOnToBncs || _bncs.IsConnected)
+        {
+            LogDebug("Auto-reconnect skipped: already connected.");
+            return;
+        }
+
         await ConnectAsync(cancellationToken).ConfigureAwait(false);
     }
 
@@ -521,6 +545,9 @@ public sealed partial class BotEngine : IAsyncDisposable
         try
         {
             LogInfo("Battle.net Connected!");
+            // If the replaced connection's own Disconnected was superseded (FramedTcpClient only
+            // reports the current connection's end), nothing else clears this.
+            Interlocked.Exchange(ref _replacingBncsConnection, 0);
             BncsConnected?.Invoke();
             StartKeepAlive();
             StartIdleWatcher();

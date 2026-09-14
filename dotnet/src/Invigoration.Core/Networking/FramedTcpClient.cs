@@ -17,6 +17,9 @@ public abstract class FramedTcpClient : IAsyncDisposable
     private NetworkStream? _stream;
     private CancellationTokenSource? _receiveCts;
 
+    /// <summary>Bumped by every ConnectAsync, so a receive loop can tell whether the connection it was reading is still the current one.</summary>
+    private int _connectionGeneration;
+
     /// <summary>
     /// Serializes every write to the socket. NetworkStream.WriteAsync is not safe to call
     /// concurrently from multiple callers — nothing previously prevented that here, and this
@@ -49,6 +52,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
     public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default, ProxyOptions? proxy = null)
     {
         Close();
+        var generation = Interlocked.Increment(ref _connectionGeneration);
 
         var client = new TcpClient();
         var connectHost = proxy?.Host ?? host;
@@ -87,7 +91,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
         Connected?.Invoke();
 
         _receiveCts = new CancellationTokenSource();
-        _ = ReceiveLoopAsync(_receiveCts.Token);
+        _ = ReceiveLoopAsync(_receiveCts.Token, generation);
     }
 
     public async Task SendAsync(byte[] packet, CancellationToken cancellationToken = default)
@@ -137,7 +141,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
         _client = null;
     }
 
-    private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
+    private async Task ReceiveLoopAsync(CancellationToken cancellationToken, int generation)
     {
         var readBuffer = new byte[8192];
         Exception? failure = null;
@@ -199,7 +203,15 @@ public abstract class FramedTcpClient : IAsyncDisposable
             failure = ex;
         }
 
-        Disconnected?.Invoke(failure);
+        // A connection that's already been replaced by a newer ConnectAsync doesn't report its own
+        // end: that report would land after the new connection is up, and whoever handles it
+        // (BotEngine stops the keep-alive, clears logon state, may schedule a reconnect) would act
+        // on the new, healthy connection instead of the dead one. A plain Close() with nothing
+        // after it still reports, as before.
+        if (generation == Volatile.Read(ref _connectionGeneration))
+        {
+            Disconnected?.Invoke(failure);
+        }
     }
 
     public ValueTask DisposeAsync()
