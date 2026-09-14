@@ -29,6 +29,7 @@ public sealed partial class BotEngine
             BncsPacketId.SID_GETCHANNELLIST => HandleGetChannelList(frame),
             BncsPacketId.SID_CHATEVENT => HandleBncsChatEventFrame(frame),
             BncsPacketId.SID_NEWS_INFO => HandleNewsInfo(frame),
+            BncsPacketId.SID_GETFILETIME => HandleFileTimeReply(frame),
             BncsPacketId.SID_REQUIREDWORK => HandleRequiredWork(),
             BncsPacketId.SID_CREATEACCOUNT => HandleLegacyCreateAccountReplyAsync(),
             BncsPacketId.SID_CHANGEPASSWORD => HandleChangePasswordReplyAsync(frame),
@@ -293,6 +294,8 @@ public sealed partial class BotEngine
             ? new PacketWriter().WriteDword(2).WriteNTString(Config.HomeChannel)
             : new PacketWriter().WriteDword(1).WriteNTString("L");
         await SendBncsAsync(joinWriter, BncsPacketId.SID_JOINCHANNEL).ConfigureAwait(false);
+
+        await RequestD2FileTimesAsync().ConfigureAwait(false);
     }
 
     /// <summary>

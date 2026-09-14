@@ -77,7 +77,11 @@ internal static class D2EquipmentTestData
     /// returns the file's bytes, or null to close without replying (how a server says "no such file").
     /// <paramref name="announcedSize"/> overrides the size in the header, for lying-server tests.
     /// </summary>
-    public static async Task<(int Port, Task<string> RequestedName)> ServeOnceAsync(Func<string, byte[]?> reply, uint? announcedSize = null, int? sendOnly = null)
+    public static Task<(int Port, Task<string> RequestedName)> ServeOnceAsync(Func<string, byte[]?> reply, uint? announcedSize = null, int? sendOnly = null) =>
+        ServeManyAsync(reply, connections: 1, announcedSize, sendOnly);
+
+    /// <summary>Like ServeOnceAsync, for a client that makes several requests in a row (one BNFTP connection each). Returns the first requested name.</summary>
+    public static async Task<(int Port, Task<string> RequestedName)> ServeManyAsync(Func<string, byte[]?> reply, int connections, uint? announcedSize = null, int? sendOnly = null)
     {
         var listener = new TcpListener(IPAddress.Loopback, 0);
         listener.Start();
@@ -85,7 +89,28 @@ internal static class D2EquipmentTestData
 
         async Task<string> Run()
         {
+            var first = "";
             try
+            {
+                for (var c = 0; c < connections; c++)
+                {
+                    var served = await ServeOne();
+                    if (c == 0)
+                    {
+                        first = served;
+                    }
+                }
+
+                return first;
+            }
+            finally
+            {
+                listener.Stop();
+            }
+        }
+
+        async Task<string> ServeOne()
+        {
             {
                 using var client = await listener.AcceptTcpClientAsync();
                 await using var stream = client.GetStream();
@@ -114,10 +139,6 @@ internal static class D2EquipmentTestData
                 }
 
                 return name;
-            }
-            finally
-            {
-                listener.Stop();
             }
         }
 

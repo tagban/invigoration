@@ -17,7 +17,7 @@ public static class BnftpClient
     public const int DefaultPort = 6112;
 
     /// <summary>Refuse anything claiming to be bigger than this — a server could announce any size.</summary>
-    public const int MaxFileBytes = 16 * 1024 * 1024;
+    public const int MaxFileBytes = 64 * 1024 * 1024;
 
     private const ushort ProtocolVersion = 0x100;
 

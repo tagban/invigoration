@@ -361,8 +361,8 @@ public partial class MainWindow : Window
 
     private static string D2EquipmentBody =>
         "Diablo II characters in the bottom strip can show what they're wearing when you hover over them — helm, armor, weapons " +
-        "and shield. That needs a small gear list (under 100 KB), downloaded once from a Command Center server — your own if one of " +
-        $"your bots uses it, otherwise {D2EquipmentStore.DefaultHost} — and kept on this computer for every server. Nothing about you or your bots is sent.";
+        $"and shield. That needs Diablo II gear data downloaded from {D2EquipmentStore.DefaultHost} and kept on this computer for every " +
+        $"server; a bot connected to {D2EquipmentStore.DefaultHost} later picks up newer copies on its own. Nothing about you or your bots is sent.";
 
     /// <summary>
     /// The one-time automatic offer, made when a bot is (or turns out to be) on a character-dock
@@ -402,15 +402,14 @@ public partial class MainWindow : Window
             return;
         }
 
-        var bots = ViewModel?.Bots.Select(b => b.Config) ?? [];
-        var (result, detail) = await D2EquipmentStore.DownloadAsync(D2EquipmentStore.DownloadSources(bots));
+        var (result, detail) = await D2EquipmentStore.DownloadAsync(D2EquipmentStore.TrustedServers);
         var (heading, body) = result switch
         {
             D2EquipmentDownloadResult.Saved => ("Diablo II gear data downloaded.",
                 "Hover over a Diablo II character in the bottom strip to see what they're wearing. Characters on a realm that " +
                 "doesn't keep items (every slot empty) won't show anything."),
             D2EquipmentDownloadResult.NotOnServer => ("The gear data isn't available yet.",
-                $"None of the servers asked have it right now ({detail}). Try again later from Customize → Download Diablo II Gear Data."),
+                $"{D2EquipmentStore.DefaultHost} isn't serving it yet. Try again later from Customize → Download Diablo II Gear Data."),
             D2EquipmentDownloadResult.Unreadable => ("The gear data couldn't be used.",
                 $"The server sent a version this Invigoration doesn't understand ({detail}). An update to Invigoration may be needed."),
             _ => ("The download didn't finish.", $"Couldn't get the gear data ({detail}). Try again later."),

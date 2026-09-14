@@ -23,6 +23,9 @@ public enum BncsPacketId : byte
     SID_CREATEACCOUNT = 0x2A,
     SID_GETICONDATA = 0x2D,
     SID_CHANGEPASSWORD = 0x31,
+
+    /// <summary>Asks the server for a file's time without downloading it — used to check the kept Diablo II data for newer copies (BotEngine.D2Data.cs).</summary>
+    SID_GETFILETIME = 0x33,
     SID_QUERYREALMS = 0x34,
     SID_LOGONRESPONSE2 = 0x3A,
     SID_LOGONREALMEX = 0x3E,

@@ -156,27 +156,16 @@ public class D2EquipmentStoreSourceTests : IDisposable
         }
     }
 
+    // Only us.bnet.cc, for now: no other server (PvPGN, Atlas...) is ever sent a request for these files.
     [Fact]
-    public void DownloadSources_AsksTheUsersOwnServersFirst_ThenUsBnetCc_NeverBlizzard()
+    public void TrustedServers_IsOnlyUsBnetCc()
     {
-        var sources = D2EquipmentStore.DownloadSources(
-        [
-            new BotConfig { BattlenetServer = "useast.battle.net", BattlenetPort = 6112 },
-            new BotConfig { BattlenetServer = "127.0.0.1", BattlenetPort = 6112 },
-            new BotConfig { BattlenetServer = "127.0.0.1", BattlenetPort = 6112 },
-            new BotConfig { BattlenetServer = "atlas.bnetdocs.org", BattlenetPort = 6112 },
-            new BotConfig { BattlenetServer = "" },
-        ]);
-
-        Assert.Equal([("127.0.0.1", 6112), ("atlas.bnetdocs.org", 6112), (D2EquipmentStore.DefaultHost, 6112)], sources);
-    }
-
-    [Fact]
-    public void DownloadSources_DoesntListUsBnetCcTwice()
-    {
-        var sources = D2EquipmentStore.DownloadSources([new BotConfig { BattlenetServer = "us.bnet.cc", BattlenetPort = 6112 }]);
-
-        Assert.Equal([("us.bnet.cc", 6112)], sources);
+        Assert.Equal([("us.bnet.cc", 6112)], D2EquipmentStore.TrustedServers);
+        Assert.True(D2EquipmentStore.IsTrustedServer(" US.bnet.cc "));
+        Assert.False(D2EquipmentStore.IsTrustedServer("127.0.0.1"));
+        Assert.False(D2EquipmentStore.IsTrustedServer("pvpgn.bnetdocs.org"));
+        Assert.False(D2EquipmentStore.IsTrustedServer("atlas.bnetdocs.org"));
+        Assert.False(D2EquipmentStore.IsTrustedServer("useast.battle.net"));
     }
 
     [Fact(Timeout = 15000)]
@@ -203,3 +192,126 @@ public class D2EquipmentStoreSourceTests : IDisposable
         Assert.Contains("127.0.0.1", detail);
     }
 }
+
+[Collection("D2EquipmentStore")]
+public class D2DataUpdateTests : IDisposable
+{
+    private readonly string _dir = Path.Combine(Path.GetTempPath(), "invig-d2update-" + Guid.NewGuid().ToString("N"));
+
+    public D2DataUpdateTests()
+    {
+        D2EquipmentStore.DirectoryOverride = _dir;
+        D2EquipmentStore.ResetCacheForTests();
+    }
+
+    public void Dispose()
+    {
+        D2EquipmentStore.DirectoryOverride = null;
+        D2EquipmentStore.ResetCacheForTests();
+        try
+        {
+            Directory.Delete(_dir, recursive: true);
+        }
+        catch (DirectoryNotFoundException)
+        {
+        }
+    }
+
+    private static byte[] Zip()
+    {
+        using var ms = new MemoryStream();
+        using (var archive = new System.IO.Compression.ZipArchive(ms, System.IO.Compression.ZipArchiveMode.Create, leaveOpen: true))
+        {
+            using var writer = new StreamWriter(archive.CreateEntry("manifest.json").Open());
+            writer.Write("{}");
+        }
+
+        return ms.ToArray();
+    }
+
+    [Fact]
+    public void BeforeOptingIn_NothingIsEverNewer()
+    {
+        Assert.False(D2EquipmentStore.OptedIn);
+        Assert.False(D2EquipmentStore.IsNewerOnServer(D2EquipmentStore.EquipmentFileName, 999));
+    }
+
+    [Fact]
+    public void AfterOptingIn_OnlyAStrictlyNewerServerCopyCounts()
+    {
+        D2EquipmentStore.Save(Bytes, fileTime: 500);
+
+        Assert.True(D2EquipmentStore.IsNewerOnServer(D2EquipmentStore.EquipmentFileName, 501));
+        Assert.False(D2EquipmentStore.IsNewerOnServer(D2EquipmentStore.EquipmentFileName, 500));
+        Assert.False(D2EquipmentStore.IsNewerOnServer(D2EquipmentStore.EquipmentFileName, 0));
+        Assert.False(D2EquipmentStore.IsNewerOnServer("icons.bni", 999));
+    }
+
+    // The art pack wasn't on the server when the user opted in; once it is, it's fetched without asking again.
+    [Fact]
+    public void AnArtPackWeDontHaveYet_CountsAsNewer()
+    {
+        D2EquipmentStore.Save(Bytes, fileTime: 500);
+
+        Assert.True(D2EquipmentStore.IsNewerOnServer(D2EquipmentStore.CharacterPackFileName, 100));
+    }
+
+    [Fact]
+    public void FileTimes_SurviveARestart()
+    {
+        D2EquipmentStore.Save(Bytes, fileTime: 123456789);
+        D2EquipmentStore.SaveCharacterPack(Zip(), fileTime: 987654321);
+        D2EquipmentStore.ResetCacheForTests();
+
+        Assert.Equal(123456789, D2EquipmentStore.StoredFileTime(D2EquipmentStore.EquipmentFileName));
+        Assert.Equal(987654321, D2EquipmentStore.StoredFileTime(D2EquipmentStore.CharacterPackFileName));
+        Assert.True(D2EquipmentStore.HasCharacterPack);
+    }
+
+    [Fact]
+    public void SaveCharacterPack_RejectsSomethingThatIsntAZip()
+    {
+        Assert.Throws<FormatException>(() => D2EquipmentStore.SaveCharacterPack("nope"u8.ToArray()));
+        Assert.False(D2EquipmentStore.HasCharacterPack);
+    }
+
+    [Fact(Timeout = 15000)]
+    public async Task DownloadAsync_FetchesTheArtPackToo_WhenTheServerHasIt()
+    {
+        var (port, _) = await ServeManyAsync(name => name == D2EquipmentStore.EquipmentFileName ? Bytes : Zip(), connections: 2);
+
+        var (result, detail) = await D2EquipmentStore.DownloadAsync("127.0.0.1", port, TimeSpan.FromSeconds(5));
+
+        Assert.Equal(D2EquipmentDownloadResult.Saved, result);
+        Assert.True(D2EquipmentStore.HasCharacterPack);
+        Assert.Contains("character art", detail);
+    }
+
+    [Fact(Timeout = 15000)]
+    public async Task DownloadAsync_WithoutAnArtPack_StillSavesTheMap()
+    {
+        var (port, _) = await ServeManyAsync(name => name == D2EquipmentStore.EquipmentFileName ? Bytes : null, connections: 2);
+
+        var (result, _) = await D2EquipmentStore.DownloadAsync("127.0.0.1", port, TimeSpan.FromSeconds(5));
+
+        Assert.Equal(D2EquipmentDownloadResult.Saved, result);
+        Assert.NotNull(D2EquipmentStore.Current);
+        Assert.False(D2EquipmentStore.HasCharacterPack);
+    }
+
+    [Theory]
+    [InlineData("us.bnet.cc", true, true)]
+    [InlineData("US.BNET.CC", true, true)]
+    [InlineData("us.bnet.cc", false, false)]
+    [InlineData("127.0.0.1", true, false)]
+    [InlineData("pvpgn.bnetdocs.org", true, false)]
+    [InlineData("useast.battle.net", true, false)]
+    public void TheEngineOnlyEverAsksATrustedServer_AfterOptingIn(string server, bool optedIn, bool expected)
+    {
+        var check = (bool)typeof(BotEngine).GetMethod("ShouldCheckD2FileTimes", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)!
+            .Invoke(null, [server, optedIn])!;
+
+        Assert.Equal(expected, check);
+    }
+}
+
