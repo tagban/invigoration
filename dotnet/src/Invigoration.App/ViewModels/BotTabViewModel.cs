@@ -10,6 +10,7 @@ using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
+using Invigoration.Core.Discord;
 using Invigoration.Core.Protocol;
 using Stimpak;
 
@@ -496,7 +497,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
         {
             var channel = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
-            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon());
+            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon(), Config.ShowUserIconsInChat);
             if (IsUnreadWorthy(e.Type))
             {
                 if (channel is not null && channel != SelectedChannel)
@@ -776,11 +777,22 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
                 break;
 
             case ChatEventType.Talk:
-                // A Discord relay's speaker is already named "[Discord] name" (BotEngine.DiscordSpeakerName) and gets the Discord icon rather than a game icon it doesn't have.
-                var icon = e.Origin == ChatEventOrigin.Discord
-                    ? (Config.ShowUserIconsInChat ? GameIconLoader.Get("discord-relay") : null)
-                    : ResolveUserIcon(e.Username);
-                ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette), icon));
+                // Discord users show under their own name with the Discord logo: either the message
+                // came in over this bot's own bridge (speaker "[Discord] name"), or another
+                // Invigoration bot relayed it into the channel ("[Discord] name: message").
+                if (e.Origin == ChatEventOrigin.Discord && DiscordRelayLine.DiscordUserFromSpeaker(e.Username) is { } fromOwnBridge)
+                {
+                    ChatLines.Add(DiscordRelayRendering.Build(fromOwnBridge, e.Text, relayedBy: null, palette, Config.ShowUserIconsInChat));
+                }
+                else if (DiscordRelayLine.TryParse(e.Text, out var relayedUser, out var relayedText))
+                {
+                    ChatLines.Add(DiscordRelayRendering.Build(relayedUser, relayedText, relayedBy: e.Username, palette, Config.ShowUserIconsInChat));
+                }
+                else
+                {
+                    ChatLines.Add(new ChatLineViewModel(BuildUserLine(e.Username, e.Text, e.Flags, palette), ResolveUserIcon(e.Username)));
+                }
+
                 break;
 
             case ChatEventType.Emote:

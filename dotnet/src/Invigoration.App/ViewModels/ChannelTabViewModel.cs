@@ -53,7 +53,7 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
     /// so BotTabViewModel.OnChatMessage never routes one here at all; see
     /// BotTabViewModel.WhisperThreads for where whispers actually go.
     /// </summary>
-    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null)
+    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null, bool showIcons = true)
     {
         switch (e.Type)
         {
@@ -63,6 +63,11 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
 
             case ChatEventType.Leave:
                 ChatLines.Add(new ChatLineViewModel($"*** {e.Username} has left the channel.", palette.Gray));
+                break;
+
+            case ChatEventType.Talk when Invigoration.Core.Discord.DiscordRelayLine.TryParse(e.Text, out var relayedUser, out var relayedText):
+                // Another Invigoration bot's Discord relay — shown under the Discord user's name with the logo, same as a classic bot tab.
+                ChatLines.Add(DiscordRelayRendering.Build(relayedUser, relayedText, relayedBy: e.Username, palette, showIcons));
                 break;
 
             case ChatEventType.Talk:

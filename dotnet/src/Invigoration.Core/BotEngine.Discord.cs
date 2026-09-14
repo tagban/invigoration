@@ -95,7 +95,7 @@ public sealed partial class BotEngine
     /// account matching the bot master's Battle.net name and run master commands through the
     /// relay, or score trivia points and roster rank as someone else.
     /// </summary>
-    public static string DiscordSpeakerName(string discordUsername) => $"[Discord] {discordUsername}";
+    public static string DiscordSpeakerName(string discordUsername) => DiscordRelayLine.SpeakerName(discordUsername);
 
     /// <summary>Only real Battle.net chat goes out to Discord — never a message that came in from Discord in the first place, which would post the user's own message back at them.</summary>
     internal static bool ShouldRelayToDiscord(ChatEvent chatEvent, bool relayBattlenetToDiscord) =>
@@ -131,10 +131,17 @@ public sealed partial class BotEngine
 
         _nextDiscordToBattlenetAllowedUtc = DateTime.UtcNow.AddSeconds(Math.Max(0, Config.Discord.RelayDelaySeconds));
 
-        // No local echo: the Discord message already shows in this bot's chat log once, as
-        // "[Discord] name: message", from the HandleChatEvent above. Echoing the relay too is
-        // what used to print it a second time as "<bot>: [Discord] name: message".
-        await SendChatCommandAsync($"{speaker}: {content}", sc2ChannelOverride: null, echoLocally: false).ConfigureAwait(false);
+        // Split here rather than leaving it to SendChatCommandAsync, so every piece of a long
+        // message keeps the "[Discord] name: " lead — that's what lets other Invigoration bots in
+        // the channel show each piece under the Discord user's name (DiscordRelayLine.TryParse).
+        // No local echo: the Discord message already shows in this bot's chat log once, from the
+        // HandleChatEvent above; echoing the relay too used to print it a second time as
+        // "<bot>: [Discord] name: message".
+        var lead = DiscordRelayLine.Format(username, "");
+        foreach (var piece in Chat.ChatLineSplitter.Split(content, Chat.ChatLineSplitter.MaxLineLength - lead.Length))
+        {
+            await SendChatCommandAsync(lead + piece, sc2ChannelOverride: null, echoLocally: false).ConfigureAwait(false);
+        }
     }
 
     private async void OnChatMessageForDiscordRelay(ChatEvent chatEvent)
