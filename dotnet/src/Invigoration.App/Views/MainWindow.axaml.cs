@@ -42,6 +42,13 @@ public partial class MainWindow : Window
                 }
 
                 vm.PropertyChanged += OnViewModelPropertyChanged;
+
+                // A bot already on a character-dock theme from before this existed gets the same
+                // one-time offer as one switched to it now. Posted so the window is up first.
+                if (vm.Bots.Any(b => b.Theme.UsesCharacterDock))
+                {
+                    Dispatcher.UIThread.Post(async () => await OfferD2EquipmentDownloadAsync());
+                }
             }
         };
     }
@@ -135,6 +142,11 @@ public partial class MainWindow : Window
         if (result is not null && ViewModel is { } vm)
         {
             vm.AddBot(result);
+            if (ThemeLibrary.ResolveFor(result).Layout == ThemeLayout.CharacterDock)
+            {
+                await OfferD2EquipmentDownloadAsync();
+            }
+
             // AddBot's own RefreshTopLevelTabs() call clears and repopulates TopLevelTabs, which
             // resets the TabControl's own selection to index 0 (the Whispers pseudo-tab, always
             // first) — SelectedBot is a separate ViewModel property, not something the TabControl
@@ -184,6 +196,11 @@ public partial class MainWindow : Window
             selected.ApplyConfig(result);
             vm.RefreshTopLevelTabs();
             vm.SaveAll();
+            if (selected.Theme.UsesCharacterDock)
+            {
+                await OfferD2EquipmentDownloadAsync();
+            }
+
             // Same TabControl-selection-reset issue as AddBot — RefreshTopLevelTabs() rebuilding
             // TopLevelTabs from scratch otherwise leaves the tab strip showing Whispers instead of
             // the bot that was actually just edited.
@@ -336,6 +353,97 @@ public partial class MainWindow : Window
     private async void OnManageColorsNativeClick(object? sender, EventArgs e) => await ShowColorManager();
 
     private async Task ShowColorManager() => await new ColorManagerWindow().ShowDialog(this);
+
+    private async void OnDownloadD2EquipmentClick(object? sender, RoutedEventArgs e) => await DownloadD2EquipmentAsync(askFirst: true);
+    private async void OnDownloadD2EquipmentNativeClick(object? sender, EventArgs e) => await DownloadD2EquipmentAsync(askFirst: true);
+
+    private const string D2EquipmentHeading = "Show what Diablo II characters are wearing?";
+
+    private static string D2EquipmentBody =>
+        "Diablo II characters in the bottom strip can show what they're wearing when you hover over them — helm, armor, weapons " +
+        "and shield. That needs a small gear list (under 100 KB), downloaded once from a Command Center server — your own if one of " +
+        $"your bots uses it, otherwise {D2EquipmentStore.DefaultHost} — and kept on this computer for every server. Nothing about you or your bots is sent.";
+
+    /// <summary>
+    /// The one-time automatic offer, made when a bot is (or turns out to be) on a character-dock
+    /// theme: only if no gear list is stored yet and it hasn't been turned down before. "No"
+    /// is remembered; the Customize menu item still works any time.
+    /// </summary>
+    private async Task OfferD2EquipmentDownloadAsync()
+    {
+        if (D2EquipmentStore.Current is not null || D2EquipmentStore.Declined || _offeringD2Equipment)
+        {
+            return;
+        }
+
+        _offeringD2Equipment = true;
+        try
+        {
+            if (!await ConfirmAsync("Diablo II Gear Data", D2EquipmentHeading, D2EquipmentBody, "Download"))
+            {
+                D2EquipmentStore.Declined = true;
+                return;
+            }
+
+            await DownloadD2EquipmentAsync(askFirst: false);
+        }
+        finally
+        {
+            _offeringD2Equipment = false;
+        }
+    }
+
+    private bool _offeringD2Equipment;
+
+    private async Task DownloadD2EquipmentAsync(bool askFirst)
+    {
+        if (askFirst && !await ConfirmAsync("Diablo II Gear Data", D2EquipmentHeading, D2EquipmentBody, "Download"))
+        {
+            return;
+        }
+
+        var bots = ViewModel?.Bots.Select(b => b.Config) ?? [];
+        var (result, detail) = await D2EquipmentStore.DownloadAsync(D2EquipmentStore.DownloadSources(bots));
+        var (heading, body) = result switch
+        {
+            D2EquipmentDownloadResult.Saved => ("Diablo II gear data downloaded.",
+                "Hover over a Diablo II character in the bottom strip to see what they're wearing. Characters on a realm that " +
+                "doesn't keep items (every slot empty) won't show anything."),
+            D2EquipmentDownloadResult.NotOnServer => ("The gear data isn't available yet.",
+                $"None of the servers asked have it right now ({detail}). Try again later from Customize → Download Diablo II Gear Data."),
+            D2EquipmentDownloadResult.Unreadable => ("The gear data couldn't be used.",
+                $"The server sent a version this Invigoration doesn't understand ({detail}). An update to Invigoration may be needed."),
+            _ => ("The download didn't finish.", $"Couldn't get the gear data ({detail}). Try again later."),
+        };
+        await InformAsync("Diablo II Gear Data", heading, body);
+    }
+
+    /// <summary>A small modal notice with a single OK.</summary>
+    private async Task InformAsync(string title, string heading, string body)
+    {
+        var dialog = new Window
+        {
+            Title = title,
+            Width = 440,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+        var ok = new Button { Content = "OK", IsDefault = true, IsCancel = true, HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right };
+        ok.Click += (_, _) => dialog.Close();
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = heading, FontWeight = Avalonia.Media.FontWeight.Bold, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                new TextBlock { Text = body, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.8 },
+                ok,
+            },
+        };
+        await dialog.ShowDialog(this);
+    }
 
     private async void OnManageThemesClick(object? sender, RoutedEventArgs e) => await ShowThemeManager();
     private async void OnManageThemesNativeClick(object? sender, EventArgs e) => await ShowThemeManager();

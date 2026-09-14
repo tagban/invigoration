@@ -117,7 +117,21 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     public bool ShowLadderScore => LadderScoreText != "" && StatusIconImage is null;
 
     /// <summary>The product-icon tooltip's text — StatStringParser's own human-readable rendering (e.g. "StarCraft: (5 wins)", "WarCraft III: Reign of Chaos (level 500)") when it recognizes the product, falling back to the raw wire value for anything it doesn't (still useful for spotting what a genuinely unrecognized/malformed statstring actually contains).</summary>
-    public string StatStringDescription => StatStringParser.Parse(StatString) is { Length: > 0 } desc ? desc : StatString;
+    public string StatStringDescription
+    {
+        get
+        {
+            var description = StatStringParser.Parse(StatString) is { Length: > 0 } desc ? desc : StatString;
+
+            // What a D2 realm character is wearing, once the gear list has been downloaded
+            // (Config.D2EquipmentStore) — "Wearing: Cap / War Hat / Shako, Dusk Shroud, ...".
+            var wearing = Core.Config.D2EquipmentStore.Current?.DescribeLine(StatString) ?? "";
+            return wearing.Length > 0 ? $"{description}\n{wearing}" : description;
+        }
+    }
+
+    /// <summary>Re-reads the tooltip text — after the gear list is downloaded, which changes what it says without the statstring changing.</summary>
+    public void RefreshDescription() => OnPropertyChanged(nameof(StatStringDescription));
 
     private bool IsSameProduct => StatString.Length >= 4 && BotProduct.Length >= 4 &&
                                    StatString.AsSpan(0, 4).SequenceEqual(BotProduct.AsSpan(0, 4));

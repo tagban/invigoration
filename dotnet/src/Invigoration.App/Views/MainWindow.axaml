@@ -43,6 +43,7 @@
                         <NativeMenuItem Header="Manage Icons..." Click="OnManageIconsNativeClick" />
                         <NativeMenuItem Header="Manage Colors..." Click="OnManageColorsNativeClick" />
                         <NativeMenuItem Header="Manage Themes..." Click="OnManageThemesNativeClick" />
+                        <NativeMenuItem Header="Download Diablo II Gear Data..." Click="OnDownloadD2EquipmentNativeClick" />
                         <NativeMenuItem Header="Manage Battle.net Profiles..." Click="OnManageBattlenetProfilesNativeClick" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
@@ -86,6 +87,7 @@
                 <MenuItem Header="Manage _Icons..." Click="OnManageIconsClick" />
                 <MenuItem Header="Manage _Colors..." Click="OnManageColorsClick" />
                 <MenuItem Header="Manage _Themes..." Click="OnManageThemesClick" />
+                <MenuItem Header="Download Diablo II _Gear Data..." Click="OnDownloadD2EquipmentClick" />
                 <MenuItem Header="Manage _Battle.net Profiles..." Click="OnManageBattlenetProfilesClick" />
                 <Separator />
                 <MenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />

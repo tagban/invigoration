@@ -42,6 +42,14 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
 
     private void OnThemesChanged() => Dispatcher.UIThread.Post(RefreshTheme);
 
+    private void OnD2EquipmentChanged() => Dispatcher.UIThread.Post(() =>
+    {
+        foreach (var user in ChannelUsers)
+        {
+            user.RefreshDescription();
+        }
+    });
+
     public BotConfig Config => Engine.Config;
 
     public string Title => Config.DisplayName;
@@ -211,6 +219,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         IconOverrideStore.OverridesChanged += OnIconOverrideChanged;
         Invigoration.Core.Clan.ClanRosterStore.RosterChanged += OnClanRosterChanged;
         ThemeLibrary.ThemesChanged += OnThemesChanged;
+        D2EquipmentStore.Changed += OnD2EquipmentChanged;
         RefreshClanRoster();
         RefreshTheme();
     }
@@ -933,6 +942,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         IconOverrideStore.OverridesChanged -= OnIconOverrideChanged;
         Invigoration.Core.Clan.ClanRosterStore.RosterChanged -= OnClanRosterChanged;
         ThemeLibrary.ThemesChanged -= OnThemesChanged;
+        D2EquipmentStore.Changed -= OnD2EquipmentChanged;
         return Engine.DisposeAsync();
     }
 }

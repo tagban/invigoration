@@ -24,6 +24,9 @@ public readonly record struct D2Character(
     bool Ladder,
     int Progress)
 {
+    /// <summary>The character struct at the end of a D2 realm statstring is always this long.</summary>
+    public const int PortraitLength = 33;
+
     public const int ClassicClassCount = 5;
     public const int ExpansionClassCount = 7;
 
@@ -69,6 +72,30 @@ public readonly record struct D2Character(
     /// <summary>Whether this character's product is the expansion (PX2D) — decides the label, independent of <see cref="Expansion"/>, which is the character's own flag.</summary>
     public static bool IsD2Product(string statString) =>
         statString.StartsWith("VD2D", StringComparison.Ordinal) || statString.StartsWith("PX2D", StringComparison.Ordinal);
+
+    /// <summary>The raw 33-byte character struct after a D2 realm statstring's second comma, or null for any other statstring (other products, Open characters, a struct too short to hold every documented byte).</summary>
+    public static byte[]? PortraitBytes(string statString)
+    {
+        if (!IsD2Product(statString))
+        {
+            return null;
+        }
+
+        var firstComma = statString.IndexOf(',', 4);
+        var secondComma = firstComma < 0 ? -1 : statString.IndexOf(',', firstComma + 1);
+        if (secondComma < 0 || statString.Length - (secondComma + 1) < PortraitLength)
+        {
+            return null;
+        }
+
+        var portrait = new byte[PortraitLength];
+        for (var i = 0; i < PortraitLength; i++)
+        {
+            portrait[i] = (byte)statString[secondComma + 1 + i];
+        }
+
+        return portrait;
+    }
 
     /// <summary>Parses a D2 statstring's character struct. False for any other product, an Open character, or a struct too short to hold the class/level/flags/act bytes.</summary>
     public static bool TryParse(string statString, out D2Character character)
