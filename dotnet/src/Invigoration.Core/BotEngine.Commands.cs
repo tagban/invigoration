@@ -343,15 +343,15 @@ public sealed partial class BotEngine
             case "pause":
             case "play":
             case "stop":
-                await HandleMusicCommandAsync(isLocal, Reply, c => c.PlayPauseAsync(), "Toggled play/pause.", "Couldn't toggle play/pause — is the music player open?").ConfigureAwait(false);
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.PlayPauseAsync(), "Toggled play/pause.", "Couldn't toggle play/pause — is something playing on Spotify?").ConfigureAwait(false);
                 break;
 
             case "thumbsup":
-                await HandleMusicCommandAsync(isLocal, Reply, c => c.ThumbsUpAsync(), "Liked it.", "Couldn't like the current track — make sure you're signed in to the music player.", c => c.SupportsThumbsUp).ConfigureAwait(false);
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.ThumbsUpAsync(), "Saved to the Spotify library.", "Couldn't save the current track to your Spotify library.", c => c.SupportsThumbsUp).ConfigureAwait(false);
                 break;
 
             case "thumbsdown":
-                await HandleMusicCommandAsync(isLocal, Reply, c => c.ThumbsDownAsync(), "Disliked it.", "Couldn't dislike the current track — make sure you're signed in to the music player.", c => c.SupportsThumbsDown).ConfigureAwait(false);
+                await HandleMusicCommandAsync(isLocal, Reply, c => c.ThumbsDownAsync(), "Disliked it.", "Couldn't dislike the current track.", c => c.SupportsThumbsDown).ConfigureAwait(false);
                 break;
 
             case "nowplaying":
@@ -750,7 +750,7 @@ public sealed partial class BotEngine
 
         if (MusicPlayerRegistry.Controller is not { } controller)
         {
-            await Respond("Music player isn't open.").ConfigureAwait(false);
+            await Respond(MusicPlayerRegistry.NotConnectedReply).ConfigureAwait(false);
             return;
         }
 
@@ -759,7 +759,7 @@ public sealed partial class BotEngine
             return;
         }
 
-        await Respond(await action(controller).ConfigureAwait(false) ? successText : failureText).ConfigureAwait(false);
+        await Respond(await action(controller).ConfigureAwait(false) ? successText : controller.LastError ?? failureText).ConfigureAwait(false);
     }
 
     /// <summary>
@@ -768,19 +768,8 @@ public sealed partial class BotEngine
     /// informational command (uptime, ver, about) — it's genuinely useful, shareable info for
     /// the channel, not just a personal control confirmation.
     /// </summary>
-    private async Task HandleNowPlayingCommandAsync(Func<string, Task> reply)
-    {
-        if (MusicPlayerRegistry.Controller is not { } controller)
-        {
-            await reply("Music player isn't open.").ConfigureAwait(false);
-            return;
-        }
-
-        var nowPlaying = await controller.GetNowPlayingAsync().ConfigureAwait(false);
-        await reply(nowPlaying is null
-            ? "Nothing seems to be playing."
-            : $"/me is now playing {nowPlaying.Title} - by {nowPlaying.Artist}{(string.IsNullOrEmpty(nowPlaying.Service) ? "" : $" on {nowPlaying.Service}")}.").ConfigureAwait(false);
-    }
+    private async Task HandleNowPlayingCommandAsync(Func<string, Task> reply) =>
+        await reply(await MusicPlayerRegistry.DescribeNowPlayingAsync().ConfigureAwait(false)).ConfigureAwait(false);
 
     private Task ReplyAsync(string text, string username, bool asWhisper, byte? originChannelIndex) =>
         asWhisper ? SendChatCommandAsync($"/w {username} {text}") : SendChatCommandAsync(text, originChannelIndex);

@@ -1,9 +1,125 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             x:Class="Invigoration.App.Views.MusicTabView">
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             xmlns:vm="using:Invigoration.App.ViewModels"
+             mc:Ignorable="d" d:DesignWidth="900" d:DesignHeight="640"
+             x:Class="Invigoration.App.Views.MusicTabView"
+             x:DataType="vm:MusicTabViewModel">
 
-    <!-- Deliberately empty — see MusicPlayerPanel's remarks. ViewLocator resolves this for
-         MusicTabViewModel because Avalonia's TabControl always instantiates SOME content for the
-         selected item's DataTemplate, but the real, always-alive player lives as a permanent
-         overlay in MainWindow.axaml instead, so this is never actually what the user sees. -->
+    <UserControl.Styles>
+        <Style Selector="Button.spotify">
+            <Setter Property="Background" Value="#1ED760" />
+            <Setter Property="Foreground" Value="#121212" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="Padding" Value="22,9" />
+        </Style>
+        <Style Selector="Button.spotify:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="#3BE477" />
+            <Setter Property="Foreground" Value="#121212" />
+        </Style>
+        <Style Selector="Button.transport">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="22" />
+            <Setter Property="Width" Value="52" />
+            <Setter Property="Height" Value="52" />
+            <Setter Property="CornerRadius" Value="26" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.transport.primary">
+            <Setter Property="Background" Value="White" />
+            <Setter Property="Foreground" Value="#121212" />
+            <Setter Property="Width" Value="60" />
+            <Setter Property="Height" Value="60" />
+            <Setter Property="CornerRadius" Value="30" />
+        </Style>
+        <Style Selector="TextBlock.step">
+            <Setter Property="Foreground" Value="#CFCFCF" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+    </UserControl.Styles>
+
+    <Border Background="#121212">
+        <ScrollViewer HorizontalScrollBarVisibility="Disabled">
+            <Grid MaxWidth="560" Margin="24,28" HorizontalAlignment="Center">
+
+                <!-- Not connected: how to make a Spotify app, then sign in. -->
+                <StackPanel Spacing="14" IsVisible="{Binding ShowsSetup}">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Image Source="{Binding TabIconImage}" Width="40" Height="40" />
+                        <TextBlock Text="Connect Spotify" FontSize="26" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Classes="step" Foreground="#A7A7A7"
+                               Text="Invigoration controls the Spotify you're already listening to — in the Spotify app, on your phone, or on a speaker. Your bots can show what's playing and skip, pause or save tracks from chat." />
+
+                    <Border Background="#1E1E1E" CornerRadius="8" Padding="16">
+                        <StackPanel Spacing="10">
+                            <TextBlock Text="One-time setup" FontWeight="Bold" Foreground="White" />
+                            <TextBlock Classes="step" Text="1. Open the Spotify developer dashboard and create an app. Spotify requires Premium on the account that owns it." />
+                            <Button Content="Open Spotify developer dashboard" Command="{Binding OpenDeveloperDashboardCommand}" HorizontalAlignment="Left" />
+                            <TextBlock Classes="step" Text="2. Add this exact Redirect URI, and tick Web API:" />
+                            <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                                <TextBox Grid.Column="0" Text="{Binding RedirectUri, Mode=OneWay}" IsReadOnly="True" FontFamily="Menlo, Consolas, monospace" />
+                                <Button Grid.Column="1" Content="Copy" Click="OnCopyRedirectUriClick" />
+                            </Grid>
+                            <TextBlock Classes="step" Text="3. Save the app, then paste its Client ID here:" />
+                            <TextBox Text="{Binding ClientId}" PlaceholderText="Client ID" FontFamily="Menlo, Consolas, monospace" />
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="10">
+                        <Button Classes="spotify" Content="Connect Spotify" Command="{Binding ConnectCommand}" />
+                        <Button Content="Cancel" Command="{Binding CancelConnectCommand}" IsVisible="{Binding IsConnecting}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock Text="{Binding StatusText}" Foreground="#A7A7A7" TextWrapping="Wrap" />
+                </StackPanel>
+
+                <!-- Connected: what's playing, with controls. -->
+                <StackPanel Spacing="16" IsVisible="{Binding IsConnected}" HorizontalAlignment="Center">
+                    <Border Width="320" Height="320" CornerRadius="8" ClipToBounds="True" Background="#282828" HorizontalAlignment="Center">
+                        <Panel>
+                            <Image Source="{Binding Artwork}" Stretch="UniformToFill" />
+                            <Image Source="{Binding TabIconImage}" Width="96" Height="96" Opacity="0.35"
+                                   IsVisible="{Binding Artwork, Converter={x:Static ObjectConverters.IsNull}}" />
+                        </Panel>
+                    </Border>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasTrack}" HorizontalAlignment="Center">
+                        <TextBlock Text="{Binding TrackTitle}" FontSize="22" FontWeight="Bold" Foreground="White"
+                                   TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
+                        <TextBlock Text="{Binding Artist}" FontSize="15" Foreground="#B3B3B3" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
+                        <TextBlock Text="{Binding Album}" FontSize="12" Foreground="#7A7A7A" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" IsVisible="{Binding HasNothingPlaying}" HorizontalAlignment="Center">
+                        <TextBlock Text="Nothing playing" FontSize="20" FontWeight="Bold" Foreground="White" TextAlignment="Center" />
+                        <TextBlock Text="Start something in the Spotify app and it'll show up here." Foreground="#A7A7A7" TextAlignment="Center" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="4" Width="420" IsVisible="{Binding HasTrack}">
+                        <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" Height="4" MinHeight="4"
+                                     Foreground="#1ED760" Background="#3A3A3A" CornerRadius="2" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBlock Grid.Column="0" Text="{Binding DeviceText}" FontSize="11" Foreground="#1ED760" />
+                            <TextBlock Grid.Column="1" Text="{Binding TimeText}" FontSize="11" Foreground="#A7A7A7" />
+                        </Grid>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="18" HorizontalAlignment="Center">
+                        <Button Classes="transport" Content="♡" Command="{Binding SaveCommand}" ToolTip.Tip="Save to your Spotify library" />
+                        <Button Classes="transport primary" Content="{Binding PlayPauseGlyph}" Command="{Binding PlayPauseCommand}" ToolTip.Tip="Play/Pause" />
+                        <Button Classes="transport" Content="⏭" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding StatusText}" Foreground="#A7A7A7" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
+                    <Button Content="Disconnect Spotify" Command="{Binding DisconnectCommand}" HorizontalAlignment="Center"
+                            Background="Transparent" Foreground="#7A7A7A" FontSize="11" />
+                </StackPanel>
+            </Grid>
+        </ScrollViewer>
+    </Border>
 </UserControl>

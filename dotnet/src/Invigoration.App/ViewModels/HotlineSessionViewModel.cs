@@ -360,15 +360,15 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             case "pause":
             case "play":
             case "stop":
-                await RunMusicCommandAsync(c => c.PlayPauseAsync(), "Toggled play/pause.", "Couldn't toggle play/pause — is the music player open?").ConfigureAwait(true);
+                await RunMusicCommandAsync(c => c.PlayPauseAsync(), "Toggled play/pause.", "Couldn't toggle play/pause — is something playing on Spotify?").ConfigureAwait(true);
                 return true;
 
             case "thumbsup":
-                await RunMusicCommandAsync(c => c.ThumbsUpAsync(), "Liked it.", "Couldn't like the current track — make sure you're signed in to the music player.", c => c.SupportsThumbsUp).ConfigureAwait(true);
+                await RunMusicCommandAsync(c => c.ThumbsUpAsync(), "Saved to the Spotify library.", "Couldn't save the current track to your Spotify library.", c => c.SupportsThumbsUp).ConfigureAwait(true);
                 return true;
 
             case "thumbsdown":
-                await RunMusicCommandAsync(c => c.ThumbsDownAsync(), "Disliked it.", "Couldn't dislike the current track — make sure you're signed in to the music player.", c => c.SupportsThumbsDown).ConfigureAwait(true);
+                await RunMusicCommandAsync(c => c.ThumbsDownAsync(), "Disliked it.", "Couldn't dislike the current track.", c => c.SupportsThumbsDown).ConfigureAwait(true);
                 return true;
 
             default:
@@ -376,24 +376,13 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         }
     }
 
-    private static async Task<string> GetNowPlayingReplyAsync()
-    {
-        if (MusicPlayerRegistry.Controller is not { } controller)
-        {
-            return "Music player isn't open.";
-        }
-
-        var nowPlaying = await controller.GetNowPlayingAsync().ConfigureAwait(false);
-        return nowPlaying is null
-            ? "Nothing seems to be playing."
-            : $"/me is now playing {nowPlaying.Title} - by {nowPlaying.Artist}{(string.IsNullOrEmpty(nowPlaying.Service) ? "" : $" on {nowPlaying.Service}")}.";
-    }
+    private static Task<string> GetNowPlayingReplyAsync() => MusicPlayerRegistry.DescribeNowPlayingAsync();
 
     private async Task RunMusicCommandAsync(Func<IMusicPlayerController, Task<bool>> action, string successText, string failureText, Func<IMusicPlayerController, bool>? isSupported = null)
     {
         if (MusicPlayerRegistry.Controller is not { } controller)
         {
-            await SendMusicReplyAsync("Music player isn't open.").ConfigureAwait(true);
+            await SendMusicReplyAsync(MusicPlayerRegistry.NotConnectedReply).ConfigureAwait(true);
             return;
         }
 
@@ -402,7 +391,7 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             return;
         }
 
-        await SendMusicReplyAsync(await action(controller).ConfigureAwait(true) ? successText : failureText).ConfigureAwait(true);
+        await SendMusicReplyAsync(await action(controller).ConfigureAwait(true) ? successText : controller.LastError ?? failureText).ConfigureAwait(true);
     }
 
     private Task SendMusicReplyAsync(string text) => SendChatWithEffectsAsync(text);

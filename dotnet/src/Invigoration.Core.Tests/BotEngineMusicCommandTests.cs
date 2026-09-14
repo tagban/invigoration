@@ -7,13 +7,14 @@ namespace Invigoration.Core.Tests;
 /// <summary>
 /// Covers the "!skip"/"!thumbsup"/"!thumbsdown"/"!nowplaying" chat commands
 /// (BotEngine.Commands.cs) against a fake IMusicPlayerController — the real one
-/// (YouTubeMusicWindow, Invigoration.App) drives an actual embedded browser and isn't
-/// unit-testable, but the dispatch/null-handling logic here is. MusicPlayerRegistry.Controller
+/// (SpotifyController) is covered against a fake Spotify in SpotifyControllerTests; this is the
+/// dispatch/null-handling logic. MusicPlayerRegistry.Controller
 /// is process-wide static state; every test resets it in a finally block so a failure here can't
 /// leak into other test files (none currently touch it, but cheap insurance regardless — see
 /// the BattlenetCredentialProfileStoreTests fixture for why shared static state left dirty is a
 /// real, previously-hit problem in this codebase).
 /// </summary>
+[Collection(MusicPlayerRegistryCollection.Name)]
 public class BotEngineMusicCommandTests
 {
     private sealed class FakeMusicPlayerController : IMusicPlayerController
@@ -53,6 +54,8 @@ public class BotEngineMusicCommandTests
         }
 
         public bool SupportsThumbsDown { get; set; } = true;
+
+        public string? LastError { get; set; }
     }
 
     private static Task InvokeRemoteCommand(BotEngine engine, string username, string message)
@@ -225,7 +228,7 @@ public class BotEngineMusicCommandTests
         MusicPlayerRegistry.Controller = null;
         await using var engine = CreateBotMasterEngine();
 
-        // "Music player isn't open." reply just goes out over a disconnected, no-op wire send in
+        // The "Spotify isn't connected" reply just goes out over a disconnected, no-op wire send in
         // tests — the point here is that a null controller doesn't throw, not the reply text.
         await InvokeRemoteCommand(engine, "TheMaster", "!skip");
     }
@@ -245,5 +248,40 @@ public class BotEngineMusicCommandTests
         {
             MusicPlayerRegistry.Controller = null;
         }
+    }
+
+    private static async Task<List<string>> RunLocalCommand(string message, IMusicPlayerController? controller)
+    {
+        MusicPlayerRegistry.Controller = controller;
+        try
+        {
+            await using var engine = CreateBotMasterEngine();
+            var logged = new List<string>();
+            engine.Log += segments => logged.Add(string.Concat(segments.Select(s => s.Text)));
+            var method = typeof(BotEngine).GetMethod("HandleCommandAsync", BindingFlags.NonPublic | BindingFlags.Instance,
+                null, [typeof(string), typeof(string), typeof(bool), typeof(byte?)], null)!;
+            await (Task)method.Invoke(engine, ["TheMaster", message, true, null])!;
+            return logged;
+        }
+        finally
+        {
+            MusicPlayerRegistry.Controller = null;
+        }
+    }
+
+    [Fact]
+    public async Task AFailedCommand_RepliesWithTheServicesOwnReason()
+    {
+        var logged = await RunLocalCommand("/skip", new FakeMusicPlayerController { NextResult = false, LastError = "Spotify has no active device — start playing in the Spotify app first." });
+
+        Assert.Contains(logged, l => l.Contains("no active device", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ACommandWithNothingConnected_SaysHowToConnect()
+    {
+        var logged = await RunLocalCommand("/skip", null);
+
+        Assert.Contains(logged, l => l.Contains(MusicPlayerRegistry.NotConnectedReply, StringComparison.Ordinal));
     }
 }

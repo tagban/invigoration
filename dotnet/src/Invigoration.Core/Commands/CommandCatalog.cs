@@ -68,15 +68,15 @@ public static class CommandCatalog
         new("clanscore", "Adjust a clan member's trivia score", ["clanscore"]),
         new("trivia", "Start/stop the trivia game", ["trivia"]),
         new("musicskip", "Skip to the next track", ["skip", "next"],
-            "skip (or next) — skips to the next track on whichever music service is open. No arguments."),
+            "skip (or next) — skips to the next track on Spotify. No arguments."),
         new("musicpauseplay", "Toggle play/pause", ["pause", "play", "stop"],
-            "pause (or play, stop) — toggles play/pause on whichever music service is open. No arguments."),
-        new("musicthumbsup", "Like the current track", ["thumbsup"],
-            "thumbsup — likes the current track. No arguments. Quietly does nothing on a service with no \"like\" concept."),
+            "pause (or play, stop) — toggles play/pause on Spotify. No arguments."),
+        new("musicthumbsup", "Save the current track", ["thumbsup"],
+            "thumbsup — saves the current track to your Spotify library. No arguments."),
         new("musicthumbsdown", "Dislike the current track", ["thumbsdown"],
-            "thumbsdown — dislikes the current track. No arguments. Quietly does nothing on a service with no \"dislike\" concept."),
+            "thumbsdown — dislikes the current track. No arguments. Spotify has no dislike, so it quietly does nothing there."),
         new("nowplaying", "Show the current track", ["nowplaying", "np", "music"],
-            "nowplaying (or np, music) — replies with the currently-playing track and service. No arguments."),
+            "nowplaying (or np, music) — replies with what's playing on Spotify. No arguments."),
     ];
 
     private static readonly Dictionary<string, string> AliasToCanonical =

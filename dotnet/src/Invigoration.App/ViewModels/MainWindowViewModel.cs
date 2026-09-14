@@ -81,10 +81,10 @@ public partial class MainWindowViewModel : ViewModelBase
     /// <summary>Exposed so a context-menu "Whisper" click deep inside a bot's own BotTabView (see BotTabView.axaml.cs's FocusWhisperThread) can switch the top-level tab strip to Whispers without needing its own reference to this pseudo-tab.</summary>
     public GlobalWhispersTabViewModel WhispersTab => _whispersTab;
 
-    /// <summary>Exposed directly (not just via TopLevelTabs) so MainWindow.axaml can bind the permanent MusicPlayerPanel overlay's DataContext to the exact same instance the tab header represents — see MusicPlayerPanel's remarks for why it lives outside the TabControl's own content area.</summary>
+    /// <summary>The Music tab — one instance for the app's lifetime, since it holds the Spotify connection every bot's music commands use.</summary>
     public MusicTabViewModel MusicTab { get; } = new();
 
-    /// <summary>Whether the Music tab (and its always-alive player overlay) shows at all — the Customize menu's "Music Player" toggle, for anyone who doesn't want it. Persisted via MusicSettingsStore, not per-bot.</summary>
+    /// <summary>Whether the Music tab shows at all — the Customize menu's "Music Player" toggle, for anyone who doesn't want it. Persisted via MusicSettingsStore, not per-bot. Spotify commands keep working while it's hidden.</summary>
     [ObservableProperty]
     public partial bool IsMusicEnabled { get; set; }
 
@@ -93,10 +93,6 @@ public partial class MainWindowViewModel : ViewModelBase
         MusicSettingsStore.IsEnabled = value;
         RefreshTopLevelTabs();
     }
-
-    /// <summary>True exactly when the Music tab's header is the one currently showing — drives MusicPlayerPanel's IsVisible in MainWindow.axaml, since the panel itself is never added/removed from the tree (see its remarks).</summary>
-    [ObservableProperty]
-    public partial bool IsMusicTabSelected { get; set; }
 
     /// <summary>The optional bottom playback-control bar's own state/commands — see MusicBarViewModel's remarks. Always exists (like MusicTab); IsMusicBarEnabled just controls whether MainWindow.axaml actually shows it.</summary>
     public MusicBarViewModel MusicBar { get; } = new();
@@ -240,7 +236,6 @@ public partial class MainWindowViewModel : ViewModelBase
     public void SetActiveTopLevelItem(object? item)
     {
         SelectedTopLevelItem = item;
-        IsMusicTabSelected = ReferenceEquals(item, MusicTab);
         RecomputeActiveBot();
     }
 

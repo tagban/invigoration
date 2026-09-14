@@ -100,7 +100,7 @@
 
         <!-- Optional persistent playback bar, docked below everything else regardless of which
              top-level tab is showing — the whole point (explicit request, 2026-08-24) is
-             controlling music without needing to switch to the Music tab. Off by default
+             controlling Spotify without needing to switch to the Music tab. Off by default
              (IsMusicBarEnabled); driven by MusicBarViewModel, refreshed by the same timer that
              already polls MusicPlayerRegistry.Controller for the title bar (see
              MainWindow.axaml.cs's UpdateTitleAsync). x:CompileBindings="False" here for the same
@@ -165,21 +165,10 @@
             </TabStrip>
 
             <Grid Grid.Row="1">
-                <!-- Whichever non-Music tab is selected — a plain ContentControl now that
-                     TabStrip no longer manages content itself; ViewLocator resolves the right
-                     view the same way it always did. -->
-                <ContentControl Content="{Binding SelectedTopLevelItem}" IsVisible="{Binding !IsMusicTabSelected}" />
-
-                <!-- Permanent overlay, not tab content — see MusicPlayerPanel's remarks for why:
-                     Avalonia's TabControl (and, if bound as normal content here, this
-                     ContentControl too) destroys/detaches non-selected content by default, which
-                     killed music playback the instant you switched away. This is created once and
-                     shown/hidden purely via IsVisible, so the underlying WebView — and playback —
-                     never stops, and (now that it only shares the content row, not the header
-                     row) never covers the other tabs either. -->
-                <ContentControl IsVisible="{Binding IsMusicTabSelected}">
-                    <views:MusicPlayerPanel DataContext="{Binding MusicTab}" />
-                </ContentControl>
+                <!-- Whichever tab is selected — a plain ContentControl since TabStrip doesn't
+                     manage content itself; ViewLocator resolves the right view, the Music tab
+                     included (Spotify plays outside Invigoration, so nothing needs keeping alive). -->
+                <ContentControl Content="{Binding SelectedTopLevelItem}" />
             </Grid>
         </Grid>
     </DockPanel>

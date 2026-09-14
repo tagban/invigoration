@@ -1,66 +1,88 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
+using Invigoration.Core.Config;
 
 namespace Invigoration.Core.Music;
 
 /// <summary>
-/// Which music service the embedded player tab remembers across restarts — global, not per-bot
-/// (same reasoning as MusicPlayerRegistry: one shared player for the whole app). A single small
-/// JSON file rather than IconOverrideStore's folder-of-files approach, since there's only one
-/// value to persist.
+/// The music settings — global, not per-bot (one shared Spotify connection, see
+/// MusicPlayerRegistry): whether the Music tab and player bar show, and the Spotify connection
+/// (the user's own app Client ID, and the saved sign-in). The refresh token is obfuscated at rest
+/// the same way bot passwords are; it's a sign-in, so it never goes anywhere but Spotify.
 /// </summary>
 public static class MusicSettingsStore
 {
-    private static string FilePath => Path.Combine(Config.ConfigStore.DefaultConfigDirectory(), "music-settings.json");
-
+    private static readonly Lock SyncRoot = new();
     private static StoredSettings? _cached;
 
-    public static MusicService SelectedService
-    {
-        get => Current.SelectedService;
-        set => Save(Current with { SelectedService = value });
-    }
+    /// <summary>Test hook: points the store at a scratch folder.</summary>
+    public static string? DirectoryOverride { get; set; }
 
-    /// <summary>Whether the Music tab shows at all — off by default is wrong here (the whole point is discoverability), on by default, toggled via the Customize menu for anyone who doesn't want it.</summary>
+    private static string FilePath => Path.Combine(DirectoryOverride ?? ConfigStore.DefaultConfigDirectory(), "music-settings.json");
+
+    /// <summary>Whether the Music tab shows at all — on by default (discoverability), toggled via the Customize menu.</summary>
     public static bool IsEnabled
     {
         get => Current.IsEnabled;
-        set => Save(Current with { IsEnabled = value });
+        set => Update(s => s with { IsEnabled = value });
     }
 
-    /// <summary>A thin persistent playback-control bar docked at the bottom of the whole window, visible no matter which top-level tab is showing — explicitly opt-in (off by default), for controlling playback without needing to switch to the Music tab.</summary>
+    /// <summary>A thin playback bar docked at the bottom of the whole window, visible whichever tab is showing — opt-in.</summary>
     public static bool ShowBottomBar
     {
         get => Current.ShowBottomBar;
-        set => Save(Current with { ShowBottomBar = value });
+        set => Update(s => s with { ShowBottomBar = value });
+    }
+
+    /// <summary>The Client ID of the user's own Spotify developer app.</summary>
+    public static string SpotifyClientId
+    {
+        get => Current.SpotifyClientId;
+        set => Update(s => s with { SpotifyClientId = value.Trim() });
+    }
+
+    /// <summary>The saved Spotify sign-in, or "" when not connected.</summary>
+    public static string SpotifyRefreshToken
+    {
+        get => Current.SpotifyRefreshToken;
+        set => Update(s => s with { SpotifyRefreshToken = value });
+    }
+
+    /// <summary>Test hook: forget what's loaded.</summary>
+    public static void ResetCacheForTests()
+    {
+        lock (SyncRoot)
+        {
+            _cached = null;
+        }
     }
 
     private static StoredSettings Current
     {
         get
         {
-            if (_cached is { } cached)
+            lock (SyncRoot)
             {
-                return cached;
+                return _cached ??= Load();
             }
-
-            var loaded = Load();
-            _cached = loaded;
-            return loaded;
         }
     }
 
-    private static void Save(StoredSettings settings)
+    private static void Update(Func<StoredSettings, StoredSettings> change)
     {
-        _cached = settings;
-        try
+        lock (SyncRoot)
         {
-            Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-            File.WriteAllText(FilePath, JsonSerializer.Serialize(settings));
-        }
-        catch (IOException)
-        {
-            // Best-effort — the in-memory cache still reflects the change for the rest of this
-            // run even if the write itself failed.
+            var settings = change(_cached ??= Load());
+            _cached = settings;
+            try
+            {
+                Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
+                File.WriteAllText(FilePath, JsonSerializer.Serialize(settings));
+            }
+            catch (IOException)
+            {
+                // Best-effort — the in-memory copy still has the change for the rest of this run.
+            }
         }
     }
 
@@ -68,19 +90,20 @@ public static class MusicSettingsStore
     {
         try
         {
-            if (!File.Exists(FilePath))
-            {
-                return new StoredSettings(MusicService.YouTubeMusic, true, false);
-            }
-
-            var stored = JsonSerializer.Deserialize<StoredSettings>(File.ReadAllText(FilePath));
-            return stored ?? new StoredSettings(MusicService.YouTubeMusic, true, false);
+            // Older files also carry a SelectedService from the retired embedded web player; it's ignored.
+            return File.Exists(FilePath)
+                ? JsonSerializer.Deserialize<StoredSettings>(File.ReadAllText(FilePath)) ?? new StoredSettings()
+                : new StoredSettings();
         }
         catch (Exception ex) when (ex is IOException or JsonException)
         {
-            return new StoredSettings(MusicService.YouTubeMusic, true, false);
+            return new StoredSettings();
         }
     }
 
-    private sealed record StoredSettings(MusicService SelectedService, bool IsEnabled, bool ShowBottomBar);
+    private sealed record StoredSettings(
+        bool IsEnabled = true,
+        bool ShowBottomBar = false,
+        string SpotifyClientId = "",
+        [property: JsonConverter(typeof(ObfuscatedPasswordJsonConverter))] string SpotifyRefreshToken = "");
 }

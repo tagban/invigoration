@@ -8,7 +8,7 @@ namespace Invigoration.App.ViewModels;
 
 /// <summary>
 /// Backs the optional bottom playback-control bar (MusicBarView) — a thin strip docked below the
-/// whole window's content, visible no matter which top-level tab is showing, so playback can be
+/// whole window's content, visible no matter which top-level tab is showing, so Spotify can be
 /// controlled without switching to the Music tab itself (explicit request, 2026-08-24: "it would
 /// make it easier to control if I'm looking at the bot"). Purely a read/act-through layer over
 /// MusicPlayerRegistry.Controller — refreshed by MainWindow.axaml.cs's existing title-bar polling
@@ -47,10 +47,7 @@ public sealed partial class MusicBarViewModel : ViewModelBase
 
         SupportsThumbsUp = controller.SupportsThumbsUp;
         SupportsThumbsDown = controller.SupportsThumbsDown;
-        ServiceIcon = GameIconLoader.Get(MusicSettingsStore.SelectedService switch
-        {
-            _ => "youtube-music",
-        });
+        ServiceIcon = GameIconLoader.Get("spotify");
 
         var nowPlaying = await controller.GetNowPlayingAsync().ConfigureAwait(true);
         HasNowPlaying = nowPlaying is not null;

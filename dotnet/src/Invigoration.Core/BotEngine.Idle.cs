@@ -79,8 +79,8 @@ public sealed partial class BotEngine
     /// %Ver%/%Uptime%/%MusicPlaying%/%Username% — resolved at send time (not when the message was
     /// typed into the config) so each reflects current state rather than whatever was true when
     /// the idle message was configured. %MusicPlaying% becomes "" (the placeholder just vanishes)
-    /// when nothing's playing or the music tab isn't open, rather than some broken-looking error
-    /// placeholder text.
+    /// when nothing's playing, it's paused, or Spotify isn't connected, rather than some
+    /// broken-looking error placeholder text.
     /// </summary>
     private async Task<string> ResolveIdlePlaceholdersAsync(string template)
     {
@@ -90,7 +90,7 @@ public sealed partial class BotEngine
             nowPlaying = await controller.GetNowPlayingAsync().ConfigureAwait(false);
         }
 
-        var musicText = nowPlaying is null ? "" : $"{nowPlaying.Title} by {nowPlaying.Artist}";
+        var musicText = nowPlaying is { IsPlaying: true } ? $"{nowPlaying.Title} by {nowPlaying.Artist}" : "";
 
         return template
             .Replace("%Ver%", AppVersion.Current, StringComparison.OrdinalIgnoreCase)
