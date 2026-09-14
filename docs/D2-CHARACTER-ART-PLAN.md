@@ -76,10 +76,14 @@ and never committed to either repo.
   portrait tiles, and the download stays available later from the Config window / Manage Themes.
   Nothing is downloaded without that yes.
 - Minimal BNFTP client (also unblocks the ad banner).
-- **Download once, keep it.** D2 1.14d's art never changes, so there are no update checks: the
-  pack is stored in the config folder and used on **every** server from then on, including ones
-  that don't serve a pack. The only reason to fetch again is an Invigoration update that needs a
-  newer pack format version — and then it asks again rather than downloading on its own.
+- **Download once, keep it.** The files are stored in the config folder and used on **every**
+  server from then on, including ones that don't serve them. **Updated (2026-09-14):** while
+  logged on to a server that serves them, Invigoration asks `SID_GETFILETIME` (0x33) for each
+  file's time and re-fetches only one that's newer than the stored copy (the server rewrites a file
+  only when its contents change). Both the download and the time check go **only to `us.bnet.cc`**
+  for now, so an unfamiliar request never reaches a PvPGN or other server that might mishandle it.
+- File formats, the BNFTP exchange and the drawing rules, written for any bot:
+  [`D2-CHARACTER-DATA-FOR-BOTS.md`](D2-CHARACTER-DATA-FOR-BOTS.md).
 - Validate before use (magic, version, hash, bounds on every count and offset — it's data from
   the network).
 - Nothing is sent but the file request; no identity beyond the normal connection.
@@ -106,6 +110,7 @@ and never committed to either repo.
   steers away from; GitHub also acts on DMCA notices, which could take the repo down with it. So
   us.bnet.cc stays the primary source; GitHub only if that trade-off is accepted deliberately.
 - Whether other (non-Command Center) servers should be able to host a pack too — the format
-  would allow it.
+  would allow it. Planned: the files will also be hosted with documentation so other servers and bots can
+  adopt them; the trusted-server list grows from there.
 - Whether Invigoration should also build a pack from a local D2 install for people who never
   connect to a Command Center node.
