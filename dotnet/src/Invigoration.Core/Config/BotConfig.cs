@@ -372,5 +372,13 @@ public sealed class DiscordBridgeConfig
     public bool RelayBattlenetToDiscord { get; set; } = true;
 
     public bool RelayDiscordToBattlenet { get; set; } = true;
+
+    /// <summary>
+    /// Post Battle.net chat on Discord as the person who said it — their Battle.net name as the
+    /// author and their game's classic logo as the avatar — through a webhook the relay creates in
+    /// the channel. Needs the Discord bot to have the Manage Webhooks permission there; without it
+    /// (or for a name Discord won't accept) messages fall back to "**name**: message" from the bot.
+    /// </summary>
+    public bool PostAsBattlenetUsers { get; set; } = true;
 }
 

@@ -371,6 +371,9 @@
                     <TextBox PlaceholderText="Relay delay (seconds)" Text="{Binding Config.Discord.RelayDelaySeconds}" />
                     <CheckBox Content="Relay Battle.net chat to Discord" IsChecked="{Binding Config.Discord.RelayBattlenetToDiscord}" />
                     <CheckBox Content="Relay Discord messages to Battle.net" IsChecked="{Binding Config.Discord.RelayDiscordToBattlenet}" />
+                    <CheckBox Content="Post on Discord as the Battle.net user, with their game logo" IsChecked="{Binding Config.Discord.PostAsBattlenetUsers}" />
+                    <TextBlock TextWrapping="Wrap" Opacity="0.6" FontSize="11"
+                               Text="Each Battle.net line appears on Discord under the speaker's own name with their game's classic Battle.net logo as the avatar, instead of all coming from the bot. Needs the Discord bot to have the Manage Webhooks permission in that channel (it creates a webhook named &quot;Invigoration Relay&quot;); without it, lines post from the bot as before. @everyone and other mentions from Battle.net never ping anyone." />
                     <TextBlock TextWrapping="Wrap" Opacity="0.7" FontSize="11" Foreground="Orange" Margin="0,4,0,0"
                                Text="Requires the bot application's 'Message Content' privileged gateway intent to be turned on in the Discord Developer Portal (Bot page) — without it, other users' messages arrive empty and nothing relays. The channel ID is the numeric ID Discord shows when you right-click a channel with Developer Mode on (User Settings → Advanced)." />
                 </StackPanel>

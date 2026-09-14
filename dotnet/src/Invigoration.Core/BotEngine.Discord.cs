@@ -161,7 +161,17 @@ public sealed partial class BotEngine
 
             _nextBattlenetToDiscordAllowedUtc = DateTime.UtcNow.AddSeconds(Math.Max(0, Config.Discord.RelayDelaySeconds));
             var prefix = chatEvent.Type == ChatEventType.Emote ? "*" : "";
-            await bridge.SendAsync($"**{chatEvent.Username}**: {prefix}{chatEvent.Text}{prefix}").ConfigureAwait(false);
+            var text = $"{prefix}{chatEvent.Text}{prefix}";
+            if (Config.Discord.PostAsBattlenetUsers)
+            {
+                // Posted as the speaker, with their game's classic logo as the avatar — see DiscordWebhookIdentity.
+                _lastKnownProduct.TryGetValue(chatEvent.Username, out var product);
+                await bridge.SendAsAsync(chatEvent.Username, DiscordWebhookIdentity.AvatarUrlFor(product), text).ConfigureAwait(false);
+            }
+            else
+            {
+                await bridge.SendAsync($"**{chatEvent.Username}**: {text}").ConfigureAwait(false);
+            }
         }
         catch (Exception ex)
         {
