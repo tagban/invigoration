@@ -27,7 +27,7 @@ internal sealed class SpotifyTestHttp : HttpMessageHandler
         var body = request.Content is null ? "" : await request.Content.ReadAsStringAsync(cancellationToken);
         lock (Requests)
         {
-            Requests.Add((request.Method, request.RequestUri!.ToString(), body, request.Headers.Authorization?.ToString()));
+            Requests.Add((request.Method, request.RequestUri!.AbsoluteUri, body, request.Headers.Authorization?.ToString()));
         }
 
         return _respond(request, body);

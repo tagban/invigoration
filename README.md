@@ -57,12 +57,12 @@ Three switchable bundled icon sets — Battle.net 1.0 Classic, Warcraft III Clas
 
 ### Music player
 
-Control your Spotify from Invigoration and from chat (`skip`/`pause`/`thumbsup`/`nowplaying`, plus `%MusicPlaying%` in idle messages). Spotify keeps playing wherever you already listen — the Spotify app, your phone, a speaker — and the Music tab shows what's on with album art, play/pause, skip and save. An optional playback bar docks at the bottom of the window so you can control it from any bot tab.
+Control your Spotify from Invigoration and from chat (`skip`/`pause`/`thumbsup`/`nowplaying`, plus `%MusicPlaying%` in idle messages). Spotify keeps playing wherever you already listen — the Spotify app, your phone, a speaker — and the Music tab shows what's on with album art, play/pause, skip and save, plus search with Play and Queue. Nothing open to play on? Start Spotify opens it (the Mac app quietly in the background if you have it, otherwise the web player) and starts the music. An optional playback bar docks at the bottom of the window so you can control it from any bot tab.
 
 Setup is one-time: create an app on the [Spotify developer dashboard](https://developer.spotify.com/dashboard) (Spotify requires Premium on the account that owns it), add the redirect URI `http://127.0.0.1:43117/callback`, and paste its Client ID into the Music tab. Sign-in happens in your browser; Invigoration never sees your Spotify password.
 
 <p align="center">
-  <img src="screenshots/music-tab.png" width="380" alt="Music tab showing the track playing on Spotify, with save, play/pause and skip">
+  <img src="screenshots/music-tab.png" width="620" alt="Music tab: the track playing on Spotify with save, play/pause and skip, beside search results with Play and Queue">
 </p>
 
 ### StarCraft II (SC:Remastered / WC3:Reforged coming soon)

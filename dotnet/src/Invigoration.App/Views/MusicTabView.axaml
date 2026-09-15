@@ -36,6 +36,9 @@
             <Setter Property="Height" Value="60" />
             <Setter Property="CornerRadius" Value="30" />
         </Style>
+        <Style Selector="Border.result:pointerover">
+            <Setter Property="Background" Value="#242424" />
+        </Style>
         <Style Selector="TextBlock.step">
             <Setter Property="Foreground" Value="#CFCFCF" />
             <Setter Property="TextWrapping" Value="Wrap" />
@@ -45,10 +48,10 @@
 
     <Border Background="#121212">
         <ScrollViewer HorizontalScrollBarVisibility="Disabled">
-            <Grid MaxWidth="560" Margin="24,28" HorizontalAlignment="Center">
+            <Grid MaxWidth="1040" Margin="24,28">
 
                 <!-- Not connected: how to make a Spotify app, then sign in. -->
-                <StackPanel Spacing="14" IsVisible="{Binding ShowsSetup}">
+                <StackPanel Spacing="14" MaxWidth="560" HorizontalAlignment="Center" IsVisible="{Binding ShowsSetup}">
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Image Source="{Binding TabIconImage}" Width="40" Height="40" />
                         <TextBlock Text="Connect Spotify" FontSize="26" FontWeight="Bold" Foreground="White" VerticalAlignment="Center" />
@@ -78,47 +81,90 @@
                     <TextBlock Text="{Binding StatusText}" Foreground="#A7A7A7" TextWrapping="Wrap" />
                 </StackPanel>
 
-                <!-- Connected: what's playing, with controls. -->
-                <StackPanel Spacing="16" IsVisible="{Binding IsConnected}" HorizontalAlignment="Center">
-                    <Border Width="320" Height="320" CornerRadius="8" ClipToBounds="True" Background="#282828" HorizontalAlignment="Center">
-                        <Panel>
-                            <Image Source="{Binding Artwork}" Stretch="UniformToFill" />
-                            <Image Source="{Binding TabIconImage}" Width="96" Height="96" Opacity="0.35"
-                                   IsVisible="{Binding Artwork, Converter={x:Static ObjectConverters.IsNull}}" />
-                        </Panel>
-                    </Border>
+                <!-- Connected: what's playing on the left, search on the right. -->
+                <Grid ColumnDefinitions="360,*" ColumnSpacing="36" IsVisible="{Binding IsConnected}">
+                    <StackPanel Grid.Column="0" Spacing="16">
+                        <Border Width="320" Height="320" CornerRadius="8" ClipToBounds="True" Background="#282828" HorizontalAlignment="Center">
+                            <Panel>
+                                <Image Source="{Binding Artwork}" Stretch="UniformToFill" />
+                                <Image Source="{Binding TabIconImage}" Width="96" Height="96" Opacity="0.35"
+                                       IsVisible="{Binding Artwork, Converter={x:Static ObjectConverters.IsNull}}" />
+                            </Panel>
+                        </Border>
 
-                    <StackPanel Spacing="4" IsVisible="{Binding HasTrack}" HorizontalAlignment="Center">
-                        <TextBlock Text="{Binding TrackTitle}" FontSize="22" FontWeight="Bold" Foreground="White"
-                                   TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
-                        <TextBlock Text="{Binding Artist}" FontSize="15" Foreground="#B3B3B3" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
-                        <TextBlock Text="{Binding Album}" FontSize="12" Foreground="#7A7A7A" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
+                        <StackPanel Spacing="4" IsVisible="{Binding HasTrack}" HorizontalAlignment="Center">
+                            <TextBlock Text="{Binding TrackTitle}" FontSize="22" FontWeight="Bold" Foreground="White"
+                                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="340" />
+                            <TextBlock Text="{Binding Artist}" FontSize="15" Foreground="#B3B3B3" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="340" />
+                            <TextBlock Text="{Binding Album}" FontSize="12" Foreground="#7A7A7A" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="340" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="10" IsVisible="{Binding HasNothingPlaying}" HorizontalAlignment="Center">
+                            <TextBlock Text="Nothing playing" FontSize="20" FontWeight="Bold" Foreground="White" TextAlignment="Center" />
+                            <TextBlock Text="Start where you left off, or search for something to play." Foreground="#A7A7A7"
+                                       TextAlignment="Center" TextWrapping="Wrap" MaxWidth="320" />
+                            <Button Classes="spotify" Content="Start Spotify" Command="{Binding StartSpotifyCommand}" HorizontalAlignment="Center" />
+                        </StackPanel>
+
+                        <StackPanel Spacing="4" Width="320" IsVisible="{Binding HasTrack}">
+                            <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" Height="4" MinHeight="4"
+                                         Foreground="#1ED760" Background="#3A3A3A" CornerRadius="2" />
+                            <Grid ColumnDefinitions="*,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding DeviceText}" FontSize="11" Foreground="#1ED760" TextTrimming="CharacterEllipsis" />
+                                <TextBlock Grid.Column="1" Text="{Binding TimeText}" FontSize="11" Foreground="#A7A7A7" />
+                            </Grid>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="18" HorizontalAlignment="Center" IsVisible="{Binding HasTrack}">
+                            <Button Classes="transport" Content="♡" Command="{Binding SaveCommand}" ToolTip.Tip="Save to your Spotify library" />
+                            <Button Classes="transport primary" Content="{Binding PlayPauseGlyph}" Command="{Binding PlayPauseCommand}" ToolTip.Tip="Play/Pause" />
+                            <Button Classes="transport" Content="⏭" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding StatusText}" Foreground="#A7A7A7" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="340" />
+                        <Button Content="Disconnect Spotify" Command="{Binding DisconnectCommand}" HorizontalAlignment="Center"
+                                Background="Transparent" Foreground="#7A7A7A" FontSize="11" />
                     </StackPanel>
 
-                    <StackPanel Spacing="4" IsVisible="{Binding HasNothingPlaying}" HorizontalAlignment="Center">
-                        <TextBlock Text="Nothing playing" FontSize="20" FontWeight="Bold" Foreground="White" TextAlignment="Center" />
-                        <TextBlock Text="Start something in the Spotify app and it'll show up here." Foreground="#A7A7A7" TextAlignment="Center" />
-                    </StackPanel>
-
-                    <StackPanel Spacing="4" Width="420" IsVisible="{Binding HasTrack}">
-                        <ProgressBar Value="{Binding Progress}" Minimum="0" Maximum="1" Height="4" MinHeight="4"
-                                     Foreground="#1ED760" Background="#3A3A3A" CornerRadius="2" />
-                        <Grid ColumnDefinitions="*,Auto">
-                            <TextBlock Grid.Column="0" Text="{Binding DeviceText}" FontSize="11" Foreground="#1ED760" />
-                            <TextBlock Grid.Column="1" Text="{Binding TimeText}" FontSize="11" Foreground="#A7A7A7" />
+                    <StackPanel Grid.Column="1" Spacing="12">
+                        <TextBlock Text="Search" FontSize="22" FontWeight="Bold" Foreground="White" />
+                        <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                            <TextBox Grid.Column="0" Text="{Binding SearchQuery}" PlaceholderText="Songs or artists">
+                                <TextBox.KeyBindings>
+                                    <KeyBinding Gesture="Enter" Command="{Binding SearchCommand}" />
+                                </TextBox.KeyBindings>
+                            </TextBox>
+                            <Button Grid.Column="1" Classes="spotify" Content="Search" Command="{Binding SearchCommand}" Padding="18,6" />
                         </Grid>
+                        <TextBlock Text="{Binding SearchStatus}" Foreground="#A7A7A7" TextWrapping="Wrap"
+                                   IsVisible="{Binding SearchStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <ItemsControl ItemsSource="{Binding SearchResults}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Spacing="2" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="vm:MusicSearchResultViewModel">
+                                    <Border Classes="result" Padding="6" CornerRadius="6">
+                                        <Grid ColumnDefinitions="48,*,Auto,Auto,Auto" ColumnSpacing="12">
+                                            <Border Grid.Column="0" Width="48" Height="48" CornerRadius="4" ClipToBounds="True" Background="#282828">
+                                                <Image Source="{Binding Artwork}" Stretch="UniformToFill" />
+                                            </Border>
+                                            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="2">
+                                                <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                <TextBlock Text="{Binding Artist}" Foreground="#A7A7A7" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                            </StackPanel>
+                                            <TextBlock Grid.Column="2" Text="{Binding DurationText}" Foreground="#7A7A7A" FontSize="12" VerticalAlignment="Center" />
+                                            <Button Grid.Column="3" Classes="spotify" Content="Play" Command="{Binding PlayCommand}" Padding="14,5" VerticalAlignment="Center" />
+                                            <Button Grid.Column="4" Content="Queue" Command="{Binding QueueCommand}" VerticalAlignment="Center" />
+                                        </Grid>
+                                    </Border>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
                     </StackPanel>
-
-                    <StackPanel Orientation="Horizontal" Spacing="18" HorizontalAlignment="Center">
-                        <Button Classes="transport" Content="♡" Command="{Binding SaveCommand}" ToolTip.Tip="Save to your Spotify library" />
-                        <Button Classes="transport primary" Content="{Binding PlayPauseGlyph}" Command="{Binding PlayPauseCommand}" ToolTip.Tip="Play/Pause" />
-                        <Button Classes="transport" Content="⏭" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
-                    </StackPanel>
-
-                    <TextBlock Text="{Binding StatusText}" Foreground="#A7A7A7" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="480" />
-                    <Button Content="Disconnect Spotify" Command="{Binding DisconnectCommand}" HorizontalAlignment="Center"
-                            Background="Transparent" Foreground="#7A7A7A" FontSize="11" />
-                </StackPanel>
+                </Grid>
             </Grid>
         </ScrollViewer>
     </Border>

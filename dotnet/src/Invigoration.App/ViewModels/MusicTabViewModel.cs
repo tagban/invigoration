@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
@@ -21,7 +22,12 @@ public sealed partial class MusicTabViewModel : ViewModelBase
 {
     public const string DeveloperDashboardUrl = "https://developer.spotify.com/dashboard";
 
+    public const string WebPlayerUrl = "https://open.spotify.com";
+
     private static readonly TimeSpan SignInTimeout = TimeSpan.FromMinutes(5);
+
+    /// <summary>How long Start waits for a Spotify app it opened to come online.</summary>
+    private static readonly TimeSpan StartTimeout = TimeSpan.FromSeconds(30);
 
     private CancellationTokenSource? _connectCts;
     private string? _artworkUrl;
@@ -107,6 +113,26 @@ public sealed partial class MusicTabViewModel : ViewModelBase
     [ObservableProperty]
     public partial string TimeText { get; set; } = "";
 
+    // --- Search ---
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
+    public partial string SearchQuery { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(SearchCommand))]
+    public partial bool IsSearching { get; set; }
+
+    [ObservableProperty]
+    public partial string SearchStatus { get; set; } = "";
+
+    public ObservableCollection<MusicSearchResultViewModel> SearchResults { get; } = [];
+
+    /// <summary>True while Start is opening Spotify and waiting for it.</summary>
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(StartSpotifyCommand))]
+    public partial bool IsStarting { get; set; }
+
     private bool CanConnect() => !IsConnecting && ClientId.Trim().Length > 0;
 
     /// <summary>Opens Spotify's sign-in in the browser and waits for it to come back to this machine.</summary>
@@ -168,6 +194,8 @@ public sealed partial class MusicTabViewModel : ViewModelBase
         MusicPlayerRegistry.Controller = null;
         IsConnected = false;
         ClearTrack();
+        SearchResults.Clear();
+        SearchStatus = "";
         StatusText = "Disconnected from Spotify.";
     }
 
@@ -175,13 +203,62 @@ public sealed partial class MusicTabViewModel : ViewModelBase
     private static void OpenDeveloperDashboard() => OpenInBrowser(DeveloperDashboardUrl);
 
     [RelayCommand]
-    private Task PlayPause() => ActAsync(c => c.PlayPauseAsync());
+    private Task PlayPause() => ActAsync(c => c.PlayPauseAsync(), startSpotifyIfClosed: true);
 
     [RelayCommand]
     private Task Skip() => ActAsync(c => c.SkipAsync());
 
     [RelayCommand]
     private Task Save() => ActAsync(c => c.ThumbsUpAsync(), "Saved to your Spotify library.");
+
+    private bool CanSearch() => !IsSearching && SearchQuery.Trim().Length > 0;
+
+    [RelayCommand(CanExecute = nameof(CanSearch))]
+    private async Task SearchAsync()
+    {
+        if (MusicPlayerRegistry.Controller is not SpotifyController controller)
+        {
+            return;
+        }
+
+        IsSearching = true;
+        SearchStatus = "Searching…";
+        try
+        {
+            var tracks = await controller.SearchTracksAsync(SearchQuery);
+            SearchResults.Clear();
+            if (tracks is null)
+            {
+                SearchStatus = controller.LastError ?? "Search didn't work.";
+                return;
+            }
+
+            foreach (var track in tracks)
+            {
+                var result = new MusicSearchResultViewModel(track, PlayTrackAsync, QueueTrackAsync);
+                SearchResults.Add(result);
+                _ = result.LoadArtworkAsync();
+            }
+
+            SearchStatus = tracks.Count == 0 ? "No tracks found." : "";
+        }
+        finally
+        {
+            IsSearching = false;
+        }
+    }
+
+    private Task PlayTrackAsync(SpotifyTrack track) =>
+        ActAsync(c => ((SpotifyController)c).PlayTrackAsync(track.Uri), $"Playing {track.Title}.", startSpotifyIfClosed: true);
+
+    private Task QueueTrackAsync(SpotifyTrack track) =>
+        ActAsync(c => ((SpotifyController)c).QueueTrackAsync(track.Uri), $"Added {track.Title} to the queue.", startSpotifyIfClosed: true);
+
+    private bool CanStartSpotify() => !IsStarting;
+
+    /// <summary>Opens Spotify (see OpenSpotify), waits for it to come online, and starts playing where it left off.</summary>
+    [RelayCommand(CanExecute = nameof(CanStartSpotify))]
+    private Task StartSpotify() => ActAsync(c => ((SpotifyController)c).ResumeAsync(), startSpotifyIfClosed: true);
 
     /// <summary>Reads what's playing — polled by the Music tab while it's showing.</summary>
     public async Task RefreshAsync()
@@ -228,7 +305,8 @@ public sealed partial class MusicTabViewModel : ViewModelBase
         IsConnected = true;
     }
 
-    private async Task ActAsync(Func<IMusicPlayerController, Task<bool>> action, string? successText = null)
+    /// <param name="startSpotifyIfClosed">When the action fails because no Spotify app is open, open one, wait for it, and try again.</param>
+    private async Task ActAsync(Func<IMusicPlayerController, Task<bool>> action, string? successText = null, bool startSpotifyIfClosed = false)
     {
         if (MusicPlayerRegistry.Controller is not { } controller)
         {
@@ -236,8 +314,66 @@ public sealed partial class MusicTabViewModel : ViewModelBase
         }
 
         var ok = await action(controller);
+        if (!ok && startSpotifyIfClosed && controller is SpotifyController { NoDeviceOpen: true } spotify && !IsStarting)
+        {
+            IsStarting = true;
+            try
+            {
+                StatusText = "Opening Spotify…";
+                OpenSpotify();
+                var deadline = DateTimeOffset.UtcNow + StartTimeout;
+                while (DateTimeOffset.UtcNow < deadline && !await spotify.HasOpenDeviceAsync())
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                }
+
+                ok = await action(controller);
+                if (!ok && spotify.NoDeviceOpen)
+                {
+                    StatusText = "Spotify didn't come online. If it opened in your browser, sign in there, then press play again.";
+                    await RefreshAsync();
+                    return;
+                }
+            }
+            finally
+            {
+                IsStarting = false;
+            }
+        }
+
         StatusText = ok ? successText ?? "" : controller.LastError ?? "That didn't work.";
         await RefreshAsync();
+    }
+
+    /// <summary>
+    /// Opens something Spotify can play on: on a Mac, the Spotify app if it's installed — hidden and
+    /// in the background, so the music just starts — otherwise the web player in the default browser.
+    /// Elsewhere, the Spotify app via its spotify: link, which the OS hands to the web player's site
+    /// if the app isn't there.
+    /// </summary>
+    private static void OpenSpotify()
+    {
+        try
+        {
+            if (OperatingSystem.IsMacOS())
+            {
+                var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+                if (Directory.Exists("/Applications/Spotify.app") || Directory.Exists(Path.Combine(home, "Applications", "Spotify.app")))
+                {
+                    Process.Start("open", ["-g", "-j", "-a", "Spotify"]);
+                    return;
+                }
+
+                OpenInBrowser(WebPlayerUrl);
+                return;
+            }
+
+            OpenInBrowser("spotify:");
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException)
+        {
+            OpenInBrowser(WebPlayerUrl);
+        }
     }
 
     private void ClearTrack()

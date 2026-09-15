@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 
 namespace Invigoration.Core.Music.Spotify;
@@ -21,6 +22,9 @@ public sealed class SpotifyController : IMusicPlayerController
 {
     public const string ServiceName = "Spotify";
     public const string ApiBase = "https://api.spotify.com/v1/";
+
+    /// <summary>The most results one search can return: Spotify's cap for development-mode apps since February 2026.</summary>
+    public const int MaxSearchResults = 10;
 
     private static readonly TimeSpan NowPlayingCacheLifetime = TimeSpan.FromSeconds(2);
 
@@ -55,6 +59,9 @@ public sealed class SpotifyController : IMusicPlayerController
     /// <summary>True once Spotify has revoked or expired the saved sign-in: nothing will work again until the user reconnects.</summary>
     public bool SignInExpired { get; private set; }
 
+    /// <summary>True after an action failed because none of the user's Spotify apps was open to play on — the cue to open one (see the Music tab's Start).</summary>
+    public bool NoDeviceOpen { get; private set; }
+
     /// <summary>Spotify has "save to your library" (the heart) but no dislike.</summary>
     public bool SupportsThumbsDown => false;
 
@@ -84,13 +91,10 @@ public sealed class SpotifyController : IMusicPlayerController
             return false;
         }
 
-        if (current is null)
-        {
-            LastError = "Nothing is playing on Spotify — start something in the Spotify app first.";
-            return false;
-        }
-
-        return await SendAsync(HttpMethod.Put, current.IsPlaying ? "me/player/pause" : "me/player/play").ConfigureAwait(false);
+        // Nothing loaded anywhere: resume the last session on whichever Spotify app is open.
+        return current is null
+            ? await ResumeAsync().ConfigureAwait(false)
+            : await SendAsync(HttpMethod.Put, current.IsPlaying ? "me/player/pause" : "me/player/play").ConfigureAwait(false);
     }
 
     /// <summary>Saves the current track (or episode) to the user's Spotify library — Spotify's heart.</summary>
@@ -116,6 +120,109 @@ public sealed class SpotifyController : IMusicPlayerController
     {
         LastError = "Spotify doesn't have a dislike.";
         return Task.FromResult(false);
+    }
+
+    /// <summary>Finds tracks by name, artist or both. Null (with LastError set) when Spotify couldn't be asked.</summary>
+    public async Task<IReadOnlyList<SpotifyTrack>?> SearchTracksAsync(string query)
+    {
+        query = query.Trim();
+        if (query.Length == 0)
+        {
+            return [];
+        }
+
+        using var response = await CallAsync(HttpMethod.Get, $"search?type=track&limit={MaxSearchResults}&q={Uri.EscapeDataString(query)}").ConfigureAwait(false);
+        if (response is null)
+        {
+            return null;
+        }
+
+        if (!response.IsSuccessStatusCode)
+        {
+            LastError = await DescribeFailureAsync(response).ConfigureAwait(false);
+            return null;
+        }
+
+        try
+        {
+            var tracks = ParseTrackSearch(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+            LastError = null;
+            return tracks;
+        }
+        catch (Exception ex) when (ex is JsonException or InvalidOperationException or KeyNotFoundException)
+        {
+            LastError = "Spotify sent something unexpected.";
+            return null;
+        }
+    }
+
+    /// <summary>Resumes playback — the last session, on the active device or else an open Spotify app.</summary>
+    public Task<bool> ResumeAsync() => SendToDeviceAsync(HttpMethod.Put, "me/player/play", null);
+
+    /// <summary>Whether any of the user's Spotify apps is open and can be told to play.</summary>
+    public async Task<bool> HasOpenDeviceAsync() => await FindDeviceAsync().ConfigureAwait(false) is not null;
+
+    /// <summary>Plays a track now, in place of whatever's playing. With nothing playing anywhere, starts it on one of the user's open Spotify apps.</summary>
+    public Task<bool> PlayTrackAsync(string uri) =>
+        SendToDeviceAsync(HttpMethod.Put, "me/player/play", JsonSerializer.Serialize(new { uris = new[] { uri } }));
+
+    /// <summary>Adds a track to play next. With nothing playing anywhere there's no queue to add to, so it just plays.</summary>
+    public async Task<bool> QueueTrackAsync(string uri)
+    {
+        using var response = await CallAsync(HttpMethod.Post, $"me/player/queue?uri={Uri.EscapeDataString(uri)}").ConfigureAwait(false);
+        if (response is null)
+        {
+            return false;
+        }
+
+        _nowPlayingCache = null;
+        if (response.IsSuccessStatusCode)
+        {
+            LastError = null;
+            return true;
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound)
+        {
+            return await PlayTrackAsync(uri).ConfigureAwait(false);
+        }
+
+        LastError = await DescribeFailureAsync(response).ConfigureAwait(false);
+        return false;
+    }
+
+    /// <summary>Reads a GET /search?type=track reply.</summary>
+    public static IReadOnlyList<SpotifyTrack> ParseTrackSearch(string json)
+    {
+        using var document = JsonDocument.Parse(json);
+        if (!document.RootElement.TryGetProperty("tracks", out var tracks) ||
+            !tracks.TryGetProperty("items", out var items) || items.ValueKind != JsonValueKind.Array)
+        {
+            return [];
+        }
+
+        var results = new List<SpotifyTrack>();
+        foreach (var item in items.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.Object || String(item, "uri") is not { Length: > 0 } uri)
+            {
+                continue;
+            }
+
+            var artists = item.TryGetProperty("artists", out var a) && a.ValueKind == JsonValueKind.Array
+                ? string.Join(", ", a.EnumerateArray().Select(x => String(x, "name")).Where(n => n.Length > 0))
+                : "";
+            var album = item.TryGetProperty("album", out var al) && al.ValueKind == JsonValueKind.Object ? al : default;
+            results.Add(new SpotifyTrack(
+                uri,
+                String(item, "name"),
+                artists,
+                album.ValueKind == JsonValueKind.Object ? String(album, "name") : "",
+                album.ValueKind == JsonValueKind.Object ? SmallestImage(album) : null,
+                item.TryGetProperty("duration_ms", out var d) && d.TryGetInt64(out var ms) ? ms : 0));
+        }
+
+        return results;
     }
 
     /// <returns>What's playing (null when nothing is), and whether Spotify could be asked at all.</returns>
@@ -211,6 +318,82 @@ public sealed class SpotifyController : IMusicPlayerController
             };
     }
 
+    /// <summary>
+    /// Like <see cref="SendAsync"/>, but when Spotify says there's no active device (nothing
+    /// playing anywhere), picks one of the user's open Spotify apps and sends it there instead.
+    /// </summary>
+    private async Task<bool> SendToDeviceAsync(HttpMethod method, string path, string? json)
+    {
+        using var response = await CallAsync(method, path, json).ConfigureAwait(false);
+        if (response is null)
+        {
+            return false;
+        }
+
+        _nowPlayingCache = null;
+        NoDeviceOpen = false;
+        if (response.IsSuccessStatusCode)
+        {
+            LastError = null;
+            return true;
+        }
+
+        if (response.StatusCode == HttpStatusCode.NotFound && await FindDeviceAsync().ConfigureAwait(false) is { } deviceId)
+        {
+            var separator = path.Contains('?') ? '&' : '?';
+            using var retry = await CallAsync(method, $"{path}{separator}device_id={Uri.EscapeDataString(deviceId)}", json).ConfigureAwait(false);
+            if (retry is null)
+            {
+                return false;
+            }
+
+            if (retry.IsSuccessStatusCode)
+            {
+                LastError = null;
+                return true;
+            }
+
+            LastError = await DescribeFailureAsync(retry).ConfigureAwait(false);
+            return false;
+        }
+
+        NoDeviceOpen = response.StatusCode == HttpStatusCode.NotFound;
+        LastError = NoDeviceOpen
+            ? "No Spotify app is open to play on — open Spotify on this computer or your phone first."
+            : await DescribeFailureAsync(response).ConfigureAwait(false);
+        return false;
+    }
+
+    /// <summary>One of the user's Spotify devices that can be told to play: the active one, else a computer, else any.</summary>
+    private async Task<string?> FindDeviceAsync()
+    {
+        using var response = await CallAsync(HttpMethod.Get, "me/player/devices").ConfigureAwait(false);
+        if (response is not { IsSuccessStatusCode: true })
+        {
+            return null;
+        }
+
+        try
+        {
+            using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync().ConfigureAwait(false));
+            if (!document.RootElement.TryGetProperty("devices", out var devices) || devices.ValueKind != JsonValueKind.Array)
+            {
+                return null;
+            }
+
+            return devices.EnumerateArray()
+                .Where(d => String(d, "id").Length > 0 && !(d.TryGetProperty("is_restricted", out var r) && r.ValueKind == JsonValueKind.True))
+                .OrderByDescending(d => d.TryGetProperty("is_active", out var active) && active.ValueKind == JsonValueKind.True)
+                .ThenByDescending(d => String(d, "type") == "Computer")
+                .Select(d => String(d, "id"))
+                .FirstOrDefault();
+        }
+        catch (JsonException)
+        {
+            return null;
+        }
+    }
+
     private async Task<bool> SendAsync(HttpMethod method, string path)
     {
         using var response = await CallAsync(method, path).ConfigureAwait(false);
@@ -231,7 +414,7 @@ public sealed class SpotifyController : IMusicPlayerController
     }
 
     /// <summary>Makes one API call with a current access token, renewing it and trying once more if Spotify says it's no longer valid. Null (with LastError set) when Spotify couldn't be asked.</summary>
-    private async Task<HttpResponseMessage?> CallAsync(HttpMethod method, string path)
+    private async Task<HttpResponseMessage?> CallAsync(HttpMethod method, string path, string? json = null)
     {
         for (var attempt = 0; attempt < 2; attempt++)
         {
@@ -249,7 +432,11 @@ public sealed class SpotifyController : IMusicPlayerController
 
             using var request = new HttpRequestMessage(method, ApiBase + path);
             request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", accessToken);
-            if (method != HttpMethod.Get)
+            if (json is not null)
+            {
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            }
+            else if (method != HttpMethod.Get)
             {
                 request.Content = new ByteArrayContent([]);
             }
@@ -334,6 +521,17 @@ public sealed class SpotifyController : IMusicPlayerController
 
     private static string String(JsonElement element, string property) =>
         element.TryGetProperty(property, out var value) && value.ValueKind == JsonValueKind.String ? value.GetString() ?? "" : "";
+
+    /// <summary>The smallest image that's still at least thumbnail size (64px), for search results.</summary>
+    private static string? SmallestImage(JsonElement element) =>
+        element.TryGetProperty("images", out var images) && images.ValueKind == JsonValueKind.Array
+            ? images.EnumerateArray()
+                .Select(i => (Url: String(i, "url"), Width: i.TryGetProperty("width", out var w) && w.TryGetInt32(out var width) ? width : 0))
+                .Where(i => i.Url.Length > 0)
+                .OrderBy(i => i.Width >= 64 ? i.Width : int.MaxValue)
+                .Select(i => i.Url)
+                .FirstOrDefault()
+            : null;
 
     /// <summary>Spotify lists images largest first; take the widest regardless.</summary>
     private static string? LargestImage(JsonElement element) =>

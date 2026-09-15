@@ -195,6 +195,109 @@ public class SpotifyControllerTests
         Assert.True(controller.SignInExpired);
         Assert.Contains("reconnect Spotify", controller.LastError);
     }
+
+    private const string SearchReply = """
+        {"tracks":{"items":[
+          {"uri":"spotify:track:t1","name":"Pink Pony Club","duration_ms":258000,"artists":[{"name":"Chappell Roan"}],
+           "album":{"name":"Midwest Princess","images":[{"url":"https://i/640","width":640},{"url":"https://i/300","width":300},{"url":"https://i/64","width":64}]}},
+          null,
+          {"uri":"spotify:track:t2","name":"Casual","duration_ms":232000,"artists":[{"name":"Chappell Roan"},{"name":"Other"}],"album":{"name":"Midwest Princess","images":[]}}
+        ]}}
+        """;
+
+    [Fact]
+    public async Task Search_AsksForTracksWithinSpotifysLimit_AndReadsThem()
+    {
+        var (controller, http, _) = Connect(_ => SpotifyTestHttp.Json(SearchReply));
+
+        var tracks = await controller.SearchTracksAsync("  pink pony club ");
+
+        Assert.Equal((HttpMethod.Get, "search?type=track&limit=10&q=pink%20pony%20club"), Assert.Single(ApiCalls(http)));
+        Assert.NotNull(tracks);
+        Assert.Equal(2, tracks.Count);
+        Assert.Equal(new SpotifyTrack("spotify:track:t1", "Pink Pony Club", "Chappell Roan", "Midwest Princess", "https://i/64", 258000), tracks[0]);
+        Assert.Equal(("Chappell Roan, Other", null), (tracks[1].Artist, tracks[1].ArtworkUrl));
+    }
+
+    [Fact]
+    public async Task Search_ForNothing_DoesntAskSpotify()
+    {
+        var (controller, http, _) = Connect(_ => throw new InvalidOperationException("no calls expected"));
+
+        Assert.Empty((await controller.SearchTracksAsync("   "))!);
+        Assert.Empty(http.Requests);
+    }
+
+    [Fact]
+    public async Task PlayTrack_SendsTheTracksUri()
+    {
+        var (controller, http, _) = Connect(_ => SpotifyTestHttp.Status(HttpStatusCode.NoContent));
+
+        Assert.True(await controller.PlayTrackAsync("spotify:track:t1"));
+
+        var request = http.Requests.Single(r => r.Url.StartsWith(SpotifyController.ApiBase, StringComparison.Ordinal));
+        Assert.Equal((HttpMethod.Put, SpotifyController.ApiBase + "me/player/play"), (request.Method, request.Url));
+        Assert.Equal("""{"uris":["spotify:track:t1"]}""", request.Body);
+    }
+
+    [Fact]
+    public async Task PlayTrack_WithNothingPlayingAnywhere_PlaysOnAnOpenSpotifyApp()
+    {
+        const string devices = """{"devices":[{"id":"phone","type":"Smartphone","is_active":false},{"id":"mac","type":"Computer","is_active":false},{"id":"locked","type":"Computer","is_restricted":true}]}""";
+        var (controller, http, _) = Connect(r => r.RequestUri!.AbsolutePath switch
+        {
+            "/v1/me/player/devices" => SpotifyTestHttp.Json(devices),
+            _ when r.RequestUri.Query.Contains("device_id") => SpotifyTestHttp.Status(HttpStatusCode.NoContent),
+            _ => SpotifyTestHttp.Json("""{"error":{"status":404,"message":"Player command failed: No active device found"}}""", HttpStatusCode.NotFound),
+        });
+
+        Assert.True(await controller.PlayTrackAsync("spotify:track:t1"));
+
+        Assert.Equal((HttpMethod.Put, "me/player/play?device_id=mac"), ApiCalls(http)[^1]);
+        Assert.Equal("""{"uris":["spotify:track:t1"]}""", http.Requests[^1].Body);
+        Assert.False(controller.NoDeviceOpen);
+    }
+
+    [Fact]
+    public async Task PlayTrack_WithNoSpotifyAppOpenAtAll_SaysSo()
+    {
+        var (controller, _, _) = Connect(r => r.RequestUri!.AbsolutePath == "/v1/me/player/devices"
+            ? SpotifyTestHttp.Json("""{"devices":[]}""")
+            : SpotifyTestHttp.Json("""{"error":{"status":404,"message":"No active device found"}}""", HttpStatusCode.NotFound));
+
+        Assert.False(await controller.PlayTrackAsync("spotify:track:t1"));
+
+        Assert.True(controller.NoDeviceOpen);
+        Assert.False(await controller.HasOpenDeviceAsync());
+        Assert.Contains("No Spotify app is open", controller.LastError);
+    }
+
+    [Fact]
+    public async Task QueueTrack_AddsItNext_OrPlaysItWhenThereIsNoQueue()
+    {
+        var (queued, queuedHttp, _) = Connect(_ => SpotifyTestHttp.Status(HttpStatusCode.NoContent));
+        Assert.True(await queued.QueueTrackAsync("spotify:track:t1"));
+        Assert.Equal((HttpMethod.Post, "me/player/queue?uri=spotify%3Atrack%3At1"), Assert.Single(ApiCalls(queuedHttp)));
+
+        var (idle, idleHttp, _) = Connect(r => r.RequestUri!.AbsolutePath.EndsWith("/queue", StringComparison.Ordinal)
+            ? SpotifyTestHttp.Status(HttpStatusCode.NotFound)
+            : SpotifyTestHttp.Status(HttpStatusCode.NoContent));
+        Assert.True(await idle.QueueTrackAsync("spotify:track:t1"));
+        Assert.Equal((HttpMethod.Put, "me/player/play"), ApiCalls(idleHttp)[^1]);
+    }
+
+    [Fact]
+    public async Task PlayPause_WithNothingLoaded_ResumesTheLastSession()
+    {
+        var (controller, http, _) = Connect(r => r.Method == HttpMethod.Get
+            ? SpotifyTestHttp.Status(HttpStatusCode.NoContent)
+            : SpotifyTestHttp.Status(HttpStatusCode.NoContent));
+
+        Assert.True(await controller.PlayPauseAsync());
+
+        Assert.Equal((HttpMethod.Put, "me/player/play"), ApiCalls(http)[^1]);
+        Assert.Equal("", http.Requests[^1].Body);
+    }
 }
 
 [Collection(MusicPlayerRegistryCollection.Name)]
