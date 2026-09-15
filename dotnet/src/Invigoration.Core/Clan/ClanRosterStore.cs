@@ -12,6 +12,17 @@ namespace Invigoration.Core.Clan;
 /// connected bot and the management window see the same live list; call
 /// <see cref="Save"/> after any edit to persist it.
 /// </summary>
+/// <remarks>
+/// Every bot's chat handling reaches this store from its own thread — auto-registering a
+/// first-time talker, looking up ranks for permission checks, scoring trivia — while the UI reads
+/// it for the Clan panel. So the list itself is only ever touched under <c>SyncRoot</c>: readers
+/// get a snapshot (<see cref="Members"/>) and additions/removals go through <see cref="Add"/>,
+/// <see cref="Remove"/> and <see cref="RemoveAll"/>. It used to be a bare public List that
+/// RecordSeen added to under the lock while leaderboards, clanlist, the name index and the UI
+/// enumerated it without one — an addition landing mid-read could hand the reader a null entry or
+/// throw "collection was modified", which is exactly how two trivia tests kept failing when the
+/// whole suite ran in parallel.
+/// </remarks>
 public static class ClanRosterStore
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
@@ -35,7 +46,52 @@ public static class ClanRosterStore
     /// </summary>
     public static void InvalidateNameIndex() => _nameIndex = null;
 
-    public static List<ClanMember> Members => _cache ??= LoadFromDisk();
+    /// <summary>A snapshot of everyone on the roster, safe to enumerate while other bots keep adding to it. The members themselves are the live objects — edit one, then call <see cref="Save"/> or <see cref="MarkDirty"/>.</summary>
+    public static IReadOnlyList<ClanMember> Members
+    {
+        get
+        {
+            lock (SyncRoot)
+            {
+                return [.. MembersLocked];
+            }
+        }
+    }
+
+    /// <summary>The live list. Caller holds SyncRoot.</summary>
+    private static List<ClanMember> MembersLocked => _cache ??= LoadFromDisk();
+
+    /// <summary>Adds someone to the roster; immediately findable. Call <see cref="Save"/> to persist.</summary>
+    public static void Add(ClanMember member)
+    {
+        lock (SyncRoot)
+        {
+            MembersLocked.Add(member);
+            _nameIndex = null;
+        }
+    }
+
+    /// <summary>Removes one member from the roster. Call <see cref="Save"/> to persist.</summary>
+    public static bool Remove(ClanMember member)
+    {
+        lock (SyncRoot)
+        {
+            var removed = MembersLocked.Remove(member);
+            _nameIndex = null;
+            return removed;
+        }
+    }
+
+    /// <summary>Removes every member matching <paramref name="match"/>. Call <see cref="Save"/> to persist.</summary>
+    public static int RemoveAll(Predicate<ClanMember> match)
+    {
+        lock (SyncRoot)
+        {
+            var removed = MembersLocked.RemoveAll(match);
+            _nameIndex = null;
+            return removed;
+        }
+    }
 
     /// <summary>Raised after every Save() — lets an open bot tab or management window pick up roster changes made elsewhere (a chat command, another window) without needing to reopen.</summary>
     public static event Action? RosterChanged;
@@ -50,11 +106,9 @@ public static class ClanRosterStore
     // testing — confirmed live as a cause of lag reappearing at that scale even after the
     // per-event send-pileup fixes.
     //
-    // Rebuilt on a short TTL rather than incrementally maintained or invalidated by comparing
-    // Members.Count: Members is a plain public List<ClanMember> that callers all over the
-    // codebase (including 40+ existing test call sites and the Clan Members management window)
-    // mutate directly via Add/RemoveAll/in-place edits, with no CollectionChanged-style hook to
-    // key an index off. A first attempt compared Members.Count to detect staleness, but that's
+    // Rebuilt on a short TTL rather than incrementally maintained: members get edited in place
+    // (renames, new aliases from the Clan Members window) with no change hook to key an index
+    // off, so additions and removals invalidate it immediately and a sub-second TTL covers the rest. A first attempt compared Members.Count to detect staleness, but that's
     // unsound: many tests each add exactly one member then remove it in a finally block, so
     // Count oscillates back to the same values across unrelated tests — confirmed live as 11 real
     // test failures (a stale index served a *different* member than the one just added, because
@@ -72,20 +126,28 @@ public static class ClanRosterStore
     {
         get
         {
-            if (_nameIndex is null || DateTime.UtcNow - _nameIndexBuiltAtUtc > NameIndexTtl)
+            var index = _nameIndex;
+            if (index is null || DateTime.UtcNow - _nameIndexBuiltAtUtc > NameIndexTtl)
             {
-                _nameIndex = BuildNameIndex();
-                _nameIndexBuiltAtUtc = DateTime.UtcNow;
+                // Built under the lock so the roster can't change underneath it; System.Threading.Lock
+                // is reentrant, so RecordSeen (already holding it) looking someone up is fine.
+                lock (SyncRoot)
+                {
+                    index = BuildNameIndex();
+                    _nameIndex = index;
+                    _nameIndexBuiltAtUtc = DateTime.UtcNow;
+                }
             }
 
-            return _nameIndex;
+            return index;
         }
     }
 
+    /// <summary>Caller holds SyncRoot.</summary>
     private static Dictionary<string, List<ClanMember>> BuildNameIndex()
     {
         var index = new Dictionary<string, List<ClanMember>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var member in Members)
+        foreach (var member in MembersLocked)
         {
             IndexKey(index, member.Name, member);
             foreach (var alias in member.Aliases)
@@ -151,7 +213,7 @@ public static class ClanRosterStore
                 }
 
                 member = new ClanMember { Name = username, Rank = defaultRankIfNew, IsClanMember = false };
-                Members.Add(member);
+                MembersLocked.Add(member);
                 _nameIndex = null; // a first-time talker must be immediately findable, not wait out NameIndexTtl
             }
 
@@ -282,7 +344,7 @@ public static class ClanRosterStore
     private static void SaveLocked()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(FilePath)!);
-        File.WriteAllText(FilePath, JsonSerializer.Serialize(Members, JsonOptions));
+        File.WriteAllText(FilePath, JsonSerializer.Serialize(MembersLocked, JsonOptions));
     }
 
     private static List<ClanMember> LoadFromDisk()

@@ -26,7 +26,7 @@ public class ClanRosterStoreScaleTests
         {
             var name = $"seen-{i}-{Guid.NewGuid():N}";
             names.Add(name);
-            ClanRosterStore.Members.Add(new ClanMember { Name = name, Aliases = [$"alt-{name}"] });
+            ClanRosterStore.Add(new ClanMember { Name = name, Aliases = [$"alt-{name}"] });
         }
 
         ClanRosterStore.InvalidateNameIndex();
@@ -70,7 +70,7 @@ public class ClanRosterStoreScaleTests
         {
             foreach (var name in names)
             {
-                ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+                ClanRosterStore.RemoveAll(m => m.Name == name);
             }
 
             ClanRosterStore.InvalidateNameIndex();
@@ -86,11 +86,11 @@ public class ClanRosterStoreScaleTests
         {
             var name = $"seen-{i}-{Guid.NewGuid():N}";
             names.Add(name);
-            ClanRosterStore.Members.Add(new ClanMember { Name = name });
+            ClanRosterStore.Add(new ClanMember { Name = name });
         }
 
         var target = $"target-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember
+        ClanRosterStore.Add(new ClanMember
         {
             Name = $"{target}@useast.battle.net",
             Rank = "Officer",
@@ -111,11 +111,57 @@ public class ClanRosterStoreScaleTests
         {
             foreach (var name in names)
             {
-                ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+                ClanRosterStore.RemoveAll(m => m.Name == name);
             }
 
-            ClanRosterStore.Members.RemoveAll(m => m.Name.StartsWith(target));
+            ClanRosterStore.RemoveAll(m => m.Name.StartsWith(target));
             ClanRosterStore.InvalidateNameIndex();
+        }
+    }
+
+    /// <summary>
+    /// Regression: bots add to the roster from their own threads (a first-time talker, clanadd)
+    /// while others read it (trivia leaderboard, clanlist, name lookups, the Clan panel). Reads used
+    /// to enumerate the live List without the lock, and an addition landing mid-read handed back a
+    /// null entry or threw — how two trivia tests kept failing in full-suite runs.
+    /// </summary>
+    [Fact(Timeout = 30000)]
+    public async Task ReadingTheRosterWhileItsBeingChanged_NeverSeesAHalfWrittenList()
+    {
+        var prefix = $"race-{Guid.NewGuid():N}-";
+        using var done = new CancellationTokenSource();
+        try
+        {
+            var writer = Task.Run(() =>
+            {
+                for (var round = 0; round < 600; round++)
+                {
+                    for (var i = 0; i < 250; i++)
+                    {
+                        ClanRosterStore.Add(new ClanMember { Name = $"{prefix}{i}", TriviaScore = i });
+                    }
+
+                    ClanRosterStore.RemoveAll(m => m.Name.StartsWith(prefix, StringComparison.Ordinal));
+                }
+
+                done.Cancel();
+            });
+
+            var readers = Enumerable.Range(0, 3).Select(r => Task.Run(() =>
+            {
+                while (!done.IsCancellationRequested)
+                {
+                    var leaders = ClanRosterStore.Members.Where(m => m.TriviaScore != 0).OrderByDescending(m => m.TriviaScore).Take(10).ToList();
+                    Assert.DoesNotContain(null, leaders);
+                    ClanRosterStore.Find($"{prefix}{r * 7}");
+                }
+            })).ToArray();
+
+            await Task.WhenAll([writer, .. readers]);
+        }
+        finally
+        {
+            ClanRosterStore.RemoveAll(m => m.Name.StartsWith(prefix, StringComparison.Ordinal));
         }
     }
 }

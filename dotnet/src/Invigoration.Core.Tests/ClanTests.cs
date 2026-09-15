@@ -66,7 +66,7 @@ public class ClanRosterStoreTests
     {
         var name = $"test-{Guid.NewGuid():N}";
         var alias = $"alt-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = "Officer", Aliases = [alias] });
+        ClanRosterStore.Add(new ClanMember { Name = name, Rank = "Officer", Aliases = [alias] });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -78,7 +78,7 @@ public class ClanRosterStoreTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
         }
     }
@@ -88,7 +88,7 @@ public class ClanRosterStoreTests
     public void RecordSeen_TrackedMember_StampsLastSeenUtc()
     {
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.Add(new ClanMember { Name = name });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -100,7 +100,7 @@ public class ClanRosterStoreTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
@@ -116,7 +116,7 @@ public class ClanRosterStoreTests
     public void RecordSeen_WithProductAndServer_StampsBoth()
     {
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.Add(new ClanMember { Name = name });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -128,7 +128,7 @@ public class ClanRosterStoreTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
@@ -148,7 +148,7 @@ public class ClanRosterStoreTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
@@ -158,7 +158,7 @@ public class ClanRosterStoreTests
     public void RecordProductSeen_FormalClanMember_UpdatesProductAndServer()
     {
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name, IsClanMember = true });
+        ClanRosterStore.Add(new ClanMember { Name = name, IsClanMember = true });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -171,7 +171,7 @@ public class ClanRosterStoreTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
@@ -189,7 +189,7 @@ public class ClanRosterStoreTests
     public void RecordProductSeen_InformalEntry_DoesNotUpdate()
     {
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name, IsClanMember = false });
+        ClanRosterStore.Add(new ClanMember { Name = name, IsClanMember = false });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -201,7 +201,7 @@ public class ClanRosterStoreTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }

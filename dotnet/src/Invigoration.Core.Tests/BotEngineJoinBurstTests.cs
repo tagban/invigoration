@@ -45,7 +45,7 @@ public class BotEngineJoinBurstTests
         var username = $"test-{Guid.NewGuid():N}";
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
-        ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.Add(new ClanMember { Name = username, Rank = rankName });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -67,7 +67,7 @@ public class BotEngineJoinBurstTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.RemoveAll(m => m.Name == username);
             ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
@@ -83,7 +83,7 @@ public class BotEngineJoinBurstTests
         var username = $"test-{Guid.NewGuid():N}";
         var rankName = $"rank-{Guid.NewGuid():N}";
         ClanRankStore.Ranks.Add(new ClanRank { Name = rankName, AutoWhisperMessage = "hi", AutoWhisperFrequency = AutoWhisperFrequency.EveryTime });
-        ClanRosterStore.Members.Add(new ClanMember { Name = username, Rank = rankName });
+        ClanRosterStore.Add(new ClanMember { Name = username, Rank = rankName });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -93,7 +93,7 @@ public class BotEngineJoinBurstTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == username);
+            ClanRosterStore.RemoveAll(m => m.Name == username);
             ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }

@@ -60,7 +60,7 @@ public class BotEngineTriviaScoringTests
         var triviaEngine = CreateTriviaEngine(engine);
 
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.Add(new ClanMember { Name = name });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -77,7 +77,7 @@ public class BotEngineTriviaScoringTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
         }
     }
@@ -89,7 +89,7 @@ public class BotEngineTriviaScoringTests
         await using var engine = new BotEngine(config);
         var triviaEngine = CreateTriviaEngine(engine);
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name });
+        ClanRosterStore.Add(new ClanMember { Name = name });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -106,7 +106,7 @@ public class BotEngineTriviaScoringTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
         }
     }

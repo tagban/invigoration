@@ -24,7 +24,7 @@ public class BotEngineAuthorizationTests
         var config = new BotConfig { BotMaster = "TheMaster", BannedRank = bannedRank };
         var engine = new BotEngine(config);
         var name = $"test-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = rank });
+        ClanRosterStore.Add(new ClanMember { Name = name, Rank = rank });
         ClanRosterStore.InvalidateNameIndex();
         return (engine, name);
     }
@@ -50,7 +50,7 @@ public class BotEngineAuthorizationTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
         }
     }
@@ -93,7 +93,7 @@ public class BotEngineAuthorizationTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
@@ -113,7 +113,7 @@ public class BotEngineAuthorizationTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRankStore.Ranks.RemoveAll(r => r.Name == rankName);
         }
@@ -138,7 +138,7 @@ public class ClanRosterStoreAutoRegistrationTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }
@@ -158,7 +158,7 @@ public class ClanRosterStoreAutoRegistrationTests
     public void RecordSeen_ExistingMember_KeepsRankEvenWithDefaultRankPassed()
     {
         var name = $"existing-{Guid.NewGuid():N}";
-        ClanRosterStore.Members.Add(new ClanMember { Name = name, Rank = "Officer" });
+        ClanRosterStore.Add(new ClanMember { Name = name, Rank = "Officer" });
         ClanRosterStore.InvalidateNameIndex();
         try
         {
@@ -168,7 +168,7 @@ public class ClanRosterStoreAutoRegistrationTests
         }
         finally
         {
-            ClanRosterStore.Members.RemoveAll(m => m.Name == name);
+            ClanRosterStore.RemoveAll(m => m.Name == name);
             ClanRosterStore.InvalidateNameIndex();
             ClanRosterStore.Save();
         }

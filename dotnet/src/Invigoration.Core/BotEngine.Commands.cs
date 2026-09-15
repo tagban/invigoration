@@ -490,7 +490,7 @@ public sealed partial class BotEngine
         {
             var qualifiedName = $"{name}@{Config.BattlenetServer}";
             member = new ClanMember { Name = qualifiedName, NickName = name, Rank = rank, IsClanMember = true };
-            ClanRosterStore.Members.Add(member);
+            ClanRosterStore.Add(member);
             ClanRosterStore.Save();
             return reply(rank.Length > 0
                 ? $"Added {name} ({qualifiedName}) to the clan roster as \"{rank}\"."
@@ -511,7 +511,7 @@ public sealed partial class BotEngine
             return reply($"{rest} isn't in the clan roster.");
         }
 
-        ClanRosterStore.Members.Remove(member);
+        ClanRosterStore.Remove(member);
         ClanRosterStore.Save();
         return reply($"Removed {member.Name} from the clan roster.");
     }
@@ -628,9 +628,10 @@ public sealed partial class BotEngine
     /// <summary>"clanlist [rank]" — lists everyone, or just members of the given rank.</summary>
     private Task HandleClanListAsync(string rest, Func<string, Task> reply)
     {
+        var roster = ClanRosterStore.Members;
         var members = rest.Length == 0
-            ? ClanRosterStore.Members
-            : ClanRosterStore.Members.Where(m => m.Rank.Equals(rest, StringComparison.OrdinalIgnoreCase)).ToList();
+            ? roster
+            : roster.Where(m => m.Rank.Equals(rest, StringComparison.OrdinalIgnoreCase)).ToList();
 
         if (members.Count == 0)
         {
