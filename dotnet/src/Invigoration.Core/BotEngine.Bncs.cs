@@ -83,7 +83,7 @@ public sealed partial class BotEngine
             // The server changed its challenge since the last logon: only BNLS can answer it.
             LogDebug("Rapid reconnect: the server sent a new version check — logging on the normal way.");
             _auth.UsingCachedChecks = false;
-            await ConnectAsync().ConfigureAwait(false);
+            await ConnectCoreAsync().ConfigureAwait(false);
             return;
         }
 

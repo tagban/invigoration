@@ -161,17 +161,22 @@
                     <CheckBox Content="Connect when the app starts" IsChecked="{Binding Config.AutoConnectOnStartup}" />
 
                     <CheckBox Content="Reconnect after an unexpected disconnect" IsChecked="{Binding Config.AutoReconnect}" />
-                    <Grid ColumnDefinitions="Auto,Auto" ColumnSpacing="8" IsVisible="{Binding Config.AutoReconnect}">
-                        <TextBlock Grid.Column="0" Text="Wait (seconds):" VerticalAlignment="Center" Opacity="0.8" FontSize="11" />
-                        <TextBox Grid.Column="1" Width="70" Text="{Binding Config.AutoReconnectDelaySeconds}" />
-                    </Grid>
-                    <TextBlock Classes="hint"
-                               Text="Never after you click Disconnect, or after Battle.net refuses the login (wrong password, closed account, bad CD key) — retrying those would only fail again." />
+                    <StackPanel Spacing="8" Margin="28,0,0,0">
+                        <WrapPanel Orientation="Horizontal">
+                            <TextBlock Text="Try every" VerticalAlignment="Center" Opacity="0.8" FontSize="12" Margin="0,0,8,0" />
+                            <TextBox Width="64" Text="{Binding Config.AutoReconnectDelaySeconds}" />
+                            <TextBlock Text="seconds, giving up after" VerticalAlignment="Center" Opacity="0.8" FontSize="12" Margin="8,0" />
+                            <TextBox Width="64" Text="{Binding Config.AutoReconnectMaxAttempts}" />
+                            <TextBlock Text="attempts (0 = keep trying)" VerticalAlignment="Center" Opacity="0.8" FontSize="12" Margin="8,0,0,0" />
+                        </WrapPanel>
+                        <TextBlock Classes="hint"
+                                   Text="For example, every 45 seconds up to 10 attempts on a server that takes a while to come back. Never after you click Disconnect, or after Battle.net refuses the login (wrong password, closed account, bad CD key) — retrying those would only fail again. On official Battle.net, keep the wait long." />
 
-                    <CheckBox Content="Rapid reconnect (private servers)" IsChecked="{Binding Config.RapidReconnect}" Margin="0,6,0,0"
-                              IsVisible="{Binding !IsStimpakBackedProduct}" />
-                    <TextBlock Classes="hint" IsVisible="{Binding !IsStimpakBackedProduct}"
-                               Text="Tries to reconnect the instant the connection drops, then every second until it's back — for holding a name or channel ops. It skips BNLS by reusing the answers from this session's first login, so it gets back on in about half the time. Works without the option above. Never used on official Battle.net, where that many connections gets an address banned." />
+                        <CheckBox Content="Rapid reconnect (private servers)" IsChecked="{Binding Config.RapidReconnect}"
+                                  IsVisible="{Binding !IsStimpakBackedProduct}" />
+                        <TextBlock Classes="hint" IsVisible="{Binding !IsStimpakBackedProduct}"
+                                   Text="For holding a name or channel ops: the first attempt goes out the instant the connection drops, and each attempt skips BNLS by reusing this session's first login answers, getting back on in about half the time. Pair it with a short wait, like every 1 second up to 45 attempts. Never used on official Battle.net." />
+                    </StackPanel>
 
                     <TextBlock Classes="label" Text="Flood protection: minimum delay between outgoing messages (ms)" Margin="0,8,0,0" />
                     <TextBox PlaceholderText="Flood protection delay (ms)" Text="{Binding Config.FloodProtectionDelayMs}" />

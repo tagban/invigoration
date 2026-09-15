@@ -121,13 +121,16 @@ public sealed class BotConfig
     /// </summary>
     public bool AutoReconnect { get; set; }
 
+    /// <summary>Seconds between reconnect attempts (at least 1). A normal reconnect also waits this long before its first attempt; a rapid one doesn't.</summary>
     public int AutoReconnectDelaySeconds { get; set; } = 20;
 
+    /// <summary>How many reconnect attempts before giving up; 0 keeps trying until it's back.</summary>
+    public int AutoReconnectMaxAttempts { get; set; }
+
     /// <summary>
-    /// Private servers: reconnect the instant the connection drops, then every second until logged
-    /// back on — skipping BNLS whenever an earlier logon's answers can be reused. Works on its own
-    /// (AutoReconnect needn't be on) and is ignored on official Battle.net. See
-    /// BotEngine.RapidReconnect.cs.
+    /// Part of AutoReconnect, for private servers: the first attempt goes out the instant the
+    /// connection drops, and attempts skip BNLS whenever an earlier logon's answers can be reused.
+    /// Ignored on official Battle.net. See BotEngine.Reconnect.cs.
     /// </summary>
     public bool RapidReconnect { get; set; }
 

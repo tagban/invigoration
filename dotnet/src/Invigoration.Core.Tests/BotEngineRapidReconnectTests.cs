@@ -44,7 +44,7 @@ public class BotEngineRapidReconnectTests : IDisposable
 
     private static int Port(TcpListener listener) => ((IPEndPoint)listener.LocalEndpoint).Port;
 
-    private BotEngine Engine(string product = BncsProduct.Diablo, bool rapid = true, string? server = null, bool autoReconnect = false) => new(new BotConfig
+    private BotEngine Engine(string product = BncsProduct.Diablo, bool rapid = true, string? server = null, int delaySeconds = 9999, int maxAttempts = 0) => new(new BotConfig
     {
         Product = product,
         Username = "Tagban",
@@ -54,8 +54,9 @@ public class BotEngineRapidReconnectTests : IDisposable
         BnlsServer = "127.0.0.1",
         BnlsPort = Port(_bnls),
         RapidReconnect = rapid,
-        AutoReconnect = autoReconnect,
-        AutoReconnectDelaySeconds = 9999,
+        AutoReconnect = true,
+        AutoReconnectDelaySeconds = delaySeconds,
+        AutoReconnectMaxAttempts = maxAttempts,
     });
 
     private static void CacheAnswers(string product = BncsProduct.Diablo)
@@ -186,21 +187,19 @@ public class BotEngineRapidReconnectTests : IDisposable
         Assert.False(badKey.CanLogOnWithoutBnls());
     }
 
-    [Fact(Timeout = 15000)]
-    public async Task RapidReconnect_TriesEverySecondUntilStopped()
+    /// <summary>Accepts and immediately hangs up on every connection, like a server that's still coming back up, recording when each arrived.</summary>
+    private static (Task Server, List<TimeSpan> Accepted, CancellationTokenSource Stop) HangUpServer(TcpListener listener)
     {
-        CacheAnswers();
-        await using var engine = Engine();
         var accepted = new List<TimeSpan>();
         var clock = Stopwatch.StartNew();
-        using var stop = new CancellationTokenSource();
+        var stop = new CancellationTokenSource();
         var server = Task.Run(async () =>
         {
             while (!stop.IsCancellationRequested)
             {
                 try
                 {
-                    using var client = await _server.AcceptTcpClientAsync(stop.Token);
+                    using var client = await listener.AcceptTcpClientAsync(stop.Token);
                     lock (accepted)
                     {
                         accepted.Add(clock.Elapsed);
@@ -212,8 +211,17 @@ public class BotEngineRapidReconnectTests : IDisposable
                 }
             }
         });
+        return (server, accepted, stop);
+    }
 
-        // The server hangs up on every attempt, like one that's still coming back up.
+    [Fact(Timeout = 15000)]
+    public async Task RapidReconnect_TriesEverySecondUntilStopped()
+    {
+        CacheAnswers();
+        await using var engine = Engine(delaySeconds: 1);
+        var (server, accepted, stop) = HangUpServer(_server);
+        using var _ = stop;
+
         typeof(BotEngine).GetMethod("MaybeScheduleAutoReconnect", Private)!.Invoke(engine, null);
         await Task.Delay(TimeSpan.FromMilliseconds(2400));
         await engine.DisconnectAsync();
@@ -243,7 +251,8 @@ public class BotEngineRapidReconnectTests : IDisposable
 
         Assert.False(engine.RapidReconnectApplies);
         Assert.Contains(logged, l => l.Contains("only for private servers", StringComparison.Ordinal));
-        Assert.DoesNotContain(logged, l => l.Contains("trying every second", StringComparison.Ordinal));
+        Assert.DoesNotContain(logged, l => l.Contains("rapid reconnect: trying now", StringComparison.Ordinal));
+        Assert.Contains(logged, l => l.Contains("reconnecting in 9999s", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -258,6 +267,65 @@ public class BotEngineRapidReconnectTests : IDisposable
         await Task.Delay(100);
 
         Assert.Contains(logged, l => l.Contains("Auto-reconnect skipped", StringComparison.Ordinal));
-        Assert.DoesNotContain(logged, l => l.Contains("trying every second", StringComparison.Ordinal));
+        Assert.DoesNotContain(logged, l => l.Contains("rapid reconnect: trying now", StringComparison.Ordinal));
+    }
+
+    [Fact(Timeout = 15000)]
+    public async Task Reconnect_WaitsBetweenAttempts_AndGivesUpAfterTheLimit()
+    {
+        // A normal reconnect asks BNLS first, so count the attempts there.
+        await using var engine = Engine(rapid: false, delaySeconds: 1, maxAttempts: 2);
+        var logged = Watch(engine);
+        var (server, accepted, stop) = HangUpServer(_bnls);
+        using var _ = stop;
+
+        typeof(BotEngine).GetMethod("MaybeScheduleAutoReconnect", Private)!.Invoke(engine, null);
+        await Task.Delay(TimeSpan.FromMilliseconds(4200));
+        stop.Cancel();
+        await server;
+
+        Assert.Equal(2, accepted.Count);
+        Assert.InRange(accepted[0].TotalMilliseconds, 700, 1700); // waited before the first attempt
+        Assert.InRange((accepted[1] - accepted[0]).TotalMilliseconds, 700, 1700);
+        Assert.Contains(logged, l => l.Contains("up to 2 attempts", StringComparison.Ordinal));
+        Assert.Contains(logged, l => l.Contains("Gave up reconnecting after 2 attempts", StringComparison.Ordinal));
+    }
+
+    [Fact(Timeout = 15000)]
+    public async Task RapidReconnect_GoesStraightAway_AndAlsoStopsAtTheLimit()
+    {
+        CacheAnswers();
+        await using var engine = Engine(delaySeconds: 1, maxAttempts: 3);
+        var logged = Watch(engine);
+        var (server, accepted, stop) = HangUpServer(_server);
+        using var _ = stop;
+
+        typeof(BotEngine).GetMethod("MaybeScheduleAutoReconnect", Private)!.Invoke(engine, null);
+        await Task.Delay(TimeSpan.FromMilliseconds(4600));
+        stop.Cancel();
+        await server;
+
+        Assert.Equal(3, accepted.Count);
+        Assert.InRange(accepted[0].TotalMilliseconds, 0, 500); // no wait before the first one
+        Assert.Contains(logged, l => l.Contains("Gave up reconnecting after 3 attempts", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ConnectingByHand_StopsAReconnectThatsWaiting()
+    {
+        await using var engine = Engine(rapid: false);
+        typeof(BotEngine).GetMethod("MaybeScheduleAutoReconnect", Private)!.Invoke(engine, null);
+        var pending = (CancellationTokenSource)typeof(BotEngine).GetField("_autoReconnectCts", Private)!.GetValue(engine)!;
+
+        _bnls.Stop(); // nothing to connect to; only the cancellation matters
+        try
+        {
+            await engine.ConnectAsync();
+        }
+        catch (SocketException)
+        {
+        }
+
+        Assert.True(pending.IsCancellationRequested);
     }
 }

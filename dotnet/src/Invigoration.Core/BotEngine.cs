@@ -189,16 +189,16 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     private void MaybeScheduleAutoReconnect()
     {
-        // A rapid reconnect already under way handles every drop until it's back on — including
-        // one of its own attempts being closed by the server.
-        if (Volatile.Read(ref _rapidReconnectRunning) == 1 && !_isIntentionalDisconnect)
+        // A reconnect already under way handles every drop until it's back on — including one of
+        // its own attempts being closed by the server, which mustn't start the count over.
+        if (Volatile.Read(ref _reconnectRunning) == 1 && !_isIntentionalDisconnect)
         {
             return;
         }
 
         _autoReconnectCts?.Cancel();
 
-        if (_isIntentionalDisconnect || (!Config.AutoReconnect && !Config.RapidReconnect))
+        if (_isIntentionalDisconnect || !Config.AutoReconnect)
         {
             return;
         }
@@ -209,40 +209,13 @@ public sealed partial class BotEngine : IAsyncDisposable
             return;
         }
 
-        if (RapidReconnectApplies)
+        if (Config.RapidReconnect && !RapidReconnectApplies && IsOfficialBattlenetServer(Config.BattlenetServer))
         {
-            _autoReconnectCts = new CancellationTokenSource();
-            SafeFireAndForget(RunRapidReconnectAsync(_autoReconnectCts.Token), "rapid reconnecting");
-            return;
+            LogWarning("Rapid reconnect is only for private servers — reconnecting to official Battle.net the normal way.");
         }
 
-        if (!Config.AutoReconnect)
-        {
-            LogWarning("Rapid reconnect is only for private servers — not reconnecting to official Battle.net automatically.");
-            return;
-        }
-
-        var delaySeconds = Math.Max(1, Config.AutoReconnectDelaySeconds);
         _autoReconnectCts = new CancellationTokenSource();
-        var token = _autoReconnectCts.Token;
-        SafeFireAndForget(RunAutoReconnectAsync(delaySeconds, token), "auto-reconnecting");
-    }
-
-    private async Task RunAutoReconnectAsync(int delaySeconds, CancellationToken cancellationToken)
-    {
-        LogInfo($"Unexpected disconnect — reconnecting in {delaySeconds}s (auto-reconnect is on).");
-        await Task.Delay(TimeSpan.FromSeconds(delaySeconds), cancellationToken).ConfigureAwait(false);
-
-        // Something else may have reconnected in the meantime (the Connect button, another
-        // recovery). Reconnecting on top of a live, logged-on session would tear it down — and
-        // that teardown used to schedule the next reconnect, looping forever.
-        if (_auth.LoggedOnToBncs || _bncs.IsConnected)
-        {
-            LogDebug("Auto-reconnect skipped: already connected.");
-            return;
-        }
-
-        await ConnectAsync(cancellationToken).ConfigureAwait(false);
+        SafeFireAndForget(RunReconnectAsync(_autoReconnectCts.Token), "reconnecting");
     }
 
     /// <summary>
@@ -316,7 +289,14 @@ public sealed partial class BotEngine : IAsyncDisposable
         }
     }
 
+    /// <summary>Connects — and, since that's the user deciding, stops any automatic reconnect that's still counting down or retrying.</summary>
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
+    {
+        _autoReconnectCts?.Cancel();
+        await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task ConnectCoreAsync(CancellationToken cancellationToken = default)
     {
         _isIntentionalDisconnect = false;
         _logonRejection = null;

@@ -13,8 +13,9 @@ A complete rewrite of the classic Battle.net bot, brought to the .NET era — 15
 - Shared clan roster with configurable ranks — per-rank command access, auto-whisper/auto-kick/auto-ban
 - Trivia across 6 categories (Diablo, Warcraft, StarCraft, Blizzard, Pop Culture, Music), with editable question packs
 - Per-bot custom chat color schemes, plus a full icon manager for game/status icons
-- BNCS friends list, flood protection, SOCKS5/HTTP CONNECT proxy support, auto-connect/auto-reconnect
-- **Rapid reconnect** for private servers: back on the instant the connection drops, retrying every second — and without a single BNLS round trip, by reusing the session's first login answers (about half the time of a normal login)
+- BNCS friends list, flood protection, SOCKS5/HTTP CONNECT proxy support, auto-connect
+- Auto-reconnect with your own pacing: seconds between attempts and how many attempts before giving up (e.g. every 45s up to 10 tries)
+- **Rapid reconnect** for private servers: the first attempt goes out the instant the connection drops, and every attempt skips BNLS by reusing the session's first login answers — about half the time of a normal login (pair it with e.g. every 1s up to 45 tries)
 - Config saved as JSON, with multi-profile loading
 
 <p align="center">

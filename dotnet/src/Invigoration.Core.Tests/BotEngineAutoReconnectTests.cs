@@ -223,10 +223,10 @@ public class BotEngineReconnectLoopTests
     [Fact]
     public async Task AReconnectThatFiresWhileLoggedOn_DoesNothing()
     {
-        await using var engine = BotEngineChatGateTests.MarkLoggedOn(new BotEngine(new BotConfig { AutoReconnect = true }));
+        await using var engine = BotEngineChatGateTests.MarkLoggedOn(new BotEngine(new BotConfig { AutoReconnect = true, AutoReconnectDelaySeconds = 1 }));
         var logged = Watch(engine);
 
-        await (Task)typeof(BotEngine).GetMethod("RunAutoReconnectAsync", Private)!.Invoke(engine, [1, CancellationToken.None])!;
+        await (Task)typeof(BotEngine).GetMethod("RunReconnectAsync", Private)!.Invoke(engine, [CancellationToken.None])!;
 
         Assert.DoesNotContain(logged, l => l.Contains("connecting to", StringComparison.OrdinalIgnoreCase));
         Assert.Contains(logged, l => l.Contains("reconnecting in 1s", StringComparison.Ordinal));
