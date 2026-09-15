@@ -307,12 +307,13 @@ public partial class MainWindow : Window
         var answer = await AskAsync(
             "Spotify",
             "Do you have Spotify Premium and want to use it?",
-            "Invigoration can show what's playing on your Spotify and let your bots skip, pause and save tracks from chat. " +
-            "Controlling Spotify needs a Premium account.\n\n" +
+            "Invigoration can show what's playing on your Spotify and let your bots skip, pause and save tracks from chat — " +
+            "so you can whisper your bot to skip a song while you're in a game. Controlling Spotify needs a Premium account.\n\n" +
             "Music plays through Spotify itself, so you'll need either the Spotify app installed on this computer, or Spotify open and signed in in your web browser.\n\n" +
             "If you choose No, the Music tab stays hidden — you can turn it on any time from Customize → Music Player.",
             "Yes, use Spotify",
-            "No");
+            "No",
+            SpotifyAppDownload());
         if (answer is not { } useSpotify)
         {
             return;
@@ -334,11 +335,17 @@ public partial class MainWindow : Window
         }
     }
 
+    /// <summary>Spotify's download page for this computer's OS, as a link for the Spotify question.</summary>
+    private static (string Text, string Url) SpotifyAppDownload() =>
+        OperatingSystem.IsMacOS() ? ("Get the Spotify app for Mac", "https://www.spotify.com/download/mac/")
+        : OperatingSystem.IsWindows() ? ("Get the Spotify app for Windows", "https://www.spotify.com/download/windows/")
+        : ("Get the Spotify app for Linux", "https://www.spotify.com/download/linux/");
+
     private async Task<bool> ConfirmAsync(string title, string heading, string body, string confirmText) =>
         await AskAsync(title, heading, body, confirmText, "Cancel") == true;
 
-    /// <summary>A two-button question. True for the confirm button, false for the other, null when the window was closed without either.</summary>
-    private async Task<bool?> AskAsync(string title, string heading, string body, string confirmText, string cancelText)
+    /// <summary>A two-button question, optionally with a link that opens in the browser without answering. True for the confirm button, false for the other, null when the window was closed without either.</summary>
+    private async Task<bool?> AskAsync(string title, string heading, string body, string confirmText, string cancelText, (string Text, string Url)? link = null)
     {
         var dialog = new Window
         {
@@ -354,7 +361,7 @@ public partial class MainWindow : Window
         confirm.Click += (_, _) => dialog.Close((bool?)true);
         cancel.Click += (_, _) => dialog.Close((bool?)false);
 
-        dialog.Content = new StackPanel
+        var content = new StackPanel
         {
             Margin = new Avalonia.Thickness(20),
             Spacing = 12,
@@ -362,15 +369,31 @@ public partial class MainWindow : Window
             {
                 new TextBlock { Text = heading, FontWeight = Avalonia.Media.FontWeight.Bold, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
                 new TextBlock { Text = body, TextWrapping = Avalonia.Media.TextWrapping.Wrap, Opacity = 0.8 },
-                new StackPanel
-                {
-                    Orientation = Avalonia.Layout.Orientation.Horizontal,
-                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
-                    Spacing = 8,
-                    Children = { cancel, confirm },
-                },
             },
         };
+
+        if (link is { } l)
+        {
+            var linkButton = new Button
+            {
+                Content = l.Text,
+                HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Left,
+                Background = Avalonia.Media.Brushes.Transparent,
+                Foreground = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(0x1E, 0xD7, 0x60)),
+                Padding = new Avalonia.Thickness(0),
+            };
+            linkButton.Click += (_, _) => Process.Start(new ProcessStartInfo(l.Url) { UseShellExecute = true });
+            content.Children.Add(linkButton);
+        }
+
+        content.Children.Add(new StackPanel
+        {
+            Orientation = Avalonia.Layout.Orientation.Horizontal,
+            HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+            Spacing = 8,
+            Children = { cancel, confirm },
+        });
+        dialog.Content = content;
 
         return await dialog.ShowDialog<bool?>(this);
     }
