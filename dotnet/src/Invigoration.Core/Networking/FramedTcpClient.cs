@@ -40,7 +40,14 @@ public abstract class FramedTcpClient : IAsyncDisposable
     public event Action<Exception?>? Disconnected;
     public event Action<byte[]>? PacketReceived;
 
-    public bool IsConnected => _client?.Connected ?? false;
+    /// <summary>
+    /// True from a successful connect until the connection ends — including the server hanging up,
+    /// which TcpClient.Connected alone doesn't notice until a later read or write fails (so a
+    /// reconnect loop would think a dead attempt was still going).
+    /// </summary>
+    public bool IsConnected => _receiving && (_client?.Connected ?? false);
+
+    private volatile bool _receiving;
 
     /// <summary>
     /// Given the bytes buffered so far, returns the total length of the next
@@ -87,6 +94,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
         _client = client;
         _stream = stream;
         _receiveBuffer.Clear();
+        _receiving = true;
 
         Connected?.Invoke();
 
@@ -133,6 +141,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
 
     public void Close()
     {
+        _receiving = false;
         _receiveCts?.Cancel();
         _receiveCts = null;
         _stream?.Dispose();
@@ -210,6 +219,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
         // after it still reports, as before.
         if (generation == Volatile.Read(ref _connectionGeneration))
         {
+            _receiving = false;
             Disconnected?.Invoke(failure);
         }
     }

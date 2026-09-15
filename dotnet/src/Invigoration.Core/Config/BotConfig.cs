@@ -124,6 +124,14 @@ public sealed class BotConfig
     public int AutoReconnectDelaySeconds { get; set; } = 20;
 
     /// <summary>
+    /// Private servers: reconnect the instant the connection drops, then every second until logged
+    /// back on — skipping BNLS whenever an earlier logon's answers can be reused. Works on its own
+    /// (AutoReconnect needn't be on) and is ignored on official Battle.net. See
+    /// BotEngine.RapidReconnect.cs.
+    /// </summary>
+    public bool RapidReconnect { get; set; }
+
+    /// <summary>
     /// Routes every connection this bot makes (BNCS, BNLS, D2 realm) through
     /// a proxy — the only client-side lever against a third-party server's
     /// per-IP connection or flood limits, since several of the user's own

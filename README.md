@@ -14,6 +14,7 @@ A complete rewrite of the classic Battle.net bot, brought to the .NET era — 15
 - Trivia across 6 categories (Diablo, Warcraft, StarCraft, Blizzard, Pop Culture, Music), with editable question packs
 - Per-bot custom chat color schemes, plus a full icon manager for game/status icons
 - BNCS friends list, flood protection, SOCKS5/HTTP CONNECT proxy support, auto-connect/auto-reconnect
+- **Rapid reconnect** for private servers: back on the instant the connection drops, retrying every second — and without a single BNLS round trip, by reusing the session's first login answers (about half the time of a normal login)
 - Config saved as JSON, with multi-profile loading
 
 <p align="center">
@@ -39,10 +40,10 @@ Each bot gets its own settings — connection, proxy, account, clan, trivia, and
 
 ### Chat color schemes
 
-Every chat message category — usernames, whispers, errors, and more — gets its own color, fully customizable per bot.
+Every chat message category — usernames, whispers, errors, and more — gets its own color, fully customizable per bot. Each bot's theme, colors, icon set and tab group live together under **Customize → Selected Bot's Appearance**, so the bot's own settings stay about connecting: game, login, server, then everything else.
 
 <p align="center">
-  <img src="screenshots/colors-appearance.png" width="500" alt="Bot Configuration window, Appearance section showing the chat color scheme picker and swatch legend">
+  <img src="screenshots/colors-appearance.png" width="500" alt="Bot Appearance window showing the theme picker, chat color scheme picker and swatch legend">
 </p>
 
 ### Icon manager
@@ -69,7 +70,7 @@ Setup is one-time: create an app on the [Spotify developer dashboard](https://de
 
 Set a bot's **Product** to StarCraft II in its Configuration window and Connect — it logs in through Blizzard's modern Battle.net service instead of the classic protocol the rest of this app uses, so a few things work differently. StarCraft: Remastered and Warcraft III: Reforged are already selectable in that same list (they share the underlying connection), but aren't actually working yet — that's coming in a future release.
 
-- **Battle.net credential profiles**: instead of each bot having its own implicit login, a bot picks a named **Battle.net Profile** from a dropdown in its Configuration window. Point two bots at the same profile to share one signed-in login (handy for running multiple bots on the same account); give a bot its own profile for a separate login. Manage profiles — rename, sign in, remove — from **Customize → Manage Battle.net Profiles...**.
+- **Battle.net credential profiles**: instead of each bot having its own implicit login, a bot picks a named **Battle.net Profile** from a dropdown in its settings. Point two bots at the same profile to share one signed-in login (handy for running multiple bots on the same account); give a bot its own profile for a separate login. Manage profiles — rename, sign in, remove — from **File → Manage Battle.net Profiles...**.
 - **Multi-channel chat**: unlike classic Battle.net's single-channel chat, these products can be joined to several channels at once (up to 6). Each joined channel gets its own sub-tab with its own chat log and user list; use the **+** button above the sub-tabs to join another public or private channel, and the **×** on a sub-tab to leave it. The bot remembers which channels it had open and rejoins them on reconnect.
 - Trivia, when running in one of these channels, only accepts answers from that same channel — not from a different one the bot also happens to be in.
 

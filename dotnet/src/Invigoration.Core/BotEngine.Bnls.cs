@@ -31,13 +31,25 @@ public sealed partial class BotEngine
     private async Task HandleVersionCheckEx2Async(byte[] frame)
     {
         var reader = BnlsConnection.GetPayloadReader(frame);
-        _ = reader.ReadBoolean(); // Success
+        var succeeded = reader.ReadBoolean();
         _auth.ExeVersion = reader.ReadDword();
         _auth.ExeChecksum = reader.ReadDword();
         _auth.ExeInfo = reader.ReadNTString();
         reader.ReadDword(); // Cookie, unused
         reader.ReadDword(); // Version code, unused
 
+        if (succeeded && _auth.VersionCheckChallenge is { } challenge)
+        {
+            LogonCheckCache.RememberVersionCheck(Config.Product, challenge.FileTime, challenge.FileName, challenge.Formula,
+                new LogonCheckCache.VersionCheck(_auth.ExeVersion, _auth.ExeChecksum, _auth.ExeInfo));
+        }
+
+        await ContinueAfterVersionCheckAsync().ConfigureAwait(false);
+    }
+
+    /// <summary>Everything after the version check is known — hash the CD key(s), then SID_AUTH_CHECK. Shared by BNLS's answer and a rapid reconnect's cached one.</summary>
+    private async Task ContinueAfterVersionCheckAsync()
+    {
         if (!BncsProduct.RequiresCdKey(Config.Product))
         {
             await SendAuthCheckAsync().ConfigureAwait(false);
@@ -259,6 +271,10 @@ public sealed partial class BotEngine
         var reader = BnlsConnection.GetPayloadReader(frame);
         reader.Skip(4); // echoed product byte
         var bnlsVersionByte = reader.ReadDword();
+        if (bnlsVersionByte != 0)
+        {
+            LogonCheckCache.RememberVersionByte(Config.Product, bnlsVersionByte);
+        }
 
         if (TryParseVersionByteOverride(Config.VersionByteOverride, out var overrideByte))
         {

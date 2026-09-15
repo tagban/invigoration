@@ -69,6 +69,23 @@ public sealed partial class BotEngine
         var mpqFileTime = reader.ReadFileTime();
         var mpqFileName = reader.ReadNTString();
         var checkRevisionFormula = reader.ReadNTString();
+        _auth.VersionCheckChallenge = (mpqFileTime, mpqFileName, checkRevisionFormula);
+
+        if (_auth.UsingCachedChecks)
+        {
+            if (LogonCheckCache.TryGetVersionCheck(Config.Product, mpqFileTime, mpqFileName, checkRevisionFormula, out var cached))
+            {
+                (_auth.ExeVersion, _auth.ExeChecksum, _auth.ExeInfo) = (cached.ExeVersion, cached.ExeChecksum, cached.ExeInfo);
+                await ContinueAfterVersionCheckAsync().ConfigureAwait(false);
+                return;
+            }
+
+            // The server changed its challenge since the last logon: only BNLS can answer it.
+            LogDebug("Rapid reconnect: the server sent a new version check — logging on the normal way.");
+            _auth.UsingCachedChecks = false;
+            await ConnectAsync().ConfigureAwait(false);
+            return;
+        }
 
         var writer = new PacketWriter()
             .WriteDword(BncsProduct.GetBnlsProductByte(Config.Product) ?? 0)

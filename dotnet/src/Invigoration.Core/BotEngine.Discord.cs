@@ -35,10 +35,31 @@ public sealed partial class BotEngine
             return;
         }
 
+        // Every reconnect (auto or rapid) comes back through ConnectAsync; the bridge that's
+        // already up (or on its way) stays, rather than a second one relaying everything twice.
+        if (_discordBridge is not null || Interlocked.Exchange(ref _discordBridgeStarting, 1) == 1)
+        {
+            return;
+        }
+
         SafeFireAndForget(ConnectDiscordBridgeAsync(), "connecting the Discord bridge");
     }
 
+    private int _discordBridgeStarting;
+
     private async Task ConnectDiscordBridgeAsync()
+    {
+        try
+        {
+            await ConnectDiscordBridgeCoreAsync().ConfigureAwait(false);
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _discordBridgeStarting, 0);
+        }
+    }
+
+    private async Task ConnectDiscordBridgeCoreAsync()
     {
         var bridge = new DiscordBridgeClient();
         bridge.Log += msg => LogDebug($"Discord: {msg}");

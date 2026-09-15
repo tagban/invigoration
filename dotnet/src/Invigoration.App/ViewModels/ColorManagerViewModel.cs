@@ -10,7 +10,7 @@ namespace Invigoration.App.ViewModels;
 /// <summary>
 /// Shared (cross-bot) color-scheme editor, reachable from the top-level
 /// Customize menu — full swatch-by-swatch editing lives here now, extracted
-/// out of the per-bot Config window's Appearance section, which is just a
+/// out of the per-bot Bot Appearance window (Customize menu), which is just a
 /// picker ("which saved scheme does this bot use") now. Operates on its own
 /// working CustomChatPalette rather than any specific BotConfig, since a
 /// saved scheme in the shared ColorSchemeLibrary isn't owned by one bot.

@@ -189,9 +189,16 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     private void MaybeScheduleAutoReconnect()
     {
+        // A rapid reconnect already under way handles every drop until it's back on — including
+        // one of its own attempts being closed by the server.
+        if (Volatile.Read(ref _rapidReconnectRunning) == 1 && !_isIntentionalDisconnect)
+        {
+            return;
+        }
+
         _autoReconnectCts?.Cancel();
 
-        if (_isIntentionalDisconnect || !Config.AutoReconnect)
+        if (_isIntentionalDisconnect || (!Config.AutoReconnect && !Config.RapidReconnect))
         {
             return;
         }
@@ -199,6 +206,19 @@ public sealed partial class BotEngine : IAsyncDisposable
         if (_logonRejection is { } rejection)
         {
             LogWarning($"Auto-reconnect skipped: {rejection} Reconnecting would only be refused the same way — fix it, then connect.");
+            return;
+        }
+
+        if (RapidReconnectApplies)
+        {
+            _autoReconnectCts = new CancellationTokenSource();
+            SafeFireAndForget(RunRapidReconnectAsync(_autoReconnectCts.Token), "rapid reconnecting");
+            return;
+        }
+
+        if (!Config.AutoReconnect)
+        {
+            LogWarning("Rapid reconnect is only for private servers — not reconnecting to official Battle.net automatically.");
             return;
         }
 
@@ -300,6 +320,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     {
         _isIntentionalDisconnect = false;
         _logonRejection = null;
+        _auth.UsingCachedChecks = false;
         StartDiscordBridgeIfEnabled();
 
         if (BncsProduct.IsStimpakBacked(Config.Product))

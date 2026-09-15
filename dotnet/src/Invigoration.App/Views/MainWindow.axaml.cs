@@ -194,8 +194,34 @@ public partial class MainWindow : Window
             return;
         }
 
-        var dialog = new ConfigWindow(selected.Config);
-        var result = await dialog.ShowDialog<BotConfig?>(this);
+        await ApplyBotEditAsync(selected, await new ConfigWindow(selected.Config).ShowDialog<BotConfig?>(this));
+    }
+
+    private async void OnBotAppearanceClick(object? sender, RoutedEventArgs e) => await EditSelectedBotAppearance();
+    private async void OnBotAppearanceNativeClick(object? sender, EventArgs e) => await EditSelectedBotAppearance();
+
+    /// <summary>Customize → Selected Bot's Appearance: theme, colors, icons and tab group, applied the same way as a settings edit.</summary>
+    private async Task EditSelectedBotAppearance()
+    {
+        var vm = ViewModel;
+        if (vm?.SelectedBot is not { } selected)
+        {
+            await InformAsync("Bot Appearance", "Select a bot first", "Open the tab of the bot whose appearance you want to change, then choose Customize → Selected Bot's Appearance.");
+            return;
+        }
+
+        await ApplyBotEditAsync(selected, await new BotAppearanceWindow(selected.Config).ShowDialog<BotConfig?>(this));
+    }
+
+    /// <summary>Applies an edited copy of a bot's config from either window, then saves and keeps that bot's tab selected.</summary>
+    private async Task ApplyBotEditAsync(BotTabViewModel selected, BotConfig? result)
+    {
+        var vm = ViewModel;
+        if (vm is null)
+        {
+            return;
+        }
+
         if (result is not null)
         {
             selected.ApplyConfig(result);

@@ -18,6 +18,7 @@
                     <NativeMenu>
                         <NativeMenuItem Header="Add Bot..." Click="OnAddBotNativeClick" />
                         <NativeMenuItem Header="Edit Selected Bot..." Click="OnEditBotNativeClick" />
+                        <NativeMenuItem Header="Manage Battle.net Profiles..." Click="OnManageBattlenetProfilesNativeClick" />
                         <NativeMenuItem Header="Normalize Selected Bot's Password..." Click="OnNormalizePasswordNativeClick" />
                         <NativeMenuItem Header="Remove Selected Bot" Click="OnRemoveBotNativeClick" />
                         <NativeMenuItemSeparator />
@@ -40,11 +41,12 @@
             <NativeMenuItem Header="Customize">
                 <NativeMenuItem.Menu>
                     <NativeMenu>
+                        <NativeMenuItem Header="Selected Bot's Appearance..." Click="OnBotAppearanceNativeClick" />
+                        <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Manage Icons..." Click="OnManageIconsNativeClick" />
                         <NativeMenuItem Header="Manage Colors..." Click="OnManageColorsNativeClick" />
                         <NativeMenuItem Header="Manage Themes..." Click="OnManageThemesNativeClick" />
                         <NativeMenuItem Header="Download Diablo II Gear Data..." Click="OnDownloadD2EquipmentNativeClick" />
-                        <NativeMenuItem Header="Manage Battle.net Profiles..." Click="OnManageBattlenetProfilesNativeClick" />
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
                         <NativeMenuItem Header="Music Bar (bottom)" ToggleType="CheckBox" IsChecked="{Binding IsMusicBarEnabled, Mode=TwoWay}" />
@@ -70,6 +72,7 @@
             <MenuItem Header="_File">
                 <MenuItem Header="_Add Bot..." Click="OnAddBotClick" />
                 <MenuItem Header="_Edit Selected Bot..." Click="OnEditBotClick" />
+                <MenuItem Header="Manage _Battle.net Profiles..." Click="OnManageBattlenetProfilesClick" />
                 <MenuItem Header="_Normalize Selected Bot's Password..." Click="OnNormalizePasswordClick" />
                 <MenuItem Header="_Remove Selected Bot" Click="OnRemoveBotClick" />
                 <Separator />
@@ -84,11 +87,12 @@
                 <MenuItem Header="Manage _Ranks..." Click="OnClanRanksClick" />
             </MenuItem>
             <MenuItem Header="_Customize">
+                <MenuItem Header="Selected Bot's _Appearance..." Click="OnBotAppearanceClick" />
+                <Separator />
                 <MenuItem Header="Manage _Icons..." Click="OnManageIconsClick" />
                 <MenuItem Header="Manage _Colors..." Click="OnManageColorsClick" />
                 <MenuItem Header="Manage _Themes..." Click="OnManageThemesClick" />
                 <MenuItem Header="Download Diablo II _Gear Data..." Click="OnDownloadD2EquipmentClick" />
-                <MenuItem Header="Manage _Battle.net Profiles..." Click="OnManageBattlenetProfilesClick" />
                 <Separator />
                 <MenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
                 <MenuItem Header="Music Bar (bottom)" ToggleType="CheckBox" IsChecked="{Binding IsMusicBarEnabled, Mode=TwoWay}" />

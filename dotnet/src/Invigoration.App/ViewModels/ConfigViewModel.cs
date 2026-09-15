@@ -45,12 +45,17 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(RequiresExpansionKey))]
     [NotifyPropertyChangedFor(nameof(RequiresCdKey))]
     [NotifyPropertyChangedFor(nameof(AllowsOfficialServers))]
+    [NotifyPropertyChangedFor(nameof(ShowsCustomServerBox))]
     [NotifyPropertyChangedFor(nameof(ServerCompatibilityNote))]
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
     [NotifyPropertyChangedFor(nameof(IsStimpakBackedProduct))]
+    [NotifyPropertyChangedFor(nameof(IsDiabloII))]
     public partial string Product { get; set; }
 
     public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
+
+    /// <summary>Only Diablo II logs on to a realm (character server) after Battle.net.</summary>
+    public bool IsDiabloII => Product is BncsProduct.DiabloII or BncsProduct.DiabloIILoD;
 
     // --- Tab group icon: which icon (see IconCatalog) this bot's Tab Group shows on its
     // collapsed top-level tab, once it has one — see TabGroupIconStore. Groups aren't a
@@ -192,7 +197,11 @@ public partial class ConfigViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsOtherServerSelected))]
+    [NotifyPropertyChangedFor(nameof(ShowsCustomServerBox))]
     public partial string SelectedOfficialServer { get; set; }
+
+    /// <summary>The second, "custom address" box — only alongside the official-server picker. A private-server-only game already shows the address box on its own.</summary>
+    public bool ShowsCustomServerBox => AllowsOfficialServers && IsOtherServerSelected;
 
     public bool IsOtherServerSelected => SelectedOfficialServer == OtherServerOption;
 

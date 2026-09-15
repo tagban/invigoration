@@ -18,6 +18,12 @@ public sealed class AuthState
     /// <summary>The CD-key block(s) sent verbatim in SID_AUTH_CHECK — either built locally by CdKeyDecoder or forwarded from BNLS_CDKEY/BNLS_CDKEY_EX.</summary>
     public byte[] CdKeyHash { get; set; } = [];
 
+    /// <summary>The version check challenge from the last SID_AUTH_INFO reply, so BNLS's answer to it can be remembered (LogonCheckCache).</summary>
+    public (Protocol.FileTimeValue FileTime, string FileName, string Formula)? VersionCheckChallenge { get; set; }
+
+    /// <summary>True for a rapid-reconnect attempt that's logging on with LogonCheckCache's answers instead of asking BNLS.</summary>
+    public bool UsingCachedChecks { get; set; }
+
     public uint ExeVersion { get; set; }
     public uint ExeChecksum { get; set; }
     public string ExeInfo { get; set; } = "";
