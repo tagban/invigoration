@@ -43,12 +43,17 @@ public partial class MainWindow : Window
 
                 vm.PropertyChanged += OnViewModelPropertyChanged;
 
-                // A bot already on a character-dock theme from before this existed gets the same
-                // one-time offer as one switched to it now. Posted so the window is up first.
-                if (vm.Bots.Any(b => b.Theme.UsesCharacterDock))
+                // One-time questions, one after the other, posted so the window is up first: whether
+                // to use Spotify at all, then — for a bot already on a character-dock theme from
+                // before that offer existed — the D2 gear data.
+                Dispatcher.UIThread.Post(async () =>
                 {
-                    Dispatcher.UIThread.Post(async () => await OfferD2EquipmentDownloadAsync());
-                }
+                    await AskAboutSpotifyAsync();
+                    if (vm.Bots.Any(b => b.Theme.UsesCharacterDock))
+                    {
+                        await OfferD2EquipmentDownloadAsync();
+                    }
+                });
             }
         };
     }
@@ -280,7 +285,58 @@ public partial class MainWindow : Window
     }
 
     /// <summary>A small modal yes/no prompt — heading, explanation, and a confirm button beside Cancel.</summary>
-    private async Task<bool> ConfirmAsync(string title, string heading, string body, string confirmText)
+    /// <summary>
+    /// First run: controlling Spotify needs Premium, so rather than show a Music tab most people
+    /// can't use, ask once. Yes keeps the tab and opens it; No hides the tab and the player bar
+    /// (Customize → Music Player brings it back). Closing the question without answering asks
+    /// again next launch. Never asked once Spotify is connected.
+    /// </summary>
+    private async Task AskAboutSpotifyAsync()
+    {
+        if (MusicSettingsStore.SpotifyPromptAnswered || ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        if (MusicSettingsStore.SpotifyRefreshToken.Length > 0)
+        {
+            MusicSettingsStore.SpotifyPromptAnswered = true;
+            return;
+        }
+
+        var answer = await AskAsync(
+            "Spotify",
+            "Do you have Spotify Premium and want to use it?",
+            "Invigoration can show what's playing on your Spotify and let your bots skip, pause and save tracks from chat. " +
+            "Controlling Spotify needs a Premium account.\n\nIf not, the Music tab stays hidden — you can turn it on any time from Customize → Music Player.",
+            "Yes, use Spotify",
+            "No");
+        if (answer is not { } useSpotify)
+        {
+            return;
+        }
+
+        MusicSettingsStore.SpotifyPromptAnswered = true;
+        if (useSpotify)
+        {
+            vm.IsMusicEnabled = true;
+            if (this.FindControl<TabStrip>("TopLevelTabControl") is { } tabControl)
+            {
+                tabControl.SelectedItem = vm.MusicTab;
+            }
+        }
+        else
+        {
+            vm.IsMusicEnabled = false;
+            vm.IsMusicBarEnabled = false;
+        }
+    }
+
+    private async Task<bool> ConfirmAsync(string title, string heading, string body, string confirmText) =>
+        await AskAsync(title, heading, body, confirmText, "Cancel") == true;
+
+    /// <summary>A two-button question. True for the confirm button, false for the other, null when the window was closed without either.</summary>
+    private async Task<bool?> AskAsync(string title, string heading, string body, string confirmText, string cancelText)
     {
         var dialog = new Window
         {
@@ -292,9 +348,9 @@ public partial class MainWindow : Window
         };
 
         var confirm = new Button { Content = confirmText, IsDefault = true };
-        var cancel = new Button { Content = "Cancel", IsCancel = true };
-        confirm.Click += (_, _) => dialog.Close(true);
-        cancel.Click += (_, _) => dialog.Close(false);
+        var cancel = new Button { Content = cancelText, IsCancel = true };
+        confirm.Click += (_, _) => dialog.Close((bool?)true);
+        cancel.Click += (_, _) => dialog.Close((bool?)false);
 
         dialog.Content = new StackPanel
         {
@@ -314,7 +370,7 @@ public partial class MainWindow : Window
             },
         };
 
-        return await dialog.ShowDialog<bool>(this);
+        return await dialog.ShowDialog<bool?>(this);
     }
 
     private void OnRemoveBotClick(object? sender, RoutedEventArgs e) => RemoveSelectedBot();

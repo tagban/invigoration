@@ -19,9 +19,11 @@ public class MusicSettingsStoreTests
             Assert.True(MusicSettingsStore.ShowBottomBar);
             Assert.Equal("", MusicSettingsStore.SpotifyClientId);
             Assert.Equal("", MusicSettingsStore.SpotifyRefreshToken);
+            Assert.False(MusicSettingsStore.SpotifyPromptAnswered);
 
             MusicSettingsStore.SpotifyClientId = "  my-client  ";
             MusicSettingsStore.SpotifyRefreshToken = "secret-refresh-token";
+            MusicSettingsStore.SpotifyPromptAnswered = true;
 
             var onDisk = File.ReadAllText(Path.Combine(directory, "music-settings.json"));
             Assert.DoesNotContain("secret-refresh-token", onDisk);
@@ -30,6 +32,7 @@ public class MusicSettingsStoreTests
             Assert.Equal("my-client", MusicSettingsStore.SpotifyClientId);
             Assert.Equal("secret-refresh-token", MusicSettingsStore.SpotifyRefreshToken);
             Assert.True(MusicSettingsStore.ShowBottomBar);
+            Assert.True(MusicSettingsStore.SpotifyPromptAnswered);
         }
         finally
         {

@@ -48,6 +48,13 @@ public static class MusicSettingsStore
         set => Update(s => s with { SpotifyRefreshToken = value });
     }
 
+    /// <summary>Whether the user has answered the first-run "use Spotify?" question (MainWindow) — a Yes or a No is remembered; closing the question without answering isn't.</summary>
+    public static bool SpotifyPromptAnswered
+    {
+        get => Current.SpotifyPromptAnswered;
+        set => Update(s => s with { SpotifyPromptAnswered = value });
+    }
+
     /// <summary>Test hook: forget what's loaded.</summary>
     public static void ResetCacheForTests()
     {
@@ -105,5 +112,6 @@ public static class MusicSettingsStore
         bool IsEnabled = true,
         bool ShowBottomBar = false,
         string SpotifyClientId = "",
-        [property: JsonConverter(typeof(ObfuscatedPasswordJsonConverter))] string SpotifyRefreshToken = "");
+        [property: JsonConverter(typeof(ObfuscatedPasswordJsonConverter))] string SpotifyRefreshToken = "",
+        bool SpotifyPromptAnswered = false);
 }
