@@ -308,7 +308,9 @@ public partial class MainWindow : Window
             "Spotify",
             "Do you have Spotify Premium and want to use it?",
             "Invigoration can show what's playing on your Spotify and let your bots skip, pause and save tracks from chat. " +
-            "Controlling Spotify needs a Premium account.\n\nIf not, the Music tab stays hidden — you can turn it on any time from Customize → Music Player.",
+            "Controlling Spotify needs a Premium account.\n\n" +
+            "Music plays through Spotify itself, so you'll need either the Spotify app installed on this computer, or Spotify open and signed in in your web browser.\n\n" +
+            "If you choose No, the Music tab stays hidden — you can turn it on any time from Customize → Music Player.",
             "Yes, use Spotify",
             "No");
         if (answer is not { } useSpotify)
