@@ -298,7 +298,15 @@ public sealed partial class HotlineTrackerViewModel : ViewModelBase
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             _allServers = [.. await HotlineTrackerClient.QueryAsync(TrackerHost, ct: cts.Token).ConfigureAwait(true)];
             ApplyFilter();
-            StatusText = _allServers.Count == 0 ? "No servers found (or the tracker didn't respond)." : "";
+
+            // Say so when a tracker turns out to speak the modern protocol — it's the difference
+            // between a list that can carry IPv6 and hostnames and one that can't.
+            var version = HotlineTrackerClient.LastNegotiatedVersion;
+            StatusText = _allServers.Count == 0
+                ? "No servers found (or the tracker didn't respond)."
+                : version >= HotlineConstants.TrackerVersion3
+                    ? $"{_allServers.Count} servers (tracker protocol v{version})."
+                    : "";
 
             // "Settings for the tracker should collapse down once the tracker is setup for the
             // first time" — the tracker having actually returned a real server list is the

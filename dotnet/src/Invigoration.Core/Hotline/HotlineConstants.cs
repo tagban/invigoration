@@ -23,6 +23,34 @@ public static class HotlineConstants
 
     public static readonly byte[] TrackerMagic = "HTRK"u8.ToArray();
     public const ushort TrackerVersion = 0x0001;
+
+    /// <summary>The modern tracker protocol. A v1/v2 tracker ignores the extra bytes a v3 client sends and answers with its own version, so asking costs nothing.</summary>
+    public const ushort TrackerVersion3 = 0x0003;
+
+    /// <summary>"H3" — marks a v3 extension block inside an otherwise v1-shaped registration datagram.</summary>
+    public const ushort TrackerV3ExtensionMagic = 0x4833;
+
+    /// <summary>What a v3 client asks for in its handshake; the tracker answers with its own set and the overlap is what's in play.</summary>
+    [Flags]
+    public enum TrackerFeatures : ushort
+    {
+        None = 0,
+
+        /// <summary>Server records may carry IPv6 addresses.</summary>
+        IPv6 = 0x0001,
+
+        /// <summary>Search text and pagination can be sent with a listing request.</summary>
+        Query = 0x0002,
+
+        ClientAuth = 0x0004,
+        RegistrationAck = 0x0008,
+        Hmac = 0x0010,
+    }
+
+    /// <summary>TLV ids for the query parameters a v3 listing request can carry.</summary>
+    public const ushort TrackerQuerySearchText = 0x1001;
+    public const ushort TrackerQueryPageOffset = 0x1010;
+    public const ushort TrackerQueryPageLimit = 0x1011;
 }
 
 /// <summary>The subset of Hotline's TransactionType opcodes this client actually sends/handles — chat, login, user list, and keepalive. File transfer, news, and media transactions are a known, accepted gap (see HotlineTransactionClient's remarks).</summary>
