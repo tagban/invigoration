@@ -274,25 +274,26 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
 
     /// <summary>
     /// Restores the VB6 original's Form_Load ASCII-art banner - a bunny made
-    /// of parentheses plus "Invigoration Beta bunny" in red/green - shown
-    /// once when a bot tab opens, as a nod to this project's long-running
-    /// beta status. Ported from frmMain.frm's AddChat calls; the colored
-    /// "Beta"/"bunny" words reuse the same inline color-code marker
-    /// (U+00A0 + letter) ChatColorFormatter already parses everywhere else.
+    /// of parentheses plus "Invigoration STABLE Bunny" in red/green - shown
+    /// once when a bot tab opens. It read "Beta bunny" through the whole
+    /// 2.0.x line; the beta is over as of 2.1.0, and the bunny was promoted
+    /// rather than retired. Ported from frmMain.frm's AddChat calls; the
+    /// colored words reuse the same inline color-code marker (U+00A0 +
+    /// letter) ChatColorFormatter already parses everywhere else.
     /// </summary>
     private void ShowStartupBanner()
     {
         var p = Engine.Palette;
         const string separator = "---------------------------------------------------";
         const char marker = ' ';
-        var bunnyLine = $"Invigoration {marker}rBeta {marker}gbunny";
+        var bunnyLine = $"Invigoration {marker}rSTABLE {marker}gBunny";
 
         ChatLines.Add(new ChatLineViewModel(separator, p.Highlight));
         ChatLines.Add(new ChatLineViewModel("()()", p.Info));
         ChatLines.Add(new ChatLineViewModel("(--)", p.Info));
         ChatLines.Add(new ChatLineViewModel("(')(')", p.Info));
         ChatLines.Add(new ChatLineViewModel(ChatColorFormatter.Parse(bunnyLine, p.Channel, p)));
-        ChatLines.Add(new ChatLineViewModel("C#/.NET port -- still in beta", p.Debug));
+        ChatLines.Add(new ChatLineViewModel($"C#/.NET port -- v{AppVersion.Current}", p.Debug));
         ChatLines.Add(new ChatLineViewModel(separator, p.Info));
     }
 

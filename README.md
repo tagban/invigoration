@@ -142,4 +142,4 @@ The classic Battle.net 1.0 (BNCS) protocol implementation wouldn't have been pos
 
 ## Status
 
-Actively developed, still labeled beta — expect rough edges. Feedback and bug reports welcome via [Issues](https://github.com/tagban/invigoration/issues).
+Stable as of 2.1.0, and actively developed. Feedback and bug reports welcome via [Issues](https://github.com/tagban/invigoration/issues).

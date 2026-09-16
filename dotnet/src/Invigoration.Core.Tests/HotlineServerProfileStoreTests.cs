@@ -94,6 +94,15 @@ public class HotlineDefaultProfileTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "invig-hlseed-" + Guid.NewGuid().ToString("N"));
 
+    /// <summary>
+    /// What the override was before this class touched it — restored on the way out rather than
+    /// cleared. Clearing it is what let a test write to the real %AppData% profile list: this
+    /// collection's fixture sets one shared override for every class in it, and a Dispose that
+    /// nulled the property instead of putting the previous value back left every test that ran
+    /// afterwards pointed at the user's own config. It really did create profiles there.
+    /// </summary>
+    private readonly string? _previousOverride = HotlineServerProfileStore.ConfigDirectoryOverride;
+
     public HotlineDefaultProfileTests()
     {
         Directory.CreateDirectory(_directory);
@@ -102,7 +111,7 @@ public class HotlineDefaultProfileTests : IDisposable
 
     public void Dispose()
     {
-        HotlineServerProfileStore.ConfigDirectoryOverride = null;
+        HotlineServerProfileStore.ConfigDirectoryOverride = _previousOverride;
         try
         {
             Directory.Delete(_directory, recursive: true);
@@ -153,7 +162,7 @@ public class HotlineDefaultProfileTests : IDisposable
             HotlineServerProfileStore.Delete(profile.Id);
         }
 
-        // Force a reload from disk the way a restart would.
+        // Force a reload from disk the way a restart would (setting the override drops the cache).
         HotlineServerProfileStore.ConfigDirectoryOverride = _directory;
 
         Assert.Empty(HotlineServerProfileStore.Profiles);

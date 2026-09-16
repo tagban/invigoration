@@ -11,6 +11,8 @@ public class ReleaseVersionTests
     [InlineData("3.0.0b", "2.9.9b")]
     [InlineData("2.0.8b", "2.0.8a")]   // same numbers, later letter
     [InlineData("2.0.8", "2.0.7b")]
+    [InlineData("2.1.0", "2.0.8b")]    // leaving beta: the number has to go up, or nobody is offered it
+    [InlineData("2.1.0", "2.0.9")]
     public void IsNewerThan_RecognizesTheLaterVersion(string later, string earlier)
     {
         var a = ReleaseVersion.TryParse(later)!;
@@ -42,6 +44,24 @@ public class ReleaseVersionTests
     [InlineData("2.x.0")]
     public void Nonsense_ParsesToNothing(string? text) => Assert.Null(ReleaseVersion.TryParse(text));
 
+    /// <summary>
+    /// The trap that decided 2.1.0's number: a bare "2.0.8" sorts BELOW "2.0.8b", because the
+    /// suffix is compared as text and "" comes before "b". Dropping the beta letter without
+    /// raising the number would have left everyone on 2.0.8b never offered the stable build.
+    /// </summary>
+    [Fact]
+    public void DroppingTheBetaLetterAlone_WouldLookOlderNotNewer()
+    {
+        var stable = ReleaseVersion.TryParse("2.0.8")!;
+        var beta = ReleaseVersion.TryParse("2.0.8b")!;
+
+        Assert.False(stable.IsNewerThan(beta));
+        Assert.True(beta.IsNewerThan(stable));
+
+        // Which is why the release went out as 2.1.0.
+        Assert.True(ReleaseVersion.TryParse("2.1.0")!.IsNewerThan(beta));
+    }
+
     [Fact]
     public void ToString_RoundTripsWithoutTheTagPrefix()
     {
@@ -59,6 +79,9 @@ public class UpdateCheckTests : IDisposable
 {
     private readonly string _directory = Path.Combine(Path.GetTempPath(), "invig-update-" + Guid.NewGuid().ToString("N"));
 
+    /// <summary>Restored rather than cleared on the way out — clearing a store's directory override points whatever runs next at the user's real config. See HotlineDefaultProfileTests for the time that actually happened.</summary>
+    private readonly string? _previousOverride = UpdateSettingsStore.DirectoryOverride;
+
     public UpdateCheckTests()
     {
         Directory.CreateDirectory(_directory);
@@ -69,7 +92,7 @@ public class UpdateCheckTests : IDisposable
     public void Dispose()
     {
         UpdateCheck.LatestTagOverride = null;
-        UpdateSettingsStore.DirectoryOverride = null;
+        UpdateSettingsStore.DirectoryOverride = _previousOverride;
         UpdateSettingsStore.ResetCacheForTests();
         try
         {
