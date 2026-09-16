@@ -83,7 +83,8 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
 
     public bool CanGoUp => _path.Count > 0;
 
-    public bool CanUpload => client.CanUploadFiles;
+    /// <summary>Always offered — see the remarks on CanDelete: upload is set per folder, and a drop box is exactly the case where the account-wide bit says no and the folder says yes.</summary>
+    public bool CanUpload => true;
 
     /// <summary>Nothing loaded yet (or the folder is genuinely empty) — a hint beats an unexplained blank pane. Never while a request is in flight.</summary>
     public bool ShowEmptyHint => !IsBusy && Entries.Count == 0;
@@ -128,11 +129,25 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
 
     private HotlineFileRowViewModel? _promptTarget;
 
-    public bool CanDelete(bool isFolder) => isFolder ? client.CanDeleteFolders : client.CanDeleteFiles;
+    // Hotline sets Upload, Download, Delete File, Create Folder and Delete Folder PER FOLDER as
+    // well as per account — a drop box grants uploads to people who don't have the privilege
+    // generally, and a locked folder refuses deletes from people who do. The protocol offers no
+    // way to ask what a given folder allows: a client finds out by trying.
+    //
+    // So the account bitmap is a hint, not a gate. Every action is offered and the server decides;
+    // a refusal comes back as a plain message, with a note when the account lacks the privilege
+    // generally (see DescribeRefusal), since that's the likeliest explanation. Hiding these
+    // instead would make a drop box impossible to use from this client.
+    public bool CanDelete(bool isFolder) => true;
 
-    public bool CanRename(bool isFolder) => isFolder ? client.CanRenameFolders : client.CanRenameFiles;
+    public bool CanRename(bool isFolder) => true;
 
-    public bool CanCreateFolder => client.CanCreateFolders;
+    public bool CanCreateFolder => true;
+
+    /// <summary>Why the server probably said no — the account-wide privilege when it's missing, since a folder can only ever have been the other reason.</summary>
+    private string DescribeRefusal(string action, bool hasAccountPrivilege) => hasAccountPrivilege
+        ? $"The server wouldn't {action} that — this folder may not allow it."
+        : $"The server wouldn't {action} that. This account doesn't have that privilege generally, though some folders grant it individually.";
 
     [RelayCommand]
     private void StartNewFolder()
@@ -192,19 +207,19 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
                 case PromptKind.NewFolder when typed.Length > 0:
                     StatusMessage = await client.CreateFolderAsync(_path, typed).ConfigureAwait(true)
                         ? $"Created {typed}."
-                        : "The server wouldn't create that folder.";
+                        : DescribeRefusal("create", client.CanCreateFolders);
                     break;
 
                 case PromptKind.Rename when target is not null && typed.Length > 0:
                     StatusMessage = await client.RenameAsync(_path, target.Name, typed).ConfigureAwait(true)
                         ? $"Renamed to {typed}."
-                        : "The server wouldn't rename that.";
+                        : DescribeRefusal("rename", target.IsFolder ? client.CanRenameFolders : client.CanRenameFiles);
                     break;
 
                 case PromptKind.ConfirmDelete when target is not null:
                     StatusMessage = await client.DeleteFileAsync(_path, target.Name).ConfigureAwait(true)
                         ? $"Deleted {target.Name.Trim()}."
-                        : "The server wouldn't delete that.";
+                        : DescribeRefusal("delete", target.IsFolder ? client.CanDeleteFolders : client.CanDeleteFiles);
                     break;
 
                 default:
@@ -248,9 +263,7 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
 
             if (Entries.Count == 0)
             {
-                StatusMessage = client.CanDownloadFiles
-                    ? "Nothing here."
-                    : "This account isn't allowed to browse files on this server.";
+                StatusMessage = "Nothing here.";
             }
         }
         catch (Exception ex) when (ex is IOException or InvalidOperationException)
@@ -461,7 +474,7 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
             var ticket = await client.RequestFolderUploadAsync(_path, name, items.Count, totalBytes).ConfigureAwait(true);
             if (ticket is null)
             {
-                StatusMessage = "The server wouldn't accept a folder upload here.";
+                StatusMessage = DescribeRefusal("accept a folder upload of", client.CanUploadFiles);
                 return;
             }
 
@@ -511,7 +524,7 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
             var ticket = await client.RequestUploadAsync(_path, name, length).ConfigureAwait(true);
             if (ticket is null)
             {
-                StatusMessage = "The server wouldn't accept an upload here.";
+                StatusMessage = DescribeRefusal("accept an upload of", client.CanUploadFiles);
                 return;
             }
 

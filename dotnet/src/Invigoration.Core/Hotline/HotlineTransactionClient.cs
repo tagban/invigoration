@@ -271,14 +271,21 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         // own anti-bot heuristic ("a real client wouldn't query the room before agreeing to its
         // rules"). Give a server-pushed ShowAgreement a brief window to arrive (empirically it
         // arrives near-instantly, right alongside the login reply, if it's coming at all) before
-        // deciding whether it's safe to fetch the user list now. (_agreementArrivedTcs was
-        // created at the very top of this method, not here — see its remarks.)
+        // deciding whether it's safe to fetch the user list now.
+        //
+        // ConnectAndLoginAsync creates _agreementArrivedTcs before either login path runs, so it's
+        // always set by the time this is reached — captured into a local both to say so and so a
+        // future caller that skipped that step gets a TCS that simply never completes (the grace
+        // window then times out, which is exactly the "no agreement" behaviour) rather than a
+        // NullReferenceException mid-login.
+        var agreementArrived = _agreementArrivedTcs ?? new TaskCompletionSource<bool>();
+
         using (var graceCts = CancellationTokenSource.CreateLinkedTokenSource(ct))
         {
             graceCts.CancelAfter(TimeSpan.FromMilliseconds(800));
             try
             {
-                await _agreementArrivedTcs.Task.WaitAsync(graceCts.Token).ConfigureAwait(false);
+                await agreementArrived.Task.WaitAsync(graceCts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (!ct.IsCancellationRequested)
             {
@@ -286,7 +293,7 @@ public sealed class HotlineTransactionClient : FramedTcpClient
             }
         }
 
-        if (_agreementArrivedTcs.Task is { IsCompletedSuccessfully: true })
+        if (agreementArrived.Task is { IsCompletedSuccessfully: true })
         {
             // Defer first — AutoAcceptAgreement's own AcceptAgreementAsync call below fetches the
             // user list itself once Agreed is actually sent, in the correct order. Without
