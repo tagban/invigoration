@@ -84,7 +84,21 @@ public sealed class HotlineTransactionClient : FramedTcpClient
 
     public uint? HistoryMaxDays { get; private set; }
 
-    public bool HasOwnAccess(int bit) => (OwnAccessBits & (1UL << bit)) != 0;
+    /// <summary>
+    /// Whether one privilege bit is set in the account-access bitmap the server sent at login.
+    ///
+    /// The bits are numbered from the MOST significant bit of the FIRST byte — bit 2 is byte 0's
+    /// 0x20, not 0x04 of the last byte — matching Mobius's own <c>bits[i/8] &amp; (1&lt;&lt;(7-i%8))</c>.
+    /// The protocol docs don't state the convention at all, so it was settled against a real
+    /// server: MacDomain hands a guest 60700c2003800000, which read this way is exactly
+    /// upload/download, read/send chat, read/post news and any-name — and read the other way round
+    /// claims a guest can't be disconnected while denying the downloads it plainly allows.
+    ///
+    /// Reading it the wrong way is what made the Files tab report "this account isn't allowed to
+    /// browse files" to a guest who could (2026-09-16).
+    /// </summary>
+    public bool HasOwnAccess(int bit) =>
+        bit is >= 0 and < 64 && (OwnAccessBits & (1UL << (63 - bit))) != 0;
 
     /// <summary>Off by default — never silently agree to a server's rules on the user's behalf. Set before ConnectAndLoginAsync; per-tracker, from HotlineTrackerConfig.AutoAcceptAgreement.</summary>
     public bool AutoAcceptAgreement { get; set; }

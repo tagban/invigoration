@@ -176,15 +176,21 @@ public class HotlineNewsParsingTests
 
 public class HotlineFileEntryTests
 {
+    /// <summary>
+    /// Built to the layout a real server actually sends — name length at 18, name at 20. An
+    /// earlier version of this helper put both two bytes later, matching the parser's own mistake,
+    /// so the pair agreed with each other and a broken listing passed its tests. See
+    /// HotlineRealServerFixtureTests for rows captured off a live server.
+    /// </summary>
     private static byte[] Entry(string name, string type, uint size)
     {
         var nameBytes = Encoding.UTF8.GetBytes(name);
-        var data = new byte[22 + nameBytes.Length];
+        var data = new byte[20 + nameBytes.Length];
         Encoding.ASCII.GetBytes(type).CopyTo(data, 0);
         Encoding.ASCII.GetBytes("HTLC").CopyTo(data, 4);
         BinaryPrimitives.WriteUInt32BigEndian(data.AsSpan(8), size);
-        BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(20), (ushort)nameBytes.Length);
-        nameBytes.CopyTo(data.AsSpan(22));
+        BinaryPrimitives.WriteUInt16BigEndian(data.AsSpan(18), (ushort)nameBytes.Length);
+        nameBytes.CopyTo(data.AsSpan(20));
         return data;
     }
 
