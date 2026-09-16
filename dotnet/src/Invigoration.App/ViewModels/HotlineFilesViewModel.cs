@@ -6,14 +6,31 @@ using Invigoration.Core.Hotline;
 
 namespace Invigoration.App.ViewModels;
 
-/// <summary>One row in the file list — a folder to open or a file to download.</summary>
-public sealed partial class HotlineFileRowViewModel(HotlineFileEntry entry) : ObservableObject
+/// <summary>
+/// One row in the file list — a folder to open or a file to download.
+///
+/// The row carries its own Open/Download commands, rather than the list binding to the files view
+/// model with a CommandParameter, because a context menu lives in its own popup tree: a binding
+/// that walks up to the parent ListBox resolves to nothing from in there. Hanging the commands off
+/// the row means the menu binds to its own DataContext and needs no such walk.
+/// </summary>
+public sealed partial class HotlineFileRowViewModel(HotlineFileEntry entry, HotlineFilesViewModel owner) : ObservableObject
 {
     public HotlineFileEntry Entry { get; } = entry;
 
     public string Name => Entry.Name;
 
     public bool IsFolder => Entry.IsFolder;
+
+    /// <summary>What the menu offers for this row — only a folder can be browsed into.</summary>
+    public string DownloadLabel => IsFolder ? "Download Folder..." : "Download...";
+
+    /// <summary>Double-clicking, or picking Open: a folder browses in, anything else downloads.</summary>
+    [RelayCommand]
+    public Task ActivateAsync() => owner.OpenAsync(this);
+
+    [RelayCommand]
+    public Task DownloadAsync() => owner.DownloadAsync(this);
 
     public string Icon => Entry.IsFolder ? "📁" : "📄";
 
@@ -93,7 +110,7 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
             // and not something the server guarantees.
             foreach (var entry in entries.OrderByDescending(e => e.IsFolder).ThenBy(e => e.Name, StringComparer.OrdinalIgnoreCase))
             {
-                Entries.Add(new HotlineFileRowViewModel(entry));
+                Entries.Add(new HotlineFileRowViewModel(entry, this));
             }
 
             if (Entries.Count == 0)
@@ -117,7 +134,7 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
     }
 
     [RelayCommand]
-    private async Task OpenAsync(HotlineFileRowViewModel? row)
+    public async Task OpenAsync(HotlineFileRowViewModel? row)
     {
         if (row is null)
         {

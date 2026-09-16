@@ -1,9 +1,11 @@
 using System.Collections.Specialized;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Platform.Storage;
+using Avalonia.VisualTree;
 using Avalonia.Threading;
 using Invigoration.App.ViewModels;
 
@@ -81,6 +83,24 @@ public partial class HotlineSessionView : UserControl
 
             return files.Count > 0 ? files[0].TryGetLocalPath() : null;
         };
+    }
+
+    /// <summary>
+    /// Double-clicking a file row activates it — a folder opens, anything else downloads (the row's
+    /// own ActivateCommand decides which). The event is handled here rather than bound in XAML
+    /// because DoubleTapped fires on whatever element inside the row was under the pointer (the
+    /// name, the size, the icon), so the row has to be found by walking up to the nearest
+    /// ListBoxItem rather than read off the sender.
+    /// </summary>
+    private void OnFilesDoubleTapped(object? sender, TappedEventArgs e)
+    {
+        if ((e.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is not { DataContext: HotlineFileRowViewModel row })
+        {
+            return;
+        }
+
+        row.ActivateCommand.Execute(null);
+        e.Handled = true;
     }
 
     /// <summary>

@@ -84,10 +84,29 @@
                     <TextBlock Grid.Row="1" Text="Nothing to show yet — press Refresh." Opacity="0.5" FontSize="12"
                                HorizontalAlignment="Center" VerticalAlignment="Center"
                                IsVisible="{Binding ShowEmptyHint}" />
-                    <ListBox Grid.Row="1" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}" Background="Transparent">
+                    <!-- Double-click activates a row: a folder opens, anything else downloads.
+                         Handled in code-behind (OnFilesDoubleTapped) because the double-click
+                         lands on whichever element inside the row was under the pointer, not on
+                         the row itself. -->
+                    <ListBox Grid.Row="1" Name="FilesList" ItemsSource="{Binding Entries}"
+                             SelectedItem="{Binding SelectedEntry}" Background="Transparent"
+                             DoubleTapped="OnFilesDoubleTapped">
                         <ListBox.ItemTemplate>
                             <DataTemplate>
-                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                                <!-- The menu binds to the row's own commands: a context menu opens in
+                                     its own popup tree, where a binding that walks up to the ListBox
+                                     resolves to nothing. It also acts on the row it was opened over
+                                     rather than on the selection, since right-clicking need not
+                                     select. Stretched horizontally so the whole row is a target, not
+                                     just the text. -->
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8" Background="Transparent">
+                                    <Grid.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Open" Command="{Binding ActivateCommand}"
+                                                      IsVisible="{Binding IsFolder}" />
+                                            <MenuItem Header="{Binding DownloadLabel}" Command="{Binding DownloadCommand}" />
+                                        </ContextMenu>
+                                    </Grid.ContextMenu>
                                     <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
                                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                                         <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
