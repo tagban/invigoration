@@ -17,7 +17,7 @@ using Stimpak;
 namespace Invigoration.App.ViewModels;
 
 /// <summary>One bot tab: wraps a BotEngine and projects its events onto observable collections for binding.</summary>
-public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedSurface
+public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedSurface, IWhisperHost
 {
     public BotEngine Engine { get; }
 
@@ -676,7 +676,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
 
     /// <summary>Sends a whisper thread's DraftText to its peer through this bot's own engine — works for both classic BNCS (server-parsed "/w") and Stimpak-backed products (BotEngine.Sc2.cs intercepts the same "/w " convention and routes it to Stimpak's dedicated whisper API instead).</summary>
     [RelayCommand]
-    private async Task SendWhisperAsync(WhisperThreadViewModel thread)
+    public async Task SendWhisperAsync(WhisperThreadViewModel thread)
     {
         var text = thread.DraftText.Trim();
         if (text.Length == 0)

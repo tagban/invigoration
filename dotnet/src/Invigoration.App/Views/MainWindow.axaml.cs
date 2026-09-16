@@ -16,6 +16,9 @@ public partial class MainWindow : Window
 
     private static readonly TimeSpan TitleUpdateInterval = TimeSpan.FromSeconds(15);
 
+    /// <summary>Kept so the static PrivateMessageRequested subscription can be removed when this window closes.</summary>
+    private Action<Models.WhisperThreadViewModel>? _focusHotlineWhisper;
+
     public MainWindow()
     {
         InitializeComponent();
@@ -24,6 +27,10 @@ public partial class MainWindow : Window
         {
             ViewModel?.SaveAll();
             Invigoration.Core.Clan.ClanRosterStore.FlushPendingSave();
+            if (_focusHotlineWhisper is not null)
+            {
+                HotlineUserRowViewModel.PrivateMessageRequested -= _focusHotlineWhisper;
+            }
         };
         StartTitleUpdateTimer();
         // TopLevelTabs puts the Whispers pseudo-tab first, then (if enabled) Music — default to
@@ -42,6 +49,14 @@ public partial class MainWindow : Window
                 }
 
                 vm.PropertyChanged += OnViewModelPropertyChanged;
+
+                // A Hotline "Send Private Message..." opens the thread and asks to be shown.
+                // Selecting it is all that's needed — OnViewModelPropertyChanged already switches
+                // the strip to Whispers whenever the selected thread changes, the same path the
+                // bot-side right-click uses. Unsubscribed on close: the event is static, so a
+                // handler holding this window would outlive it.
+                _focusHotlineWhisper = vm.FocusWhisperThread;
+                HotlineUserRowViewModel.PrivateMessageRequested += _focusHotlineWhisper;
 
                 // One-time questions, one after the other, posted so the window is up first: whether
                 // to use Spotify at all, then — for a bot already on a character-dock theme from

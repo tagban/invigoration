@@ -62,6 +62,9 @@ public enum HotlineTransactionType : ushort
     SendChat = 105,
     ChatMessage = 106,
     Login = 107,
+    /// <summary>Client -&gt; server: a private message to one user. The server relays it as a ServerMessage carrying the sender's id and name.</summary>
+    SendInstantMessage = 108,
+
     ShowAgreement = 109,
     DisconnectUser = 110,
     DisconnectMessage = 111,

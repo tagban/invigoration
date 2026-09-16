@@ -259,6 +259,8 @@
                                 <Grid.ContextMenu>
                                     <!-- A preset palette rather than a full color-picker popup — simpler and more reliable inside a menu, and matches the classic IRC-client "highlight this person" idiom this was modeled on. -->
                                     <ContextMenu>
+                                        <MenuItem Header="Send Private Message..." Command="{Binding SendPrivateMessageCommand}" />
+                                        <Separator />
                                         <MenuItem Header="Highlight Color">
                                             <MenuItem Header="Red" Command="{Binding SetHighlightColorCommand}" CommandParameter="#FF6B6B">
                                                 <MenuItem.Icon><Border Background="#FF6B6B" Width="12" Height="12" /></MenuItem.Icon>

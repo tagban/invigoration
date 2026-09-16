@@ -60,7 +60,7 @@
                 <TextBox Grid.Column="0" PlaceholderText="Type a whisper..." Text="{Binding SelectedThread.DraftText}"
                          Name="WhisperInputBox" />
                 <Button Grid.Column="1" Content="Send" Margin="4,0,0,0" Padding="10,3"
-                        Command="{Binding SelectedThread.Owner.SendWhisperCommand}" CommandParameter="{Binding SelectedThread}" />
+                        Command="{Binding SelectedThread.SendCommand}" />
             </Grid>
         </Grid>
     </Grid>

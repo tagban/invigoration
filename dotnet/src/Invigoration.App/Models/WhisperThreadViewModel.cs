@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Invigoration.App.ViewModels;
 
 namespace Invigoration.App.Models;
@@ -12,9 +13,31 @@ namespace Invigoration.App.Models;
 /// route a reply through the right bot's engine, while the exact same instance is also what
 /// that bot's own per-bot Whispers tab shows — replying from either place updates one thread.
 /// </summary>
-public sealed partial class WhisperThreadViewModel(BotTabViewModel owner, string peer) : ObservableObject
+/// <summary>
+/// Whatever a whisper thread belongs to — a Battle.net bot, or a Hotline session. The global
+/// Whispers tab shows threads from both, so it needs a name to label them by and a way to send a
+/// reply back through whichever connection the thread came in on.
+/// </summary>
+public interface IWhisperHost
 {
-    public BotTabViewModel Owner { get; } = owner;
+    /// <summary>What to call this connection in the Whispers tab ("via ...").</summary>
+    string Title { get; }
+
+    /// <summary>Sends this thread's DraftText to its peer and clears it.</summary>
+    Task SendWhisperAsync(WhisperThreadViewModel thread);
+}
+
+public sealed partial class WhisperThreadViewModel(IWhisperHost owner, string peer) : ObservableObject
+{
+    public IWhisperHost Owner { get; } = owner;
+
+    /// <summary>
+    /// Sending lives on the thread rather than on the owner so the view binds to one command
+    /// regardless of which kind of connection the thread belongs to — a bot's whisper and a
+    /// Hotline private message reach the same box.
+    /// </summary>
+    [RelayCommand]
+    private Task Send() => Owner.SendWhisperAsync(this);
 
     public string Peer { get; } = peer;
 

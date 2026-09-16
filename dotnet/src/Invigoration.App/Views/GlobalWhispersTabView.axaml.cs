@@ -17,7 +17,7 @@ public partial class GlobalWhispersTabView : UserControl
             {
                 if (e.Key == Key.Enter && DataContext is GlobalWhispersTabViewModel { SelectedThread: { } thread })
                 {
-                    thread.Owner.SendWhisperCommand.Execute(thread);
+                    thread.SendCommand.Execute(null);
                     e.Handled = true;
                 }
             };

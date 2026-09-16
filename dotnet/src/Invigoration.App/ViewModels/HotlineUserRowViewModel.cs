@@ -18,6 +18,7 @@ namespace Invigoration.App.ViewModels;
 public sealed partial class HotlineUserRowViewModel : ViewModelBase
 {
     private readonly HotlineTabViewModel _parent;
+    private readonly HotlineSessionViewModel? _session;
 
     public HotlineUser User { get; }
 
@@ -43,9 +44,27 @@ public sealed partial class HotlineUserRowViewModel : ViewModelBase
     /// </summary>
     public IBrush DisplayBrush => HighlightBrush ?? (User.IsAdmin ? new SolidColorBrush(Color.Parse(_parent.Config.AdminColorHex)) : Brushes.Black);
 
-    public HotlineUserRowViewModel(HotlineTabViewModel parent, HotlineUser user)
+    /// <summary>Raised when this row's "Send Private Message" is picked, so the view can switch to the Whispers tab and focus the thread.</summary>
+    public static event Action<WhisperThreadViewModel>? PrivateMessageRequested;
+
+    /// <summary>
+    /// Opens a private-message thread with this user in the Whispers tab. Hotline addresses a PM by
+    /// session id, so the id is taken from this row — the live list — rather than from anything
+    /// remembered earlier.
+    /// </summary>
+    [RelayCommand]
+    private void SendPrivateMessage()
+    {
+        if (_session?.OpenWhisperThread(Name, UserId) is { } thread)
+        {
+            PrivateMessageRequested?.Invoke(thread);
+        }
+    }
+
+    public HotlineUserRowViewModel(HotlineTabViewModel parent, HotlineUser user, HotlineSessionViewModel? session = null)
     {
         _parent = parent;
+        _session = session;
         User = user;
         _ = LoadIconAsync();
     }

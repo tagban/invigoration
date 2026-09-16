@@ -613,6 +613,24 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         return reply is { ErrorCode: 0 };
     }
 
+    /// <summary>A private message from another user, relayed by the server.</summary>
+    public event Action<HotlinePrivateMessage>? PrivateMessageReceived;
+
+    /// <summary>
+    /// Sends a private message to one user. Hotline has no separate "whisper" the way Battle.net
+    /// does — it's its own transaction addressed by the recipient's session id, which means a PM
+    /// can only be sent to someone currently connected (ids are per-session, not per-account).
+    /// </summary>
+    public Task SendPrivateMessageAsync(ushort userId, string text, CancellationToken ct = default) =>
+        SendTransactionAsync(
+            HotlineTransactionType.SendInstantMessage,
+            [
+                new HotlineField(HotlineFieldType.UserId, userId),
+                new HotlineField(HotlineFieldType.Options, (ushort)1),
+                new HotlineField(HotlineFieldType.Data, text),
+            ],
+            ct);
+
     /// <summary>A post someone else just made, pushed by the server — just the new item, to go on top of what's already shown.</summary>
     public event Action<string>? FlatNewsPosted;
 
@@ -934,8 +952,30 @@ public sealed class HotlineTransactionClient : FramedTcpClient
                 break;
 
             case HotlineTransactionType.ServerMessage:
-                ServerMessageReceived?.Invoke(tx.Field(HotlineFieldType.Data)?.AsString() ?? "");
+            {
+                // 104 carries two different things. A broadcast from the server has only text; a
+                // private message from another user also carries who sent it. Telling them apart by
+                // the presence of a sender is what makes a PM a PM — without it every private
+                // message showed up as an anonymous "* ..." line in the chat log, with no way to
+                // tell who sent it or to reply.
+                var text = tx.Field(HotlineFieldType.Data)?.AsString() ?? "";
+                var senderName = tx.Field(HotlineFieldType.UserName)?.AsString();
+                var senderId = tx.Field(HotlineFieldType.UserId);
+
+                if (senderId is not null || !string.IsNullOrEmpty(senderName))
+                {
+                    PrivateMessageReceived?.Invoke(new HotlinePrivateMessage(
+                        senderId?.AsUInt16() ?? 0,
+                        string.IsNullOrEmpty(senderName) ? "(unknown)" : senderName,
+                        text));
+                }
+                else
+                {
+                    ServerMessageReceived?.Invoke(text);
+                }
+
                 break;
+            }
 
             case HotlineTransactionType.ShowAgreement:
             {

@@ -214,6 +214,7 @@ public partial class MainWindowViewModel : ViewModelBase
         var tab = new HotlineTabViewModel(config);
         tab.ConfigChanged += SaveHotlineTrackers;
         tab.RemoveRequested += () => RemoveHotlineTracker(tab);
+        WireHotlineWhispers(tab);
         return tab;
     }
 
@@ -316,6 +317,9 @@ public partial class MainWindowViewModel : ViewModelBase
     /// </summary>
     public void FocusWhisperThread(BotTabViewModel bot, string peer) =>
         SelectedGlobalWhisperThread = bot.GetOrCreateWhisperThread(peer);
+
+    /// <summary>Selects an already-created thread — used by the Hotline users list, which builds the thread itself since it needs the peer's session id.</summary>
+    public void FocusWhisperThread(WhisperThreadViewModel thread) => SelectedGlobalWhisperThread = thread;
 
     /// <summary>
     /// "Active" (IsActive/HasUnread-clearing) means genuinely visible right now — for a plain
@@ -429,6 +433,49 @@ public partial class MainWindowViewModel : ViewModelBase
         {
             GlobalWhisperThreads.Remove(thread);
         }
+    }
+
+    /// <summary>
+    /// Hotline private messages join the same Whispers tab as bot whispers. Sessions come and go
+    /// under a tracker as servers are opened and closed, so each tracker's own session list is
+    /// watched rather than wired once — a session connected later still gets its threads merged.
+    /// </summary>
+    private void WireHotlineWhispers(HotlineTabViewModel tracker)
+    {
+        foreach (var session in tracker.Items.OfType<HotlineSessionViewModel>())
+        {
+            WireGlobalWhispers(session.WhisperThreads);
+        }
+
+        tracker.Items.CollectionChanged += OnHotlineSessionsChanged;
+    }
+
+    private void OnHotlineSessionsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Dispatcher.UIThread.Post(() =>
+    {
+        foreach (var session in (e.NewItems ?? System.Array.Empty<object>()).OfType<HotlineSessionViewModel>())
+        {
+            WireGlobalWhispers(session.WhisperThreads);
+        }
+
+        foreach (var session in (e.OldItems ?? System.Array.Empty<object>()).OfType<HotlineSessionViewModel>())
+        {
+            session.WhisperThreads.CollectionChanged -= OnBotWhisperThreadsChanged;
+            foreach (var thread in session.WhisperThreads)
+            {
+                GlobalWhisperThreads.Remove(thread);
+            }
+        }
+    });
+
+    /// <summary>Merges one collection of threads into the global list and keeps following it.</summary>
+    private void WireGlobalWhispers(ObservableCollection<WhisperThreadViewModel> threads)
+    {
+        foreach (var thread in threads)
+        {
+            GlobalWhisperThreads.Insert(0, thread);
+        }
+
+        threads.CollectionChanged += OnBotWhisperThreadsChanged;
     }
 
     private void OnBotWhisperThreadsChanged(object? sender, NotifyCollectionChangedEventArgs e) => Dispatcher.UIThread.Post(() =>

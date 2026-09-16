@@ -22,7 +22,7 @@ namespace Invigoration.App.ViewModels;
 /// onto the UI thread via Dispatcher.UIThread.Post before touching an ObservableCollection or
 /// [ObservableProperty] (an ObservableCollection mutated off the UI thread throws).
 /// </summary>
-public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDisposable
+public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDisposable, IWhisperHost
 {
     private readonly HotlineTabViewModel _parent;
     private readonly HotlineTransactionClient _client = new();
@@ -125,6 +125,85 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
     public ObservableCollection<HotlineChatLine> Messages { get; } = [];
     public ObservableCollection<HotlineUserRowViewModel> Users { get; } = [];
 
+    /// <summary>
+    /// Private-message conversations on this server, in the same shape a bot's whispers use so the
+    /// global Whispers tab can show both side by side. Hotline addresses a PM by session id rather
+    /// than by name, so each thread remembers the id it was opened against and refreshes it from
+    /// the live user list when replying — a peer who reconnects gets a new id, and a reply sent to
+    /// the stale one would go nowhere or, worse, to whoever inherited it.
+    /// </summary>
+    public ObservableCollection<WhisperThreadViewModel> WhisperThreads { get; } = [];
+
+    private readonly Dictionary<string, ushort> _whisperPeerIds = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>Plain white for message text and a dimmer grey for this client's own notices — the Whispers tab has no per-server palette of its own.</summary>
+    private static readonly Invigoration.Core.Chat.RgbColor WhisperTextColor = new(0xFF, 0xFF, 0xFF);
+
+    private static readonly Invigoration.Core.Chat.RgbColor WhisperNoticeColor = new(0x99, 0x99, 0x99);
+
+    /// <summary>Opens (or brings up) the PM thread for one user and returns it, so a right-click can jump straight to it.</summary>
+    public WhisperThreadViewModel OpenWhisperThread(string peer, ushort userId)
+    {
+        _whisperPeerIds[peer] = userId;
+        var existing = WhisperThreads.FirstOrDefault(t => string.Equals(t.Peer, peer, StringComparison.OrdinalIgnoreCase));
+        if (existing is not null)
+        {
+            return existing;
+        }
+
+        var thread = new WhisperThreadViewModel(this, peer) { LastActivityUtc = DateTime.UtcNow };
+        WhisperThreads.Insert(0, thread);
+        return thread;
+    }
+
+    /// <summary>Records an incoming or outgoing private message against its thread, marking it unread only when it came from the other side.</summary>
+    private void AppendWhisper(string peer, ushort userId, string speaker, string text, bool incoming)
+    {
+        var thread = OpenWhisperThread(peer, userId);
+        thread.Messages.Add(new ChatLineViewModel($"{speaker}: {text}", WhisperTextColor));
+        thread.LastActivityUtc = DateTime.UtcNow;
+        if (incoming)
+        {
+            thread.HasUnread = true;
+        }
+
+        // Most-recently-active first, matching the bot side's own ordering.
+        var index = WhisperThreads.IndexOf(thread);
+        if (index > 0)
+        {
+            WhisperThreads.Move(index, 0);
+        }
+    }
+
+    /// <summary>
+    /// Sends a thread's draft as a private message. The peer's id is looked up fresh from the live
+    /// user list first — see WhisperThreads' remarks on why a remembered id goes stale.
+    /// </summary>
+    public async Task SendWhisperAsync(WhisperThreadViewModel thread)
+    {
+        var text = thread.DraftText.Trim();
+        if (text.Length == 0 || !IsConnected)
+        {
+            return;
+        }
+
+        var live = Users.FirstOrDefault(u => string.Equals(u.Name, thread.Peer, StringComparison.OrdinalIgnoreCase));
+        if (live is not null)
+        {
+            _whisperPeerIds[thread.Peer] = live.UserId;
+        }
+
+        if (!_whisperPeerIds.TryGetValue(thread.Peer, out var userId))
+        {
+            thread.Messages.Add(new ChatLineViewModel($"* {thread.Peer} isn't connected — a private message can only reach someone who's here.", WhisperNoticeColor));
+            return;
+        }
+
+        thread.DraftText = "";
+        await _client.SendPrivateMessageAsync(userId, text).ConfigureAwait(true);
+        AppendWhisper(thread.Peer, userId, _options.Nickname, text, incoming: false);
+    }
+
     /// <summary>Discord users seen talking through this server's relay bot recently — kept separate from the real Users list, per explicit request. See PruneStaleGhosts and TryAppendDiscordRelayMessage.</summary>
     public ObservableCollection<HotlineGhostUserViewModel> DiscordUsers { get; } = [];
 
@@ -168,6 +247,9 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         // Someone posted to the flat news while we're connected — the server sends just the new
         // item, which goes on top of what's already shown rather than costing a full re-fetch.
         _client.FlatNewsPosted += post => Dispatcher.UIThread.Post(() => News.PrependFlatNews(post));
+
+        _client.PrivateMessageReceived += pm => Dispatcher.UIThread.Post(() =>
+            AppendWhisper(pm.SenderName, pm.SenderId, pm.SenderName, pm.Text, incoming: true));
         _client.Disconnected += ex => Dispatcher.UIThread.Post(() =>
         {
             IsConnected = false;
@@ -745,7 +827,7 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         Users.Clear();
         foreach (var user in users)
         {
-            Users.Add(new HotlineUserRowViewModel(_parent, user));
+            Users.Add(new HotlineUserRowViewModel(_parent, user, this));
         }
     }
 
@@ -757,7 +839,7 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             Users.Remove(existing);
         }
 
-        Users.Add(new HotlineUserRowViewModel(_parent, user));
+        Users.Add(new HotlineUserRowViewModel(_parent, user, this));
     }
 
     private void RemoveUser(ushort userId)

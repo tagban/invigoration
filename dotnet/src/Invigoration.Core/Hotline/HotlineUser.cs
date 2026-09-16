@@ -37,3 +37,6 @@ public sealed record HotlineUser(ushort UserId, ushort IconId, ushort Flags, str
         return new HotlineUser(userId, iconId, flags, name);
     }
 }
+
+/// <summary>A private message as it arrived: who sent it (by this session's id and their name) and what they said.</summary>
+public sealed record HotlinePrivateMessage(ushort SenderId, string SenderName, string Text);
