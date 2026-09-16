@@ -81,6 +81,8 @@
                     <DockPanel Grid.Row="0" Margin="6">
                         <Button DockPanel.Dock="Left" Content="↑" Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}"
                                 ToolTip.Tip="Up one folder" Padding="8,3" />
+                        <Button DockPanel.Dock="Right" Content="New Folder..." Command="{Binding StartNewFolderCommand}"
+                                IsVisible="{Binding CanCreateFolder}" Padding="8,3" Margin="6,0,0,0" />
                         <Button DockPanel.Dock="Right" Content="Upload Folder..." Command="{Binding UploadFolderCommand}"
                                 IsVisible="{Binding CanUpload}" Padding="8,3" Margin="6,0,0,0" />
                         <Button DockPanel.Dock="Right" Content="Upload..." Command="{Binding UploadCommand}"
@@ -114,6 +116,9 @@
                                             <MenuItem Header="Open" Command="{Binding ActivateCommand}"
                                                       IsVisible="{Binding IsFolder}" />
                                             <MenuItem Header="{Binding DownloadLabel}" Command="{Binding DownloadCommand}" />
+                                            <Separator IsVisible="{Binding CanRename}" />
+                                            <MenuItem Header="Rename..." Command="{Binding RenameCommand}" IsVisible="{Binding CanRename}" />
+                                            <MenuItem Header="Delete..." Command="{Binding DeleteCommand}" IsVisible="{Binding CanDelete}" />
                                         </ContextMenu>
                                     </Grid.ContextMenu>
                                     <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
@@ -130,7 +135,20 @@
                         </ListBox.ItemTemplate>
                     </ListBox>
 
-                    <DockPanel Grid.Row="2" Margin="6">
+                    <!-- One strip serving rename, new folder, and the delete confirmation. Inline
+                         rather than a modal: it keeps what's being acted on visible behind it, and
+                         a delete confirmation that names the thing is the whole point. -->
+                    <Grid Grid.Row="2" Margin="6" RowDefinitions="Auto,Auto" IsVisible="{Binding IsPrompting}">
+                        <TextBlock Grid.Row="0" Text="{Binding PromptHeading}" TextWrapping="Wrap" FontSize="12" Margin="0,0,0,6" />
+                        <DockPanel Grid.Row="1">
+                            <Button DockPanel.Dock="Right" Content="{Binding PromptAction}" Command="{Binding SubmitPromptCommand}"
+                                    Padding="10,3" Margin="6,0,0,0" IsDefault="True" />
+                            <Button DockPanel.Dock="Right" Content="Cancel" Command="{Binding CancelPromptCommand}" Padding="10,3" />
+                            <TextBox Text="{Binding PromptText}" IsVisible="{Binding NeedsPromptText}" />
+                        </DockPanel>
+                    </Grid>
+
+                    <DockPanel Grid.Row="2" Margin="6" IsVisible="{Binding !IsPrompting}">
                         <!-- Works for a folder too: that downloads the whole thing, recreating its
                              structure under a directory you pick. Double-clicking a folder still
                              browses into it. -->

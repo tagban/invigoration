@@ -661,6 +661,67 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         return new FolderTicket(refNum.AsUInt32(), itemCount, (uint)totalBytes, reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
     }
 
+    /// <summary>
+    /// Deletes a file or folder on the server. Returns whether the server accepted it. There is no
+    /// undo and no confirmation step in the protocol — the server acts the moment this arrives.
+    /// </summary>
+    public async Task<bool> DeleteFileAsync(IReadOnlyList<string> directory, string fileName, CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField> { new(HotlineFieldType.FileName, fileName) };
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.DeleteFile, [.. fields], ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 };
+    }
+
+    /// <summary>Creates a folder on the server.</summary>
+    public async Task<bool> CreateFolderAsync(IReadOnlyList<string> directory, string folderName, CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField> { new(HotlineFieldType.FileName, folderName) };
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.NewFolder, [.. fields], ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 };
+    }
+
+    /// <summary>
+    /// Renames a file or folder. Hotline has no rename transaction — it's a SetFileInfo carrying a
+    /// new name, which is why this and "set the comment" are the same request underneath.
+    /// </summary>
+    public async Task<bool> RenameAsync(IReadOnlyList<string> directory, string currentName, string newName, CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>
+        {
+            new(HotlineFieldType.FileName, currentName),
+            new(HotlineFieldType.FileNewName, newName),
+        };
+
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Insert(1, pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.SetFileInfo, [.. fields], ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 };
+    }
+
+    /// <summary>Whether this account may delete files on the server.</summary>
+    public bool CanDeleteFiles => HasOwnAccess(HotlineAccessBits.DeleteFile);
+
+    public bool CanDeleteFolders => HasOwnAccess(HotlineAccessBits.DeleteFolder);
+
+    public bool CanRenameFiles => HasOwnAccess(HotlineAccessBits.RenameFile);
+
+    public bool CanRenameFolders => HasOwnAccess(HotlineAccessBits.RenameFolder);
+
+    public bool CanCreateFolders => HasOwnAccess(HotlineAccessBits.CreateFolder);
+
     /// <summary>Whether this account may download files, per the access bitmap from login.</summary>
     public bool CanDownloadFiles => HasOwnAccess(HotlineAccessBits.DownloadFile);
 

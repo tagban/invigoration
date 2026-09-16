@@ -83,6 +83,15 @@ public enum HotlineTransactionType : ushort
     /// <summary>Client -&gt; server: ask to upload a file. Same shape as DownloadFile — the reply hands back a reference number to push the bytes with.</summary>
     UploadFile = 203,
 
+    /// <summary>Client -&gt; server: delete a file or folder. Needs the delete privilege, and there's no undo.</summary>
+    DeleteFile = 204,
+
+    /// <summary>Client -&gt; server: create a folder.</summary>
+    NewFolder = 205,
+
+    /// <summary>Client -&gt; server: change a file or folder's name (and comment). Renaming is a SetFileInfo with a new name, not a transaction of its own.</summary>
+    SetFileInfo = 207,
+
     /// <summary>Client -&gt; server: download a whole folder, recursively. The transfer connection then walks its contents item by item — see HotlineFolderTransfer.</summary>
     DownloadFolder = 210,
 
@@ -161,6 +170,9 @@ public enum HotlineFieldType : ushort
     TransferSize = 108,
 
     FileSize = 207,
+
+    /// <summary>The name to give a file or folder when renaming it (SetFileInfo).</summary>
+    FileNewName = 211,
 
     /// <summary>The token the separate transfer connection presents to claim this transfer.</summary>
     TransferRefNum = 107,
@@ -307,6 +319,16 @@ public static class HotlineAccessBits
     public const int DeleteFile = 0;
     public const int UploadFile = 1;
     public const int DownloadFile = 2;
+
+    // Bits 3-8 are the rest of the file-management block, in the standard order. Consistent with
+    // the bits confirmed live (0/1/2 for delete/upload/download and 9/10 for chat sit exactly
+    // where this ordering puts them — see HotlineTransactionClient.HasOwnAccess).
+    public const int RenameFile = 3;
+    public const int MoveFile = 4;
+    public const int CreateFolder = 5;
+    public const int DeleteFolder = 6;
+    public const int RenameFolder = 7;
+    public const int MoveFolder = 8;
     public const int ReadChat = 9;
     public const int SendChat = 10;
     public const int CreateUser = 14;

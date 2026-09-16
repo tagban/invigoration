@@ -32,6 +32,17 @@ public sealed partial class HotlineFileRowViewModel(HotlineFileEntry entry, Hotl
     [RelayCommand]
     public Task DownloadAsync() => owner.DownloadAsync(this);
 
+    /// <summary>Whether this account may delete this particular row — the protocol tracks files and folders as separate privileges.</summary>
+    public bool CanDelete => owner.CanDelete(IsFolder);
+
+    public bool CanRename => owner.CanRename(IsFolder);
+
+    [RelayCommand]
+    private void Delete() => owner.AskToDelete(this);
+
+    [RelayCommand]
+    private void Rename() => owner.AskToRename(this);
+
     public string Icon => Entry.IsFolder ? "📁" : "📄";
 
     /// <summary>A folder's "size" is how many items it holds, not bytes — showing it as bytes would be a lie.</summary>
@@ -85,6 +96,128 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
 
     [ObservableProperty]
     public partial HotlineFileRowViewModel? SelectedEntry { get; set; }
+
+    /// <summary>What the inline prompt strip at the bottom of the Files tab is currently asking.</summary>
+    public enum PromptKind
+    {
+        None,
+        NewFolder,
+        Rename,
+        ConfirmDelete,
+    }
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsPrompting))]
+    [NotifyPropertyChangedFor(nameof(NeedsPromptText))]
+    public partial PromptKind Prompt { get; set; }
+
+    public bool IsPrompting => Prompt != PromptKind.None;
+
+    /// <summary>A delete only needs a yes; the other two need a name typed.</summary>
+    public bool NeedsPromptText => Prompt is PromptKind.NewFolder or PromptKind.Rename;
+
+    [ObservableProperty]
+    public partial string PromptHeading { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string PromptText { get; set; } = "";
+
+    /// <summary>The verb on the confirm button — "Create", "Rename", "Delete" — so it says what will happen rather than "OK".</summary>
+    [ObservableProperty]
+    public partial string PromptAction { get; set; } = "";
+
+    private HotlineFileRowViewModel? _promptTarget;
+
+    public bool CanDelete(bool isFolder) => isFolder ? client.CanDeleteFolders : client.CanDeleteFiles;
+
+    public bool CanRename(bool isFolder) => isFolder ? client.CanRenameFolders : client.CanRenameFiles;
+
+    public bool CanCreateFolder => client.CanCreateFolders;
+
+    [RelayCommand]
+    private void StartNewFolder()
+    {
+        _promptTarget = null;
+        Prompt = PromptKind.NewFolder;
+        PromptHeading = $"New folder in {PathText}";
+        PromptAction = "Create";
+        PromptText = "";
+    }
+
+    public void AskToRename(HotlineFileRowViewModel row)
+    {
+        _promptTarget = row;
+        Prompt = PromptKind.Rename;
+        PromptHeading = $"Rename \"{row.Name.Trim()}\"";
+        PromptAction = "Rename";
+        PromptText = row.Name.Trim();
+    }
+
+    /// <summary>
+    /// Deleting asks first, and names what will go. It happens on the server, to everyone, with no
+    /// undo in the protocol — a misclick on a folder full of other people's files is not
+    /// recoverable from here.
+    /// </summary>
+    public void AskToDelete(HotlineFileRowViewModel row)
+    {
+        _promptTarget = row;
+        Prompt = PromptKind.ConfirmDelete;
+        PromptHeading = row.IsFolder
+            ? $"Delete the folder \"{row.Name.Trim()}\" and everything in it? This can't be undone."
+            : $"Delete \"{row.Name.Trim()}\"? This can't be undone.";
+        PromptAction = "Delete";
+        PromptText = "";
+    }
+
+    [RelayCommand]
+    private void CancelPrompt()
+    {
+        Prompt = PromptKind.None;
+        _promptTarget = null;
+    }
+
+    [RelayCommand]
+    private async Task SubmitPromptAsync()
+    {
+        var kind = Prompt;
+        var target = _promptTarget;
+        var typed = PromptText.Trim();
+        Prompt = PromptKind.None;
+        _promptTarget = null;
+
+        try
+        {
+            switch (kind)
+            {
+                case PromptKind.NewFolder when typed.Length > 0:
+                    StatusMessage = await client.CreateFolderAsync(_path, typed).ConfigureAwait(true)
+                        ? $"Created {typed}."
+                        : "The server wouldn't create that folder.";
+                    break;
+
+                case PromptKind.Rename when target is not null && typed.Length > 0:
+                    StatusMessage = await client.RenameAsync(_path, target.Name, typed).ConfigureAwait(true)
+                        ? $"Renamed to {typed}."
+                        : "The server wouldn't rename that.";
+                    break;
+
+                case PromptKind.ConfirmDelete when target is not null:
+                    StatusMessage = await client.DeleteFileAsync(_path, target.Name).ConfigureAwait(true)
+                        ? $"Deleted {target.Name.Trim()}."
+                        : "The server wouldn't delete that.";
+                    break;
+
+                default:
+                    return;
+            }
+
+            await RefreshAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or System.Net.Sockets.SocketException)
+        {
+            StatusMessage = $"Failed: {ex.Message}";
+        }
+    }
 
     /// <summary>Set by the view: asks the user where to save a download, or which file to upload. Null result means they cancelled.</summary>
     public Func<string, Task<string?>>? AskWhereToSave { get; set; }
