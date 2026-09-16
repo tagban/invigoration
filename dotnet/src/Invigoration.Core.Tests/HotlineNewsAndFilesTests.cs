@@ -111,6 +111,7 @@ public class HotlineNewsParsingTests
             body.AddRange(HotlineDate(2026, 3600));
             body.AddRange(BigEndian(parent));
             body.AddRange([0, 0]);       // flags
+            body.AddRange([0, 0]);       // reserved — the two bytes this helper used to omit
             body.AddRange([0, 1]);       // one flavour
             body.Add((byte)title.Length);
             body.AddRange(Encoding.UTF8.GetBytes(title));
