@@ -50,6 +50,8 @@
                         <NativeMenuItemSeparator />
                         <NativeMenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
                         <NativeMenuItem Header="Music Bar (bottom)" ToggleType="CheckBox" IsChecked="{Binding IsMusicBarEnabled, Mode=TwoWay}" />
+                        <NativeMenuItemSeparator />
+                        <NativeMenuItem Header="Tell Me About New Versions" ToggleType="CheckBox" IsChecked="{Binding IsUpdateCheckEnabled, Mode=TwoWay}" />
                     </NativeMenu>
                 </NativeMenuItem.Menu>
             </NativeMenuItem>
@@ -96,6 +98,8 @@
                 <Separator />
                 <MenuItem Header="Music Player" ToggleType="CheckBox" IsChecked="{Binding IsMusicEnabled, Mode=TwoWay}" />
                 <MenuItem Header="Music Bar (bottom)" ToggleType="CheckBox" IsChecked="{Binding IsMusicBarEnabled, Mode=TwoWay}" />
+                <Separator />
+                <MenuItem Header="Tell Me About New _Versions" ToggleType="CheckBox" IsChecked="{Binding IsUpdateCheckEnabled, Mode=TwoWay}" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_About" Click="OnAboutClick" />
@@ -130,6 +134,24 @@
                 <Button Grid.Column="4" Content="👎" Padding="8,4" Command="{Binding ThumbsDownCommand}"
                         IsVisible="{Binding SupportsThumbsDown}" ToolTip.Tip="Thumbs down" />
                 <Button Grid.Column="5" Content="⏭" Padding="8,4" Command="{Binding SkipCommand}" ToolTip.Tip="Skip" />
+            </Grid>
+        </Border>
+
+        <!-- "A newer version exists" — one quiet line, docked above the tabs, shown only when a
+             check actually found something newer that hasn't been dismissed. Deliberately not a
+             dialog and deliberately not an installer: it links to the releases page and gets out
+             of the way. Dismissing hides this version for good (MainWindowViewModel's
+             DismissUpdateNotice); Customize → Tell Me About New Versions turns the whole thing
+             off, after which nothing contacts GitHub at all. -->
+        <Border DockPanel.Dock="Top" Background="#1F2D3D" BorderBrush="#2CACE8" BorderThickness="0,0,0,1"
+                Padding="12,6" IsVisible="{Binding HasUpdateNotice}">
+            <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                <TextBlock Grid.Column="0" Text="{Binding UpdateNotice}" Foreground="White" FontSize="12"
+                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                <Button Grid.Column="1" Content="See what's new" FontSize="12" Padding="8,3"
+                        Command="{Binding OpenReleasesPageCommand}" />
+                <Button Grid.Column="2" Content="✕" FontSize="12" Padding="8,3"
+                        Command="{Binding DismissUpdateNoticeCommand}" ToolTip.Tip="Don't tell me about this version again" />
             </Grid>
         </Border>
 

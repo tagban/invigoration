@@ -53,6 +53,11 @@ public partial class MainWindow : Window
                     {
                         await OfferD2EquipmentDownloadAsync();
                     }
+
+                    // Last, and asks nothing: it either puts one dismissible line above the tabs or
+                    // does nothing at all. Never blocks startup — a slow or unreachable GitHub just
+                    // means no notice this run.
+                    await vm.CheckForUpdatesAsync();
                 });
             }
         };

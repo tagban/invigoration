@@ -3,12 +3,14 @@ using System.Collections.Specialized;
 using System.Diagnostics;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Config;
 using Invigoration.Core.Hotline;
 using Invigoration.Core.Music;
 using Invigoration.Core.Trivia;
+using Invigoration.Core.Updates;
 
 namespace Invigoration.App.ViewModels;
 
@@ -103,6 +105,71 @@ public partial class MainWindowViewModel : ViewModelBase
 
     partial void OnIsMusicBarEnabledChanged(bool value) => MusicSettingsStore.ShowBottomBar = value;
 
+    // --- "There's a newer version" notice: one dismissible line, never a dialog, and never
+    // anything that downloads or installs. See Core's UpdateCheck for what it does and doesn't
+    // send. Everything here stays silent unless there really is a newer release. ---
+
+    /// <summary>Text of the update notice ("2.0.9b is available"), or "" when there's nothing to say.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasUpdateNotice))]
+    public partial string UpdateNotice { get; set; } = "";
+
+    public bool HasUpdateNotice => !string.IsNullOrEmpty(UpdateNotice);
+
+    private ReleaseVersion? _offeredUpdate;
+
+    /// <summary>Whether to look for new releases at all — the Customize menu's toggle. Off means the app never contacts GitHub.</summary>
+    [ObservableProperty]
+    public partial bool IsUpdateCheckEnabled { get; set; }
+
+    partial void OnIsUpdateCheckEnabledChanged(bool value)
+    {
+        UpdateSettingsStore.CheckForUpdates = value;
+        if (!value)
+        {
+            UpdateNotice = "";
+        }
+    }
+
+    /// <summary>Runs the one startup check. Silent unless there's a newer release the user hasn't already waved away.</summary>
+    public async Task CheckForUpdatesAsync()
+    {
+        var update = await UpdateCheck.FindNewerReleaseAsync(AppVersion.Current).ConfigureAwait(true);
+        if (update is null)
+        {
+            return;
+        }
+
+        _offeredUpdate = update.Version;
+        UpdateNotice = $"Invigoration {update.Version} is available — you're on {AppVersion.Current}.";
+    }
+
+    /// <summary>Opens the releases page. Downloading and installing stay the user's own business.</summary>
+    [RelayCommand]
+    private void OpenReleasesPage()
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo(UpdateCheck.ReleasesPage) { UseShellExecute = true });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or InvalidOperationException or PlatformNotSupportedException)
+        {
+            // No browser to hand — not worth an error dialog over an optional notice.
+        }
+    }
+
+    /// <summary>Hides this version's notice for good; a later release is newer than what's remembered, so it announces itself on its own.</summary>
+    [RelayCommand]
+    private void DismissUpdateNotice()
+    {
+        if (_offeredUpdate is { } offered)
+        {
+            UpdateSettingsStore.DismissedVersion = offered.ToString();
+        }
+
+        UpdateNotice = "";
+    }
+
     private readonly HotlineTrackerConfigStore _hotlineStore = new();
 
     /// <summary>"Add Bot"-style top-level Hotline entities, per the user's own framing ("each hotline connection is a 'tracker'") — one HotlineTabViewModel per HotlineTrackerConfig, persisted the same way Bots/BotConfig are.</summary>
@@ -113,6 +180,7 @@ public partial class MainWindowViewModel : ViewModelBase
         _whispersTab = new GlobalWhispersTabViewModel(this);
         IsMusicEnabled = MusicSettingsStore.IsEnabled;
         IsMusicBarEnabled = MusicSettingsStore.ShowBottomBar;
+        IsUpdateCheckEnabled = UpdateSettingsStore.CheckForUpdates;
 
         foreach (var config in _store.Load())
         {
