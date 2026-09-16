@@ -124,6 +124,59 @@ public sealed partial class HotlineTrackerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>Whether sessions under this tracker come back on their own after a drop — see HotlineTrackerConfig.AutoReconnect.</summary>
+    public bool AutoReconnect
+    {
+        get => _parent.Config.AutoReconnect;
+        set
+        {
+            if (_parent.Config.AutoReconnect == value)
+            {
+                return;
+            }
+
+            _parent.Config.AutoReconnect = value;
+            OnPropertyChanged();
+            _parent.NotifyConfigChanged();
+        }
+    }
+
+    /// <summary>Seconds between reconnect attempts — 30 by default. Clamped to at least 1 so a typo can't spin.</summary>
+    public int AutoReconnectDelaySeconds
+    {
+        get => _parent.Config.AutoReconnectDelaySeconds;
+        set
+        {
+            var seconds = Math.Max(1, value);
+            if (_parent.Config.AutoReconnectDelaySeconds == seconds)
+            {
+                return;
+            }
+
+            _parent.Config.AutoReconnectDelaySeconds = seconds;
+            OnPropertyChanged();
+            _parent.NotifyConfigChanged();
+        }
+    }
+
+    /// <summary>Attempts before giving up; 0 keeps trying.</summary>
+    public int AutoReconnectMaxAttempts
+    {
+        get => _parent.Config.AutoReconnectMaxAttempts;
+        set
+        {
+            var attempts = Math.Max(0, value);
+            if (_parent.Config.AutoReconnectMaxAttempts == attempts)
+            {
+                return;
+            }
+
+            _parent.Config.AutoReconnectMaxAttempts = attempts;
+            OnPropertyChanged();
+            _parent.NotifyConfigChanged();
+        }
+    }
+
     /// <summary>Logs every inbound transaction on every session connected under this tracker — see HotlineTransactionClient.DebugLog's remarks. Grouped under the collapsed "Advanced" section.</summary>
     public bool Debug
     {

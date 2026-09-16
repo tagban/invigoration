@@ -111,9 +111,86 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         {
             IsConnected = false;
             AppendMessage(ex is null ? "* Disconnected." : $"* Disconnected ({ex.GetType().Name}: {ex.Message}).");
+            MaybeScheduleReconnect();
         });
 
         _ = ConnectAsync(options.Login, options.Password, options.Nickname, options.IconId);
+    }
+
+    // --- Reconnecting after a drop. A Hotline session is something you leave running, so losing
+    // the server to a reboot or a flaky link shouldn't mean noticing hours later and reconnecting
+    // by hand. Deliberately does NOT retry a refused login (see _loginRefused): a server that said
+    // no says no every 30 seconds too, and hammering it is how an account or address gets banned. ---
+
+    private CancellationTokenSource? _reconnectCts;
+
+    /// <summary>Set once the user disconnects or closes this session — nothing reconnects after that.</summary>
+    private bool _closing;
+
+    /// <summary>Set when the server accepted the connection but refused the login, which reconnecting can only repeat.</summary>
+    private bool _loginRefused;
+
+    /// <summary>True while attempts are still being made, so the UI can say so rather than looking dead.</summary>
+    [ObservableProperty]
+    public partial bool IsReconnecting { get; set; }
+
+    private void MaybeScheduleReconnect()
+    {
+        var config = _parent.Config;
+        if (_closing || _loginRefused || !config.AutoReconnect || IsReconnecting)
+        {
+            return;
+        }
+
+        _reconnectCts?.Cancel();
+        _reconnectCts = new CancellationTokenSource();
+        _ = RunReconnectAsync(_reconnectCts.Token);
+    }
+
+    private async Task RunReconnectAsync(CancellationToken cancellationToken)
+    {
+        var config = _parent.Config;
+        var delay = TimeSpan.FromSeconds(Math.Max(1, config.AutoReconnectDelaySeconds));
+        var maxAttempts = Math.Max(0, config.AutoReconnectMaxAttempts);
+        var limit = maxAttempts > 0 ? $", up to {maxAttempts} attempt{(maxAttempts == 1 ? "" : "s")}" : "";
+        IsReconnecting = true;
+        AppendMessage($"* Reconnecting every {delay.TotalSeconds:0}s{limit}...");
+
+        try
+        {
+            for (var attempt = 1; maxAttempts == 0 || attempt <= maxAttempts; attempt++)
+            {
+                await Task.Delay(delay, cancellationToken).ConfigureAwait(true);
+                if (_closing || IsConnected)
+                {
+                    return;
+                }
+
+                await ConnectAsync(_options.Login, _options.Password, _options.Nickname, _options.IconId)
+                    .ConfigureAwait(true);
+                if (IsConnected)
+                {
+                    AppendMessage($"* Back on after {attempt} attempt{(attempt == 1 ? "" : "s")}.");
+                    return;
+                }
+
+                if (_loginRefused)
+                {
+                    AppendMessage("* Not reconnecting again — the server refused the login.");
+                    return;
+                }
+            }
+
+            AppendMessage($"* Gave up reconnecting after {maxAttempts} attempt{(maxAttempts == 1 ? "" : "s")}. Connect again when the server's back.");
+        }
+        catch (OperationCanceledException)
+        {
+            // Disconnected, closed, or reconnected another way.
+        }
+        finally
+        {
+            IsReconnecting = false;
+        }
     }
 
     private async Task ConnectAsync(string login, string password, string nickname, ushort iconId)
@@ -121,7 +198,12 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         AppendMessage($"* Connecting to {Host}:{Port}...");
         var ok = await _client.ConnectAndLoginAsync(Host, Port, login, password, nickname, iconId, _options.SendClientVersion ? _options.ClientVersion : null, _options.AdvertiseChatHistorySupport).ConfigureAwait(true);
         IsConnected = ok;
-        AppendMessage(ok ? "* Connected." : "* Failed to connect or log in.");
+        _loginRefused = !ok && _client.LoginRefusedReason is not null;
+        AppendMessage(ok
+            ? "* Connected."
+            : _client.LoginRefusedReason is { } refused
+                ? $"* Login refused: {refused}"
+                : "* Failed to connect or log in.");
         if (ok)
         {
             // A saved profile's or tracker listing's own name always wins — this is purely the
@@ -399,6 +481,8 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
     [RelayCommand]
     private async Task Disconnect()
     {
+        _closing = true;
+        _reconnectCts?.Cancel();
         await _client.DisposeAsync().ConfigureAwait(true);
         _parent.CloseSession(this);
     }
@@ -615,6 +699,8 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
 
     public ValueTask DisposeAsync()
     {
+        _closing = true;
+        _reconnectCts?.Cancel();
         _ghostPruneTimer.Stop();
         return _client.DisposeAsync();
     }

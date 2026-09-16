@@ -26,6 +26,20 @@ public sealed class HotlineTrackerConfig
     /// <summary>Off by default — logs every inbound transaction (type + fields) to a session's chat log, to diagnose exactly what a server sends right before an unexplained disconnect. Grouped under the tracker settings' collapsed "Advanced" section.</summary>
     public bool Debug { get; set; }
 
+    /// <summary>
+    /// Whether a server session under this tracker comes back on its own after an unexpected
+    /// disconnect — on by default, since a Hotline session is something you leave running. Never
+    /// after you disconnect deliberately, and never after the server refused the login: retrying a
+    /// refused login only fails the same way.
+    /// </summary>
+    public bool AutoReconnect { get; set; } = true;
+
+    /// <summary>Seconds between reconnect attempts — 30 by default, which is gentle enough for a small hobby server that's rebooting.</summary>
+    public int AutoReconnectDelaySeconds { get; set; } = 30;
+
+    /// <summary>How many attempts before giving up; 0 keeps trying until you disconnect or close the session.</summary>
+    public int AutoReconnectMaxAttempts { get; set; }
+
     /// <summary>Off by default — the "Copy Log" button on a session's top bar is a niche/debugging tool most people never need; shown only once explicitly opted into here, so it doesn't take up UI space by default.</summary>
     public bool ShowCopyLogButton { get; set; }
 

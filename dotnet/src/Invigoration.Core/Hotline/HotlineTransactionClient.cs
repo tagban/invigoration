@@ -60,6 +60,14 @@ public sealed class HotlineTransactionClient : FramedTcpClient
     /// <summary>Every inbound transaction, decoded — type name/number and every field — fired only when Debug is on. Exists specifically to diagnose "a server disconnects us and we don't know why": the last few lines before Disconnected fires are whatever the server actually sent right before closing the connection.</summary>
     public event Action<string>? DebugLog;
 
+    /// <summary>
+    /// Why the last <see cref="ConnectAndLoginAsync"/> was turned down by the server, or null when
+    /// it succeeded or never got that far (unreachable host, failed handshake). The distinction is
+    /// what lets auto-reconnect keep retrying a server that's merely down while standing down for
+    /// one that refused the credentials.
+    /// </summary>
+    public string? LoginRefusedReason { get; private set; }
+
     public IReadOnlyList<HotlineUser> Users => _users;
 
     /// <summary>The server's own reported name (login reply field 162, e.g. "MacDomain", "Hotline Central Hub" — confirmed live), null until login succeeds. A saved profile's or tracker listing's own name should still win in the UI when one exists; this is the fallback for a session that has neither.</summary>
@@ -109,6 +117,7 @@ public sealed class HotlineTransactionClient : FramedTcpClient
     {
         _nickname = nickname;
         _iconId = iconId;
+        LoginRefusedReason = null;
 
         // Created before anything else, not after the login reply — confirmed live that a real
         // server can (and does) push ShowAgreement before its own Login reply arrives, and this
@@ -172,6 +181,12 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         var loginReply = await SendTransactionAsync(HotlineTransactionType.Login, [.. loginFields], ct).ConfigureAwait(false);
         if (loginReply is not { ErrorCode: 0 })
         {
+            // The server answered and said no — bad credentials, banned, or full. Worth
+            // distinguishing from "couldn't reach it": reconnecting can't talk a refusal round,
+            // and a run of rejected logins is what gets an account or address banned.
+            LoginRefusedReason = loginReply?.Field(HotlineFieldType.ErrorText)?.AsString() is { Length: > 0 } text
+                ? text
+                : "the server refused the login";
             return false;
         }
 
