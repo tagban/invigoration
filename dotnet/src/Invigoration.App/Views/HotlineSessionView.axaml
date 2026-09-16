@@ -35,10 +35,17 @@
             </DockPanel>
         </Border>
 
+        <!-- Chat / Files / News for this one server. Files and News don't ask the server anything
+             until their tab is first opened (HotlineSessionViewModel.OnSelectedSectionIndexChanged) —
+             most sessions are opened to chat, and a server with a big file tree shouldn't be
+             walked just in case. -->
+        <TabControl Grid.Row="2" Grid.Column="0" SelectedIndex="{Binding SelectedSectionIndex}" Padding="0">
+            <TabItem Header="Chat">
+
         <!-- SelectableTextBlock (not plain TextBlock) so an individual line's text can be
              click-dragged and copied directly — a ListBox only supports item selection, not text
              selection, which is what made "Copy Log" above necessary in the first place. -->
-        <ListBox Name="MessagesList" Grid.Row="2" Grid.Column="0" ItemsSource="{Binding Messages}" Background="Transparent" Padding="4">
+        <ListBox Name="MessagesList" ItemsSource="{Binding Messages}" Background="Transparent" Padding="4">
             <!-- Same fix as the Users list — ListBoxItem's default theme padding/min-height was
                  adding visible gaps between every chat line. -->
             <ListBox.Styles>
@@ -60,6 +67,124 @@
                 </DataTemplate>
             </ListBox.ItemTemplate>
         </ListBox>
+            </TabItem>
+
+            <TabItem Header="Files">
+                <Grid RowDefinitions="Auto,*,Auto" DataContext="{Binding Files}" x:CompileBindings="False">
+                    <DockPanel Grid.Row="0" Margin="6">
+                        <Button DockPanel.Dock="Left" Content="↑" Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}"
+                                ToolTip.Tip="Up one folder" Padding="8,3" />
+                        <Button DockPanel.Dock="Right" Content="Upload..." Command="{Binding UploadCommand}"
+                                IsVisible="{Binding CanUpload}" Padding="8,3" Margin="6,0,0,0" />
+                        <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" Padding="8,3" />
+                        <TextBlock Text="{Binding PathText}" VerticalAlignment="Center" Margin="8,0" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+
+                    <TextBlock Grid.Row="1" Text="Nothing to show yet — press Refresh." Opacity="0.5" FontSize="12"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding ShowEmptyHint}" />
+                    <ListBox Grid.Row="1" ItemsSource="{Binding Entries}" SelectedItem="{Binding SelectedEntry}" Background="Transparent">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnDefinitions="Auto,*,Auto,Auto" ColumnSpacing="8">
+                                    <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Status}" FontSize="10" Opacity="0.6"
+                                                   IsVisible="{Binding Status, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                    <ProgressBar Grid.Column="2" Width="90" Height="6" Value="{Binding DownloadProgress}"
+                                                 VerticalAlignment="Center" IsVisible="{Binding DownloadProgress}" />
+                                    <TextBlock Grid.Column="3" Text="{Binding SizeText}" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+
+                    <DockPanel Grid.Row="2" Margin="6">
+                        <Button DockPanel.Dock="Right" Content="Download" Command="{Binding DownloadCommand}"
+                                CommandParameter="{Binding SelectedEntry}" Padding="10,3"
+                                IsEnabled="{Binding SelectedEntry, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" FontSize="11" VerticalAlignment="Center"
+                                   TextWrapping="Wrap" />
+                    </DockPanel>
+                </Grid>
+            </TabItem>
+
+            <TabItem Header="News">
+                <Grid RowDefinitions="Auto,*,Auto" DataContext="{Binding News}" x:CompileBindings="False">
+                    <DockPanel Grid.Row="0" Margin="6">
+                        <Button DockPanel.Dock="Left" Content="↑" Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}"
+                                ToolTip.Tip="Up one level" Padding="8,3" />
+                        <Button DockPanel.Dock="Right" Content="Post..." Command="{Binding StartPostCommand}"
+                                IsVisible="{Binding CanPost}" Padding="8,3" Margin="6,0,0,0" />
+                        <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" Padding="8,3" />
+                        <TextBlock Text="{Binding PathText}" VerticalAlignment="Center" Margin="8,0" FontWeight="Bold"
+                                   TextTrimming="CharacterEllipsis" />
+                    </DockPanel>
+
+                    <Grid Grid.Row="1" RowDefinitions="*,Auto,*">
+                        <TextBlock Grid.Row="0" Text="Nothing to show yet — press Refresh." Opacity="0.5" FontSize="12"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   IsVisible="{Binding ShowEmptyHint}" />
+                        <!-- Categories while browsing the tree; the article list once inside one. -->
+                        <ListBox Grid.Row="0" ItemsSource="{Binding Categories}" Background="Transparent"
+                                 IsVisible="{Binding !IsInCategory}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                                        <TextBlock Grid.Column="0" Text="{Binding Icon}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding Name}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Column="2" Text="{Binding CountText}" Opacity="0.6" FontSize="11" VerticalAlignment="Center" />
+                                    </Grid>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <ListBox Grid.Row="0" ItemsSource="{Binding Articles}" SelectedItem="{Binding SelectedArticle}"
+                                 Background="Transparent" IsVisible="{Binding IsInCategory}">
+                            <ListBox.ItemTemplate>
+                                <DataTemplate>
+                                    <StackPanel Margin="{Binding Indent}">
+                                        <TextBlock Text="{Binding Title}" FontWeight="Bold" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Byline}" FontSize="11" Opacity="0.6" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ListBox.ItemTemplate>
+                        </ListBox>
+
+                        <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" Background="#3A3A3A"
+                                      IsVisible="{Binding HasOpenArticle}" />
+
+                        <Border Grid.Row="2" BorderBrush="#3A3A3A" BorderThickness="0,1,0,0" Padding="8"
+                                IsVisible="{Binding HasOpenArticle}">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Top" HorizontalAlignment="Right" Content="Reply"
+                                        Command="{Binding StartReplyCommand}" IsVisible="{Binding CanPost}" Padding="8,3" />
+                                <ScrollViewer>
+                                    <SelectableTextBlock Text="{Binding ArticleBody}" TextWrapping="Wrap" />
+                                </ScrollViewer>
+                            </DockPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Composer, shown in place of the footer while writing a post or a reply. -->
+                    <Grid Grid.Row="2" Margin="6" RowDefinitions="Auto,Auto,Auto" IsVisible="{Binding IsComposing}">
+                        <TextBox Grid.Row="0" Watermark="Subject" Text="{Binding ComposeTitle}" />
+                        <TextBox Grid.Row="1" Watermark="Write your post..." Text="{Binding ComposeBody}"
+                                 AcceptsReturn="True" Height="90" TextWrapping="Wrap" Margin="0,6" />
+                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                            <Button Content="Cancel" Command="{Binding CancelPostCommand}" Padding="10,3" />
+                            <Button Content="Post" Command="{Binding SubmitPostCommand}" Padding="10,3" />
+                        </StackPanel>
+                    </Grid>
+
+                    <TextBlock Grid.Row="2" Margin="6" Text="{Binding StatusMessage}" Opacity="0.7" FontSize="11"
+                               TextWrapping="Wrap" IsVisible="{Binding !IsComposing}" />
+                </Grid>
+            </TabItem>
+        </TabControl>
 
         <!-- Lighter background (not this app's usual dark theme) — real Hotline clients render
              names in black by default (admin/mod ranks get their own colors, a follow-up once
@@ -197,7 +322,10 @@
             </Grid>
         </Border>
 
-        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="8">
+        <!-- Chat input belongs to chat: hidden while browsing Files or News, where a typed line
+             would otherwise go silently to the channel. -->
+        <Grid Grid.Row="3" Grid.Column="0" Grid.ColumnSpan="2" ColumnDefinitions="*,Auto" Margin="8"
+              IsVisible="{Binding IsChatSection}">
             <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message..."
                      IsEnabled="{Binding IsConnected}" />
             <Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}" Margin="8,0,0,0" IsEnabled="{Binding IsConnected}" />

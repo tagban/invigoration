@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using Invigoration.App.ViewModels;
 
@@ -29,7 +30,46 @@ public partial class HotlineSessionView : UserControl
             };
         }
 
-        DataContextChanged += (_, _) => AttachAutoScroll();
+        DataContextChanged += (_, _) =>
+        {
+            AttachAutoScroll();
+            AttachFilePickers();
+        };
+    }
+
+    /// <summary>
+    /// Downloads and uploads need the platform file pickers, which need a TopLevel — a view
+    /// concern, so the Files view model asks through these callbacks rather than reaching for one
+    /// itself. Both return null when the user cancels, which the view model treats as "don't".
+    /// </summary>
+    private void AttachFilePickers()
+    {
+        if (DataContext is not HotlineSessionViewModel vm)
+        {
+            return;
+        }
+
+        vm.Files.AskWhereToSave = async suggestedName =>
+        {
+            var file = await TopLevel.GetTopLevel(this)!.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
+            {
+                Title = "Save file from server",
+                SuggestedFileName = suggestedName,
+            });
+
+            return file?.TryGetLocalPath();
+        };
+
+        vm.Files.AskWhatToUpload = async () =>
+        {
+            var files = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
+            {
+                Title = "Choose a file to upload",
+                AllowMultiple = false,
+            });
+
+            return files.Count > 0 ? files[0].TryGetLocalPath() : null;
+        };
     }
 
     /// <summary>

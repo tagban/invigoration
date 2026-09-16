@@ -28,6 +28,54 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
     private readonly HotlineTransactionClient _client = new();
     private readonly HotlineConnectOptions _options;
 
+    /// <summary>The Files tab for this server — created up front, but it doesn't ask the server anything until the tab is actually opened (see SelectedSectionIndex).</summary>
+    public HotlineFilesViewModel Files { get; }
+
+    /// <summary>The News tab for this server, same lazy arrangement as Files.</summary>
+    public HotlineNewsViewModel News { get; }
+
+    /// <summary>
+    /// Which of Chat/Files/News is showing. Files and News load on first view rather than at
+    /// login: most sessions are opened for chat, and a server with a big file tree shouldn't be
+    /// listed just in case.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsChatSection))]
+    public partial int SelectedSectionIndex { get; set; }
+
+    /// <summary>The chat input box belongs to chat — it's hidden while browsing files or news, where a typed line would silently go to the channel.</summary>
+    public bool IsChatSection => SelectedSectionIndex == 0;
+
+    private bool _filesLoaded;
+    private bool _newsLoaded;
+
+    partial void OnSelectedSectionIndexChanged(int value) => LoadSectionIfNeeded();
+
+    /// <summary>
+    /// Loads whichever of Files/News is showing, once. Called both when the tab changes and when
+    /// the session finishes logging in — a tab opened before the connection was ready (or left
+    /// selected across a reconnect) would otherwise sit empty until the user switched away and
+    /// back.
+    /// </summary>
+    private void LoadSectionIfNeeded()
+    {
+        if (!IsConnected)
+        {
+            return;
+        }
+
+        if (SelectedSectionIndex == 1 && !_filesLoaded)
+        {
+            _filesLoaded = true;
+            _ = Files.RefreshAsync();
+        }
+        else if (SelectedSectionIndex == 2 && !_newsLoaded)
+        {
+            _newsLoaded = true;
+            _ = News.RefreshAsync();
+        }
+    }
+
     /// <summary>Whether the caller already gave us a real name (a saved profile's own Name, or the tracker listing's Name) — if so, that always wins over the server's own self-reported name once login completes.</summary>
     private readonly bool _hasExplicitDisplayName;
 
@@ -97,6 +145,8 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         Title = options.DisplayName is { Length: > 0 } ? options.DisplayName : $"{options.Host}:{options.Port}";
         _client.AutoAcceptAgreement = options.AutoAcceptAgreement;
         _client.Debug = parent.Config.Debug;
+        Files = new HotlineFilesViewModel(_client, options.Host, options.Port);
+        News = new HotlineNewsViewModel(_client);
 
         _client.ChatMessageReceived += msg => Dispatcher.UIThread.Post(() => AppendChatMessage(msg));
         _client.ServerMessageReceived += msg => Dispatcher.UIThread.Post(() => AppendMessage($"* {msg}"));
@@ -214,6 +264,11 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             }
 
             ReplaceUsers(_client.Users);
+
+            // A reconnect gets fresh listings rather than whatever the previous session left.
+            _filesLoaded = false;
+            _newsLoaded = false;
+            LoadSectionIfNeeded();
 
             // Two ways to show "where the conversation was last at" on connect, per explicit
             // request — mutually exclusive to avoid showing the same recent messages twice.
