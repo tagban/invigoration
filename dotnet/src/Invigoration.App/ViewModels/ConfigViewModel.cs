@@ -38,6 +38,10 @@ public partial class ConfigViewModel : ObservableObject
                 // ChatIcon.GetProductIconKey's "sc2" sentinel case.
                 new ProductOption(BncsProduct.ScRemastered, "StarCraft: Remastered", GameIconLoader.Get("sc")),
                 new ProductOption(BncsProduct.Wc3Reforged, "Warcraft III: Reforged", GameIconLoader.Get("war3")),
+                // Not a game at all — the plain-text Chat/telnet connection type, which some
+                // private servers still run alongside the binary protocol. Last in the list
+                // since it's the odd one out, not something most bots want.
+                new ProductOption(BncsProduct.Chat, "Chat / Telnet (no game)", GameIconLoader.Get("chat")),
             ])
             .ToList();
 
@@ -45,14 +49,23 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(RequiresExpansionKey))]
     [NotifyPropertyChangedFor(nameof(RequiresCdKey))]
     [NotifyPropertyChangedFor(nameof(AllowsOfficialServers))]
+    [NotifyPropertyChangedFor(nameof(ShowsRetiredGameWarning))]
     [NotifyPropertyChangedFor(nameof(ShowsCustomServerBox))]
     [NotifyPropertyChangedFor(nameof(ServerCompatibilityNote))]
     [NotifyPropertyChangedFor(nameof(ProductIconImage))]
     [NotifyPropertyChangedFor(nameof(IsStimpakBackedProduct))]
+    [NotifyPropertyChangedFor(nameof(IsChatTelnet))]
+    [NotifyPropertyChangedFor(nameof(UsesBnls))]
     [NotifyPropertyChangedFor(nameof(IsDiabloII))]
     public partial string Product { get; set; }
 
     public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
+
+    /// <summary>The plain-text Chat/telnet connection type — a username and password only: no CD key, no BNLS, no version check.</summary>
+    public bool IsChatTelnet => BncsProduct.IsChatTelnet(Product);
+
+    /// <summary>Whether the BNLS fields apply at all — neither StarCraft II's modern login nor the Chat protocol touches BNLS.</summary>
+    public bool UsesBnls => !IsStimpakBackedProduct && !IsChatTelnet;
 
     /// <summary>Only Diablo II logs on to a realm (character server) after Battle.net.</summary>
     public bool IsDiabloII => Product is BncsProduct.DiabloII or BncsProduct.DiabloIILoD;
@@ -185,8 +198,14 @@ public partial class ConfigViewModel : ObservableObject
 
     public bool AllowsOfficialServers => BncsProduct.GetServerCompatibility(Product) == ServerCompatibility.Both;
 
-    public string? ServerCompatibilityNote =>
-        BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.Notes : null;
+    /// <summary>The "retired from official Battle.net" warning — about a game that used to work there, so not shown for Chat/Telnet, which never was a game and has its own note above.</summary>
+    public bool ShowsRetiredGameWarning => !AllowsOfficialServers && !IsChatTelnet;
+
+    public string? ServerCompatibilityNote => IsChatTelnet
+        ? "Not a game — the plain-text chat connection some private servers run alongside the binary protocol. " +
+          "Just a username and password: no CD key, no BNLS, no version check, and it reconnects in about one round trip. " +
+          "Official Battle.net doesn't offer it."
+        : BncsProduct.Catalog.TryGetValue(Product, out var info) ? info.Notes : null;
 
     public Bitmap? ProductIconImage => GameIconLoader.Get(BncsProduct.GetIconKey(Product));
 

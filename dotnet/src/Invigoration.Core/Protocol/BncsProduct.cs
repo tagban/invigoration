@@ -68,6 +68,19 @@ public static class BncsProduct
     public const string Diablo = "LTRD";
 
     /// <summary>
+    /// Not a real BNCS product — a pseudo-entry offered in the Game picker for the plain-text
+    /// "Chat" (telnet) connection type (see BotEngine.Chat.cs): no BNLS, no CD-key, no
+    /// version-check, and no official-server option, since that connection type isn't tied to any
+    /// specific game at all. Deliberately kept out of <see cref="Catalog"/> itself (that's "legacy
+    /// BNCS products this engine speaks" — Chat is a different connection type, not a product),
+    /// with the few methods below special-cased instead, so a real lookup miss can't accidentally
+    /// behave correctly for it by coincidence. Value is "TAHC" (wire-reversed "CHAT", matching
+    /// every other constant here) because <see cref="Chat.ChatIcon.GetProductIconKey"/> already
+    /// maps "TAHC" → "chat", so the picker's icon falls out of that lookup for free.
+    /// </summary>
+    public const string Chat = "TAHC";
+
+    /// <summary>
     /// Not a real BNCS product — a UI-only marker for StarCraft II, whose modern Battle.net
     /// login (via the Stimpak native library — see BotEngine.Sc2.cs) is an entirely different
     /// protocol with no classic-BNCS wire form at all. Deliberately kept out of
@@ -165,6 +178,7 @@ public static class BncsProduct
 
     public static string GetDisplayName(string wireCode) => wireCode switch
     {
+        Chat => "Chat / Telnet",
         Sc2 => "StarCraft II",
         ScRemastered => "StarCraft: Remastered",
         Wc3Reforged => "Warcraft III: Reforged",
@@ -177,11 +191,20 @@ public static class BncsProduct
     /// <summary>Expansion products that authenticate with a classic+expansion CD-key pair.</summary>
     public static bool RequiresExpansionCdKey(string wireCode) => wireCode is DiabloIILoD or Warcraft3TFT;
 
-    /// <summary>Whether this product needs a CD-key at all — Diablo (1) is the sole exception.</summary>
-    public static bool RequiresCdKey(string wireCode) => wireCode != Diablo;
+    /// <summary>Whether this product needs a CD-key at all — Diablo (1) doesn't, and the Chat/Telnet connection type never does (see <see cref="Chat"/>).</summary>
+    public static bool RequiresCdKey(string wireCode) => wireCode != Diablo && wireCode != Chat;
+
+    /// <summary>
+    /// Whether this "product" is really the plain-text Chat/telnet connection type rather than a
+    /// game — a username/password line exchange with no BNLS, CD-key, or version-check at all
+    /// (see BotEngine.Chat.cs). Branch on this rather than a literal <c>== Chat</c> comparison.
+    /// </summary>
+    public static bool IsChatTelnet(string wireCode) => wireCode == Chat;
 
     public static ServerCompatibility GetServerCompatibility(string wireCode) =>
-        Catalog.TryGetValue(wireCode, out var info) ? info.Compatibility : ServerCompatibility.Both;
+        wireCode == Chat
+            ? ServerCompatibility.PrivateOnly
+            : Catalog.TryGetValue(wireCode, out var info) ? info.Compatibility : ServerCompatibility.Both;
 
     /// <summary>
     /// Whether this product's server pushes SID_FRIENDSLIST/UPDATE/ADD/REMOVE/POSITION

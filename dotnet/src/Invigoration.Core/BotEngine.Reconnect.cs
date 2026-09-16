@@ -39,12 +39,15 @@ public sealed partial class BotEngine
 
     /// <summary>Whether this bot can log on without asking BNLS anything (see the remarks above).</summary>
     public bool CanLogOnWithoutBnls() =>
-        !BncsProduct.UsesNewLoginSystem(Config.Product) &&
-        !BncsProduct.IsStimpakBacked(Config.Product) &&
-        (!BncsProduct.RequiresCdKey(Config.Product) ||
-         (CdKeyDecoder.Decode(Config.CdKey) is not null &&
-          (!BncsProduct.RequiresExpansionCdKey(Config.Product) || CdKeyDecoder.Decode(Config.ExpansionCdKey) is not null))) &&
-        LogonCheckCache.TryGetVersionByte(Config.Product, out _);
+        // The Chat protocol never involves BNLS at all — there's nothing to cache or skip, so
+        // every attempt is already the fast path (see BotEngine.Chat.cs).
+        BncsProduct.IsChatTelnet(Config.Product) ||
+        (!BncsProduct.UsesNewLoginSystem(Config.Product) &&
+         !BncsProduct.IsStimpakBacked(Config.Product) &&
+         (!BncsProduct.RequiresCdKey(Config.Product) ||
+          (CdKeyDecoder.Decode(Config.CdKey) is not null &&
+           (!BncsProduct.RequiresExpansionCdKey(Config.Product) || CdKeyDecoder.Decode(Config.ExpansionCdKey) is not null))) &&
+         LogonCheckCache.TryGetVersionByte(Config.Product, out _));
 
     private async Task RunReconnectAsync(CancellationToken cancellationToken)
     {
@@ -80,7 +83,9 @@ public sealed partial class BotEngine
 
             while (!_auth.LoggedOnToBncs && _logonRejection is null)
             {
-                var attemptInFlight = attemptStartedAt is { } started && (_bncs.IsConnected || _bnls.IsConnected) && clock.Elapsed - started < AttemptTimeout;
+                var attemptInFlight = attemptStartedAt is { } started &&
+                    (_bncs.IsConnected || _bnls.IsConnected || _chatTelnet.IsConnected) &&
+                    clock.Elapsed - started < AttemptTimeout;
                 if (!attemptInFlight)
                 {
                     if (maxAttempts > 0 && attempts >= maxAttempts)
@@ -133,6 +138,15 @@ public sealed partial class BotEngine
     private async Task ConnectForRapidReconnectAsync(CancellationToken cancellationToken)
     {
         AbandonConnectionAttempt();
+
+        // Nothing to skip on the Chat protocol — its ordinary connect is already a socket and two
+        // credential lines, so the normal path *is* the fast one.
+        if (BncsProduct.IsChatTelnet(Config.Product))
+        {
+            await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (!CanLogOnWithoutBnls() || !LogonCheckCache.TryGetVersionByte(Config.Product, out var versionByte))
         {
             await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
@@ -151,12 +165,13 @@ public sealed partial class BotEngine
     /// <summary>Closes whatever a previous attempt left half-open, without it counting as a drop.</summary>
     private void AbandonConnectionAttempt()
     {
-        if (_bncs.IsConnected)
+        if (_bncs.IsConnected || _chatTelnet.IsConnected)
         {
             Interlocked.Exchange(ref _replacingBncsConnection, 1);
         }
 
         _bncs.Close();
         _bnls.Close();
+        _chatTelnet.Close();
     }
 }

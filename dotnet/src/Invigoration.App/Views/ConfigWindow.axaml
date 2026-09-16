@@ -137,7 +137,7 @@
                                   PlaceholderText="Custom server address"
                                   FilterMode="StartsWith"
                                   IsVisible="{Binding ShowsCustomServerBox}" />
-                <TextBlock Classes="warning" IsVisible="{Binding !AllowsOfficialServers}"
+                <TextBlock Classes="warning" IsVisible="{Binding ShowsRetiredGameWarning}"
                            Text="Only private/PVPGN servers work for this game — it no longer works on official Battle.net." />
                 <Grid ColumnDefinitions="*,Auto" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="3">
                     <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Home channel" />
@@ -174,8 +174,10 @@
 
                         <CheckBox Content="Rapid reconnect (private servers)" IsChecked="{Binding Config.RapidReconnect}"
                                   IsVisible="{Binding !IsStimpakBackedProduct}" />
-                        <TextBlock Classes="hint" IsVisible="{Binding !IsStimpakBackedProduct}"
+                        <TextBlock Classes="hint" IsVisible="{Binding UsesBnls}"
                                    Text="For holding a name or channel ops: the first attempt goes out the instant the connection drops, and each attempt skips BNLS by reusing this session's first login answers, getting back on in about half the time. Pair it with a short wait, like every 1 second up to 45 attempts. Never used on official Battle.net." />
+                        <TextBlock Classes="hint" IsVisible="{Binding IsChatTelnet}"
+                                   Text="For holding a name or channel ops: the first attempt goes out the instant the connection drops. Chat / Telnet is already the fastest way back on — a socket and two credential lines, no BNLS or version check — so pair it with a short wait, like every 1 second up to 45 attempts." />
                     </StackPanel>
 
                     <TextBlock Classes="label" Text="Flood protection: minimum delay between outgoing messages (ms)" Margin="0,8,0,0" />
@@ -304,7 +306,7 @@
                 </StackPanel>
             </Expander>
 
-            <Expander Header="Advanced" HorizontalAlignment="Stretch" IsVisible="{Binding !IsStimpakBackedProduct}">
+            <Expander Header="Advanced" HorizontalAlignment="Stretch" IsVisible="{Binding UsesBnls}">
                 <StackPanel Margin="8" Spacing="8">
                     <TextBlock Classes="label" Text="BNLS server (login helper — change only if it stops working)" />
                     <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">

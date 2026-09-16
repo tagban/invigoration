@@ -152,6 +152,7 @@ public sealed partial class BotEngine : IAsyncDisposable
             MaybeScheduleAutoReconnect();
         };
 
+        WireChatTelnet();
         WireDiscordBridge();
     }
 
@@ -309,6 +310,13 @@ public sealed partial class BotEngine : IAsyncDisposable
             return;
         }
 
+        // No BNLS hop, no version check, no CD key — straight to the server (see BotEngine.Chat.cs).
+        if (UsesChatTelnet)
+        {
+            await ConnectChatTelnetAsync(cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
         if (BncsProduct.IsLikelyIncompatible(Config.Product, Config.BattlenetServer))
         {
             LogWarning(
@@ -342,6 +350,7 @@ public sealed partial class BotEngine : IAsyncDisposable
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
+        _chatTelnet.Close();
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
         LogInfo("Disconnected.");
@@ -440,6 +449,12 @@ public sealed partial class BotEngine : IAsyncDisposable
             {
                 await SendSc2Async(outgoing, sc2ChannelOverride).ConfigureAwait(false);
             }
+            else if (UsesChatTelnet)
+            {
+                // The Chat protocol has no packet for this at all — chat and "/" commands alike
+                // are just the line itself, exactly as a telnet user would type it.
+                await _chatTelnet.SendLineAsync(outgoing).ConfigureAwait(false);
+            }
             else
             {
                 await SendBncsAsync(new PacketWriter().WriteNTString(outgoing), BncsPacketId.SID_CHATCOMMAND)
@@ -512,6 +527,12 @@ public sealed partial class BotEngine : IAsyncDisposable
 
     public async Task JoinHomeAsync()
     {
+        if (UsesChatTelnet)
+        {
+            await _chatTelnet.SendLineAsync($"/join {Config.HomeChannel}").ConfigureAwait(false);
+            return;
+        }
+
         await SendBncsAsync(new PacketWriter(), BncsPacketId.SID_LEAVECHAT).ConfigureAwait(false);
         await SendBncsAsync(
             new PacketWriter().WriteDword(2).WriteNTString(Config.HomeChannel),

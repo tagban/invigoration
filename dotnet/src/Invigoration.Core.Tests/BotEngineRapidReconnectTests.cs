@@ -10,7 +10,7 @@ using Invigoration.Core.Protocol;
 namespace Invigoration.Core.Tests;
 
 /// <summary>
-/// Rapid reconnect (BotEngine.RapidReconnect.cs) against loopback stand-ins for the Battle.net
+/// Rapid reconnect (BotEngine.Reconnect.cs) against loopback stand-ins for the Battle.net
 /// server and BNLS: a cached attempt logs on without touching BNLS, a changed challenge falls back
 /// to BNLS, BNLS's answers get remembered, and attempts repeat every second until stopped.
 /// LogonCheckCache is shared by the whole process, so these run one at a time.
