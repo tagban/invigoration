@@ -164,6 +164,10 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         // notice something sitting in the middle.
         _client.SecureLoginAddressMismatch += detail => Dispatcher.UIThread.Post(() =>
             AppendMessage($"* Note: {detail}."));
+
+        // Someone posted to the flat news while we're connected — the server sends just the new
+        // item, which goes on top of what's already shown rather than costing a full re-fetch.
+        _client.FlatNewsPosted += post => Dispatcher.UIThread.Post(() => News.PrependFlatNews(post));
         _client.Disconnected += ex => Dispatcher.UIThread.Post(() =>
         {
             IsConnected = false;

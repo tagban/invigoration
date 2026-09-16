@@ -52,10 +52,28 @@ public sealed partial class HotlineNewsViewModel(HotlineTransactionClient client
 
     public bool CanGoUp => _path.Count > 0;
 
-    public bool CanPost => client.CanPostNews && _path.Count > 0;
+    /// <summary>At the root a post goes to the flat news document; inside a category it's a threaded article. Either way the account needs the privilege.</summary>
+    public bool CanPost => client.CanPostNews;
+
+    /// <summary>True when a post would go to the flat news rather than a threaded category — the composer says so, since the two land in different places.</summary>
+    public bool PostsToFlatNews => _path.Count == 0;
+
+    public string ComposeHeading => PostsToFlatNews ? "Post to the server's news" : $"Post to {_path[^1]}";
+
+    /// <summary>
+    /// The server's flat news — the original 1.x form, one text document rather than a tree. On
+    /// most classic servers this is where the real news actually is, so it's shown first and the
+    /// category tree (if any) below it.
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasFlatNews))]
+    [NotifyPropertyChangedFor(nameof(ShowEmptyHint))]
+    public partial string FlatNews { get; set; } = "";
+
+    public bool HasFlatNews => !string.IsNullOrWhiteSpace(FlatNews);
 
     /// <summary>Nothing has been loaded yet (or there's genuinely nothing here) — shows a hint instead of an unexplained blank pane. Never while a request is in flight.</summary>
-    public bool ShowEmptyHint => !IsBusy && Categories.Count == 0 && Articles.Count == 0;
+    public bool ShowEmptyHint => !IsBusy && !HasFlatNews && Categories.Count == 0 && Articles.Count == 0;
 
     /// <summary>True once we're inside a category — that's when the article list, rather than the category list, is what to show.</summary>
     public bool IsInCategory => Articles.Count > 0 || (_path.Count > 0 && Categories.Count == 0);
@@ -131,6 +149,12 @@ public sealed partial class HotlineNewsViewModel(HotlineTransactionClient client
                 return;
             }
 
+            // Only at the root: inside a category the flat document isn't what's being looked at.
+            if (_path.Count == 0)
+            {
+                FlatNews = await client.GetFlatNewsAsync().ConfigureAwait(true) ?? "";
+            }
+
             var categories = await client.GetNewsCategoriesAsync(_path).ConfigureAwait(true);
             Categories.Clear();
             foreach (var category in categories)
@@ -149,7 +173,7 @@ public sealed partial class HotlineNewsViewModel(HotlineTransactionClient client
                 }
             }
 
-            if (Categories.Count == 0 && Articles.Count == 0)
+            if (Categories.Count == 0 && Articles.Count == 0 && !HasFlatNews)
             {
                 StatusMessage = _path.Count == 0 ? "This server has no news." : "Nothing posted here yet.";
             }
@@ -226,7 +250,9 @@ public sealed partial class HotlineNewsViewModel(HotlineTransactionClient client
             return;
         }
 
-        var posted = await client.PostNewsArticleAsync(_path, ComposeTitle.Trim(), ComposeBody, _replyingTo).ConfigureAwait(true);
+        var posted = PostsToFlatNews
+            ? await client.PostFlatNewsAsync(FormatFlatPost(ComposeTitle.Trim(), ComposeBody)).ConfigureAwait(true)
+            : await client.PostNewsArticleAsync(_path, ComposeTitle.Trim(), ComposeBody, _replyingTo).ConfigureAwait(true);
         if (!posted)
         {
             StatusMessage = "The server wouldn't accept the post.";
@@ -238,6 +264,20 @@ public sealed partial class HotlineNewsViewModel(HotlineTransactionClient client
         await RefreshAsync().ConfigureAwait(true);
     }
 
+    /// <summary>Puts a just-posted item on top of the flat news, the way the server itself orders it (newest first).</summary>
+    public void PrependFlatNews(string post)
+    {
+        FlatNews = string.IsNullOrEmpty(FlatNews) ? post : post + "\r" + FlatNews;
+    }
+
+    /// <summary>
+    /// The flat news is one plain document with no fields of its own, so a subject only exists if
+    /// it's written into the text. Real clients put it on the first line; this matches that rather
+    /// than silently dropping what the user typed in the subject box.
+    /// </summary>
+    private static string FormatFlatPost(string title, string body) =>
+        string.IsNullOrWhiteSpace(title) ? body : $"{title}\r\r{body}";
+
     private void RaiseLocationChanged()
     {
         OnPropertyChanged(nameof(PathText));
@@ -245,5 +285,7 @@ public sealed partial class HotlineNewsViewModel(HotlineTransactionClient client
         OnPropertyChanged(nameof(CanPost));
         OnPropertyChanged(nameof(IsInCategory));
         OnPropertyChanged(nameof(ShowEmptyHint));
+        OnPropertyChanged(nameof(PostsToFlatNews));
+        OnPropertyChanged(nameof(ComposeHeading));
     }
 }

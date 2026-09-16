@@ -155,8 +155,17 @@
                         <TextBlock Grid.Row="0" Text="Nothing to show yet — press Refresh." Opacity="0.5" FontSize="12"
                                    HorizontalAlignment="Center" VerticalAlignment="Center"
                                    IsVisible="{Binding ShowEmptyHint}" />
+
+                        <!-- The server's flat news document — the original 1.x form, and where the
+                             real news still lives on most classic servers. Shown first, with the
+                             category tree (usually near-empty) underneath. -->
+                        <ScrollViewer Grid.Row="0" IsVisible="{Binding HasFlatNews}">
+                            <SelectableTextBlock Text="{Binding FlatNews}" TextWrapping="Wrap" Margin="8"
+                                                 FontFamily="{OnPlatform Default=monospace, macOS=Menlo}" FontSize="12" />
+                        </ScrollViewer>
+
                         <!-- Categories while browsing the tree; the article list once inside one. -->
-                        <ListBox Grid.Row="0" ItemsSource="{Binding Categories}" Background="Transparent"
+                        <ListBox Grid.Row="2" ItemsSource="{Binding Categories}" Background="Transparent"
                                  IsVisible="{Binding !IsInCategory}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
@@ -169,7 +178,7 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <ListBox Grid.Row="0" ItemsSource="{Binding Articles}" SelectedItem="{Binding SelectedArticle}"
+                        <ListBox Grid.Row="2" ItemsSource="{Binding Articles}" SelectedItem="{Binding SelectedArticle}"
                                  Background="Transparent" IsVisible="{Binding IsInCategory}">
                             <ListBox.ItemTemplate>
                                 <DataTemplate>
@@ -181,10 +190,10 @@
                             </ListBox.ItemTemplate>
                         </ListBox>
 
-                        <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" Background="#3A3A3A"
-                                      IsVisible="{Binding HasOpenArticle}" />
+                        <GridSplitter Grid.Row="1" Height="4" HorizontalAlignment="Stretch" Background="#3A3A3A" />
 
                         <Border Grid.Row="2" BorderBrush="#3A3A3A" BorderThickness="0,1,0,0" Padding="8"
+                                ZIndex="1" Background="#1B1B1B"
                                 IsVisible="{Binding HasOpenArticle}">
                             <DockPanel>
                                 <Button DockPanel.Dock="Top" HorizontalAlignment="Right" Content="Reply"
@@ -197,11 +206,12 @@
                     </Grid>
 
                     <!-- Composer, shown in place of the footer while writing a post or a reply. -->
-                    <Grid Grid.Row="2" Margin="6" RowDefinitions="Auto,Auto,Auto" IsVisible="{Binding IsComposing}">
-                        <TextBox Grid.Row="0" Watermark="Subject" Text="{Binding ComposeTitle}" />
-                        <TextBox Grid.Row="1" Watermark="Write your post..." Text="{Binding ComposeBody}"
+                    <Grid Grid.Row="2" Margin="6" RowDefinitions="Auto,Auto,Auto,Auto" IsVisible="{Binding IsComposing}">
+                        <TextBlock Grid.Row="0" Text="{Binding ComposeHeading}" FontWeight="Bold" FontSize="12" Margin="0,0,0,4" />
+                        <TextBox Grid.Row="1" Watermark="Subject" Text="{Binding ComposeTitle}" />
+                        <TextBox Grid.Row="2" Watermark="Write your post..." Text="{Binding ComposeBody}"
                                  AcceptsReturn="True" Height="90" TextWrapping="Wrap" Margin="0,6" />
-                        <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                        <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                             <Button Content="Cancel" Command="{Binding CancelPostCommand}" Padding="10,3" />
                             <Button Content="Post" Command="{Binding SubmitPostCommand}" Padding="10,3" />
                         </StackPanel>

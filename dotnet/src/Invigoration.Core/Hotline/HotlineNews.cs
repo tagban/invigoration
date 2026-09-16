@@ -10,13 +10,21 @@ public sealed record HotlineNewsCategory(string Name, bool IsBundle, ushort Arti
     /// Unpacks the reply to GetNewsCategoryNameList (370). Each entry is:
     ///
     ///   uint16  type — 2 = bundle, 3 = category
-    ///   uint16  article count (categories only; a bundle's is meaningless)
-    ///   bytes   8-byte GUID + uint32 add-SN + uint32 delete-SN, all unused here
+    ///   uint16  count — articles in a category, items in a bundle
+    ///   (categories only) 16-byte GUID + uint32 add-SN + uint32 delete-SN, unused here
     ///   uint8   name length
     ///   bytes   name
     ///
-    /// A bundle carries no counts or serial numbers, so its fixed part is shorter — getting that
-    /// wrong desynchronizes the whole list, which is why the two are sized separately below.
+    /// A bundle stops after the count, so the two are sized separately — and the GUID is 16 bytes,
+    /// not 8. Confirmed byte-for-byte against MacDomain (2026-09-16), whose reply is:
+    ///
+    ///   0002 0005 05 "Files"                          — a bundle, 10 bytes
+    ///   0003 005b [24 zero bytes] 09 "Guestbook"      — a category, 38 bytes
+    ///
+    /// Sizing the category's fixed part at 20 instead of 28 reads the name length out of the
+    /// middle of the GUID, which lands on a zero, and every entry after it is lost — which is why
+    /// this server's news looked empty.
+    ///
     /// Stops at the first entry that doesn't fit rather than throwing: a listing this client can't
     /// fully parse is still worth showing as far as it got.
     /// </summary>
@@ -31,8 +39,8 @@ public sealed record HotlineNewsCategory(string Name, bool IsBundle, ushort Arti
             var isBundle = type == 2;
             var count = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 2)..]);
 
-            // Bundle: type + count, then the name. Category: the same plus GUID and two serials.
-            var fixedPart = isBundle ? 4 : 4 + 8 + 4 + 4;
+            // Bundle: type + count, then the name. Category: the same plus a 16-byte GUID and two serials.
+            var fixedPart = isBundle ? 4 : 4 + 16 + 4 + 4;
             if (offset + fixedPart + 1 > data.Length)
             {
                 break;
@@ -48,7 +56,7 @@ public sealed record HotlineNewsCategory(string Name, bool IsBundle, ushort Arti
             categories.Add(new HotlineNewsCategory(
                 Encoding.UTF8.GetString(data.Slice(nameStart, nameLength)),
                 isBundle,
-                isBundle ? (ushort)0 : count));
+                count));
             offset = nameStart + nameLength;
         }
 
@@ -71,16 +79,28 @@ public sealed record HotlineNewsArticle(
     ///   uint32  ID of the first article
     ///   uint32  count
     ///   uint16  name length, then the name
-    ///   then per article:
-    ///     uint32  article ID
-    ///     8 bytes date, uint32 parent ID, uint16 flags
-    ///     uint16  flavour count
+    ///   then per article, a 22-byte header:
+    ///     +0   uint32  article ID
+    ///     +4   8 bytes date (year, ms, seconds-into-year)
+    ///     +12  uint32  parent ID — non-zero makes this a reply
+    ///     +16  uint16  flags
+    ///     +18  uint16  reserved; every server seen sends zero
+    ///     +20  uint16  flavour count
+    ///   then:
     ///     uint8   title length, title
     ///     uint8   poster length, poster
     ///     then per flavour: uint8 length + name, uint16 size
     ///
-    /// The flavour list is the part that bites: it's variable-length and sits at the END of each
-    /// article, so skipping it wrong walks into the middle of the next article. Parsing stops at
+    /// That header is 22 bytes, not the 20 the docs' field list implies. Confirmed against
+    /// MacDomain's Guestbook (2026-09-16), where article 1 reads
+    /// <c>00000001 | 07e6 0000 01dc2a48 | 00000000 | 0000 0000 0001 | 0a "Greetings!" 0a "MacDude888"</c> —
+    /// the flavour count is plainly the third uint16 after the parent, not the first. Reading it
+    /// two bytes early takes the count as 0 and then the title length from a zero byte, so the
+    /// first article comes out blank and the walk lands mid-way through the second: 91 articles
+    /// parsed as one empty row.
+    ///
+    /// The flavour list is the other thing that bites: it's variable-length and sits at the END of
+    /// each article, so skipping it wrong walks into the middle of the next one. Parsing stops at
     /// the first entry that doesn't fit rather than throwing.
     /// </summary>
     public static IReadOnlyList<HotlineNewsArticle> ParseList(ReadOnlySpan<byte> data)
@@ -97,7 +117,7 @@ public sealed record HotlineNewsArticle(
 
         for (var i = 0u; i < count; i++)
         {
-            if (offset + 20 > data.Length)
+            if (offset + 22 > data.Length)
             {
                 break;
             }
@@ -105,8 +125,8 @@ public sealed record HotlineNewsArticle(
             var id = BinaryPrimitives.ReadUInt32BigEndian(data[offset..]);
             var posted = ParseDate(data.Slice(offset + 4, 8));
             var parentId = BinaryPrimitives.ReadUInt32BigEndian(data[(offset + 12)..]);
-            var flavorCount = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 18)..]);
-            offset += 20;
+            var flavorCount = BinaryPrimitives.ReadUInt16BigEndian(data[(offset + 20)..]);
+            offset += 22;
 
             if (!TryReadShortString(data, ref offset, out var title) ||
                 !TryReadShortString(data, ref offset, out var poster))

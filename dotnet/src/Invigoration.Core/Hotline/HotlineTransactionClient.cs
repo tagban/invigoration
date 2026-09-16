@@ -590,7 +590,34 @@ public sealed class HotlineTransactionClient : FramedTcpClient
     // without news, or an account without the news privilege, answers with an error code, which
     // surfaces here as an empty list rather than an exception — asking is not a failure. ---
 
+    /// <summary>
+    /// The whole flat news document, or null if the server wouldn't give it. This is the original
+    /// (1.x) news: one text blob, newest post first, rather than a tree of articles. Worth asking
+    /// for even on a server that also has a threaded tree — on the classic servers still running,
+    /// the real news is usually here and the tree is empty (MacDomain: 45 KB of posts here, two
+    /// near-empty categories there).
+    /// </summary>
+    public async Task<string?> GetFlatNewsAsync(CancellationToken ct = default)
+    {
+        var reply = await SendTransactionAsync(HotlineTransactionType.GetMessages, [], ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 } ? reply.Field(HotlineFieldType.Data)?.AsString() ?? "" : null;
+    }
+
+    /// <summary>Adds a post to the flat news. Returns whether the server took it — a "no" is usually the account lacking the post privilege.</summary>
+    public async Task<bool> PostFlatNewsAsync(string text, CancellationToken ct = default)
+    {
+        var reply = await SendTransactionAsync(
+            HotlineTransactionType.PostFlatNews,
+            [new HotlineField(HotlineFieldType.Data, text)],
+            ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 };
+    }
+
+    /// <summary>A post someone else just made, pushed by the server — just the new item, to go on top of what's already shown.</summary>
+    public event Action<string>? FlatNewsPosted;
+
     /// <summary>The bundles and categories at <paramref name="path"/> — empty path for the root of the news tree.</summary>
+
     public async Task<IReadOnlyList<HotlineNewsCategory>> GetNewsCategoriesAsync(
         IReadOnlyList<string>? path = null,
         CancellationToken ct = default)
@@ -607,9 +634,13 @@ public sealed class HotlineTransactionClient : FramedTcpClient
             return [];
         }
 
-        return reply.Field(HotlineFieldType.NewsCategoryListData) is { } list
-            ? HotlineNewsCategory.ParseList(list.Data)
-            : [];
+        // One field PER entry, not one field holding every entry — confirmed against MacDomain,
+        // which sends a 10-byte field for its bundle and a 38-byte field for its category. Reading
+        // only the first (what Field() returns) showed one of the two and silently dropped the rest.
+        return reply.Fields
+            .Where(f => f.Type == (ushort)HotlineFieldType.NewsCategoryListData)
+            .SelectMany(f => HotlineNewsCategory.ParseList(f.Data))
+            .ToList();
     }
 
     /// <summary>The articles in one category. Ordered as the server sent them — oldest first on every server seen so far.</summary>
@@ -629,9 +660,11 @@ public sealed class HotlineTransactionClient : FramedTcpClient
             return [];
         }
 
-        return reply.Field(HotlineFieldType.NewsArticleListData) is { } list
-            ? HotlineNewsArticle.ParseList(list.Data)
-            : [];
+        // Same again: a server may split the listing across several fields rather than one.
+        return reply.Fields
+            .Where(f => f.Type == (ushort)HotlineFieldType.NewsArticleListData)
+            .SelectMany(f => HotlineNewsArticle.ParseList(f.Data))
+            .ToList();
     }
 
     /// <summary>One article's body, or null if the server wouldn't give it up.</summary>
@@ -878,6 +911,14 @@ public sealed class HotlineTransactionClient : FramedTcpClient
 
             case HotlineTransactionType.ChatMessage:
                 ChatMessageReceived?.Invoke(tx.Field(HotlineFieldType.Data)?.AsString() ?? "");
+                break;
+
+            case HotlineTransactionType.NewMessage:
+                if (tx.Field(HotlineFieldType.Data)?.AsString() is { Length: > 0 } posted)
+                {
+                    FlatNewsPosted?.Invoke(posted);
+                }
+
                 break;
 
             case HotlineTransactionType.UserAccess:

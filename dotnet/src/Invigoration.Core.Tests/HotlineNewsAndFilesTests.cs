@@ -55,8 +55,11 @@ public class HotlineNewsParsingTests
     private static byte[] Category(string name, bool isBundle, ushort articleCount)
     {
         var nameBytes = Encoding.UTF8.GetBytes(name);
-        // A bundle has no GUID or serial numbers — the whole point of the size difference.
-        var fixedPart = isBundle ? 4 : 20;
+        // A bundle has no GUID or serial numbers — the whole point of the size difference. The
+        // category's is 28: type + count + a 16-byte GUID + two serials, matching what MacDomain
+        // actually sends (see HotlineRealServerFixtureTests). This helper said 20 while the parser
+        // did too, so the pair agreed and a broken listing passed.
+        var fixedPart = isBundle ? 4 : 28;
         var entry = new byte[fixedPart + 1 + nameBytes.Length];
         BinaryPrimitives.WriteUInt16BigEndian(entry, isBundle ? (ushort)2 : (ushort)3);
         BinaryPrimitives.WriteUInt16BigEndian(entry.AsSpan(2), articleCount);

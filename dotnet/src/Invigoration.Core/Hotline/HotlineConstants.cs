@@ -86,6 +86,19 @@ public enum HotlineTransactionType : ushort
     /// <summary>Client -&gt; server: upload a whole folder.</summary>
     UploadFolder = 213,
 
+    // --- News, flat (Hotline 1.x). The original form: the whole news is ONE text document, newest
+    // post first, that a client fetches in full and appends to. Most classic servers still keep
+    // their real news here even when they also expose an empty threaded tree. ---
+
+    /// <summary>Client -&gt; server: fetch the entire flat news document. The reply's Data field is the whole thing.</summary>
+    GetMessages = 101,
+
+    /// <summary>Server -&gt; client, unsolicited: someone posted, and this is just the new post to prepend.</summary>
+    NewMessage = 102,
+
+    /// <summary>Client -&gt; server: add a post to the flat news.</summary>
+    PostFlatNews = 103,
+
     // --- News, threaded (Hotline 1.5+): categories and bundles form a tree, each category holding
     // articles. See HotlineNewsPath for how a location in that tree goes on the wire. ---
 
