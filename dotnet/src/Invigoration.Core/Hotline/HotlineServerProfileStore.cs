@@ -72,10 +72,64 @@ public static class HotlineServerProfileStore
     {
         if (!File.Exists(FilePath))
         {
-            return [];
+            // First run only — keyed on the file not existing rather than the list being empty, so
+            // someone who deliberately deletes every profile doesn't get these back on next launch.
+            var seeded = DefaultProfiles();
+            TrySaveSeed(seeded);
+            return seeded;
         }
 
         var loaded = JsonSerializer.Deserialize<List<HotlineServerProfile>>(File.ReadAllText(FilePath), JsonOptions);
         return loaded ?? [];
     }
+
+    private static void TrySaveSeed(List<HotlineServerProfile> seeded)
+    {
+        try
+        {
+            Directory.CreateDirectory(ConfigDirectory);
+            File.WriteAllText(FilePath, JsonSerializer.Serialize(seeded, JsonOptions));
+        }
+        catch (IOException)
+        {
+            // The in-memory copy still has them for this run; nothing here is worth failing over.
+        }
+    }
+
+    /// <summary>
+    /// A couple of long-running public servers to start from, so a new Hotline tab isn't an empty
+    /// box asking for an IP address. Both are real servers this client has been tested against.
+    ///
+    /// Deliberately NOT included, whatever any one person's own setup looks like:
+    ///   - Auto-connect. Nothing dials out on startup unless someone asks it to.
+    ///   - Any login or password. These connect as a guest; the nickname is "Guest".
+    ///   - Auto-accepting the server's agreement. Agreeing to someone's rules on their behalf
+    ///     isn't a default to ship (see HotlineTransactionClient.AutoAcceptAgreement).
+    ///
+    /// The Discord relay names ARE included: each of these servers bridges its chat to Discord
+    /// under a specific account name, and without it the relay's messages show up as an ordinary
+    /// user talking rather than as relayed Discord chat.
+    /// </summary>
+    public static List<HotlineServerProfile> DefaultProfiles() =>
+    [
+        new()
+        {
+            Name = "MacDomain",
+            Host = "62.116.228.143",
+            Port = 5500,
+            DiscordRelayUsername = "Discord",
+        },
+        new()
+        {
+            Name = "HL Central",
+            Host = "74.208.191.206",
+            Port = 5500,
+            DiscordRelayUsername = "Relay",
+            DiscordRelayPrefix = "Discord |",
+
+            // This one speaks HOPE, so the password is MAC'd rather than sent obfuscated if
+            // anyone does put credentials on it later. Falls back on its own if it ever stops.
+            UseSecureLogin = true,
+        },
+    ];
 }

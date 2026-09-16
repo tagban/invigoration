@@ -83,3 +83,79 @@ public class HotlineServerProfileStoreTests
         Assert.False(profile.AutoConnect);
     }
 }
+
+/// <summary>
+/// The servers a brand-new install starts with. What they must NOT carry matters more than what
+/// they do: anything that dials out on startup, or that agrees to a server's rules, or that
+/// carries one person's own credentials, would be shipped to everybody.
+/// </summary>
+[Collection("HotlineServerProfileStore")]
+public class HotlineDefaultProfileTests : IDisposable
+{
+    private readonly string _directory = Path.Combine(Path.GetTempPath(), "invig-hlseed-" + Guid.NewGuid().ToString("N"));
+
+    public HotlineDefaultProfileTests()
+    {
+        Directory.CreateDirectory(_directory);
+        HotlineServerProfileStore.ConfigDirectoryOverride = _directory;
+    }
+
+    public void Dispose()
+    {
+        HotlineServerProfileStore.ConfigDirectoryOverride = null;
+        try
+        {
+            Directory.Delete(_directory, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+    }
+
+    [Fact]
+    public void AFreshInstall_StartsWithTheDefaultServers()
+    {
+        var profiles = HotlineServerProfileStore.Profiles;
+
+        Assert.Contains(profiles, p => p.Name == "MacDomain");
+        Assert.Contains(profiles, p => p.Name == "HL Central");
+    }
+
+    [Fact]
+    public void NoDefaultServer_ConnectsOnItsOwnOrCarriesCredentials()
+    {
+        foreach (var profile in HotlineServerProfileStore.DefaultProfiles())
+        {
+            Assert.False(profile.AutoConnect, $"{profile.Name} would connect on startup");
+            Assert.False(profile.AutoAcceptAgreement, $"{profile.Name} would agree to the server's rules unasked");
+            Assert.Equal("", profile.Login);
+            Assert.Equal("", profile.Password);
+            Assert.Equal("Guest", profile.Nickname);
+        }
+    }
+
+    /// <summary>These servers bridge their chat to Discord under a specific account; without the name, relayed messages look like an ordinary user talking.</summary>
+    [Fact]
+    public void TheDefaultServers_KeepTheirDiscordRelayNames()
+    {
+        var defaults = HotlineServerProfileStore.DefaultProfiles();
+
+        Assert.Equal("Discord", defaults.Single(p => p.Name == "MacDomain").DiscordRelayUsername);
+        Assert.Equal("Relay", defaults.Single(p => p.Name == "HL Central").DiscordRelayUsername);
+    }
+
+    /// <summary>Deleting them is meant to stick — the seed is keyed on the file's absence, not on the list being empty.</summary>
+    [Fact]
+    public void DeletingEveryDefault_DoesNotBringThemBack()
+    {
+        foreach (var profile in HotlineServerProfileStore.Profiles.ToList())
+        {
+            HotlineServerProfileStore.Delete(profile.Id);
+        }
+
+        // Force a reload from disk the way a restart would.
+        HotlineServerProfileStore.ConfigDirectoryOverride = _directory;
+
+        Assert.Empty(HotlineServerProfileStore.Profiles);
+    }
+}
