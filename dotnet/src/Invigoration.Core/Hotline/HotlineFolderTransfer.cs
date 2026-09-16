@@ -102,6 +102,169 @@ public static class HotlineFolderTransfer
         return filesWritten;
     }
 
+    /// <summary>Everything in a folder, flattened to the list the server will be walked through — folders first so they exist before the files that go in them.</summary>
+    public static IReadOnlyList<(IReadOnlyList<string> Path, bool IsFolder, long Size)> Enumerate(string localDirectory)
+    {
+        var root = new DirectoryInfo(localDirectory);
+        var items = new List<(IReadOnlyList<string> Path, bool IsFolder, long Size)>();
+
+        void Walk(DirectoryInfo directory, List<string> prefix)
+        {
+            foreach (var sub in directory.GetDirectories().OrderBy(d => d.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                List<string> path = [.. prefix, sub.Name];
+                items.Add((path, true, 0));
+                Walk(sub, path);
+            }
+
+            foreach (var file in directory.GetFiles().OrderBy(f => f.Name, StringComparer.OrdinalIgnoreCase))
+            {
+                items.Add(([.. prefix, file.Name], false, file.Length));
+            }
+        }
+
+        Walk(root, []);
+        return items;
+    }
+
+    /// <summary>
+    /// Uploads a folder and everything under it. The mirror of the download: the server drives,
+    /// asking for the next item and then deciding whether it wants that item's contents, and this
+    /// answers until every item has been offered.
+    ///
+    /// Resume (action 2) is answered by sending the whole file from the start — the resume block
+    /// is read and discarded. Partial resumes aren't implemented; re-sending is correct, just not
+    /// the most economical thing a client could do.
+    /// </summary>
+    public static async Task<int> UploadAsync(
+        string host,
+        int serverPort,
+        uint referenceNumber,
+        string localDirectory,
+        IProgress<HotlineFolderItem>? itemProgress = null,
+        IProgress<HotlineTransferProgress>? byteProgress = null,
+        CancellationToken ct = default)
+    {
+        var items = Enumerate(localDirectory);
+        using var client = new TcpClient();
+        await client.ConnectAsync(host, HotlineFileTransfer.TransferPort(serverPort), ct).ConfigureAwait(false);
+        await using var stream = client.GetStream();
+
+        // Same 16 bytes a file upload sends, with the type marking this a folder. Unlike a
+        // download there's no opening action here — the server speaks first.
+        var header = new byte[16];
+        "HTXF"u8.CopyTo(header.AsSpan(0));
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4), referenceNumber);
+        BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(8), 0);
+        BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(12), 1);
+        await stream.WriteAsync(header, ct).ConfigureAwait(false);
+
+        var sent = 0;
+        var next = 0;
+
+        while (next < items.Count)
+        {
+            if (await ReadActionAsync(stream, ct).ConfigureAwait(false) is not { } action)
+            {
+                break;
+            }
+
+            if (action != FolderAction.NextFile)
+            {
+                // Only "next file" is meaningful before an item has been offered.
+                continue;
+            }
+
+            var (path, isFolder, size) = items[next++];
+            await stream.WriteAsync(ItemDescriptor(path, isFolder), ct).ConfigureAwait(false);
+            await stream.FlushAsync(ct).ConfigureAwait(false);
+
+            if (isFolder)
+            {
+                itemProgress?.Report(new HotlineFolderItem(path, true, 0));
+                continue;
+            }
+
+            if (await ReadActionAsync(stream, ct).ConfigureAwait(false) is not { } response)
+            {
+                break;
+            }
+
+            if (response == FolderAction.ResumeFile)
+            {
+                // Read past the resume block, then send the whole file anyway.
+                var resumeSize = new byte[2];
+                await stream.ReadExactlyAsync(resumeSize, ct).ConfigureAwait(false);
+                var length = BinaryPrimitives.ReadUInt16BigEndian(resumeSize);
+                if (length > 0)
+                {
+                    await stream.ReadExactlyAsync(new byte[length], ct).ConfigureAwait(false);
+                }
+            }
+            else if (response != FolderAction.SendFile)
+            {
+                // The server skipped this one.
+                continue;
+            }
+
+            var localPath = Path.Combine(localDirectory, Path.Combine([.. path]));
+            await using (var file = File.OpenRead(localPath))
+            {
+                await HotlineFileTransfer.WriteFlattenedFileAsync(stream, path[^1], file, size, byteProgress, ct)
+                    .ConfigureAwait(false);
+            }
+
+            sent++;
+            itemProgress?.Report(new HotlineFolderItem(path, false, size));
+        }
+
+        await stream.FlushAsync(ct).ConfigureAwait(false);
+        return sent;
+    }
+
+    private static async Task<FolderAction?> ReadActionAsync(Stream stream, CancellationToken ct)
+    {
+        var action = new byte[2];
+        try
+        {
+            await stream.ReadExactlyAsync(action, ct).ConfigureAwait(false);
+        }
+        catch (EndOfStreamException)
+        {
+            return null;
+        }
+
+        return (FolderAction)BinaryPrimitives.ReadUInt16BigEndian(action);
+    }
+
+    /// <summary>
+    /// One item offered to the server: a length, whether it's a folder, then its path relative to
+    /// the folder being uploaded. Note this is NOT the same packing a request's FilePath uses —
+    /// the is-folder flag sits between the length and the component count.
+    /// </summary>
+    private static byte[] ItemDescriptor(IReadOnlyList<string> path, bool isFolder)
+    {
+        var names = path.Select(Encoding.UTF8.GetBytes).ToArray();
+        var bodySize = 2 + 2 + names.Sum(n => 3 + n.Length);
+        var buffer = new byte[2 + bodySize];
+
+        BinaryPrimitives.WriteUInt16BigEndian(buffer, (ushort)bodySize);
+        BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(2), isFolder ? (ushort)1 : (ushort)0);
+        BinaryPrimitives.WriteUInt16BigEndian(buffer.AsSpan(4), (ushort)names.Length);
+
+        var offset = 6;
+        foreach (var name in names)
+        {
+            buffer[offset] = 0;
+            buffer[offset + 1] = 0;
+            buffer[offset + 2] = (byte)Math.Min(name.Length, byte.MaxValue);
+            name.AsSpan(0, buffer[offset + 2]).CopyTo(buffer.AsSpan(offset + 3));
+            offset += 3 + buffer[offset + 2];
+        }
+
+        return buffer;
+    }
+
     /// <summary>
     /// The opening header: the same 16 bytes a file transfer sends, but with the type set to 1 and
     /// a first folder action ("next file") appended — that action is what starts the item loop.

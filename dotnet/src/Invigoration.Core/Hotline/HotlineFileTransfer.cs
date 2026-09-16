@@ -123,6 +123,35 @@ public static class HotlineFileTransfer
         await using var stream = client.GetStream();
 
         await stream.WriteAsync(TransferHeader(referenceNumber, (uint)totalSize), ct).ConfigureAwait(false);
+        await WriteFlattenedFileAsync(stream, fileName, source, length, progress, ct, withLengthPrefix: false).ConfigureAwait(false);
+    }
+
+    /// <summary>Total bytes a flattened file takes on the wire, so a folder upload can tell the server up front how much is coming.</summary>
+    public static long FlattenedSize(string fileName, long length) => 24 + 16 + BuildInfoFork(fileName).Length + 16 + length;
+
+    /// <summary>
+    /// Writes one flattened file object to an already-open transfer stream. Shared by a single-file
+    /// upload and by each file of a folder upload — the only difference is that a folder item is
+    /// prefixed with its own 4-byte length, which is what <paramref name="withLengthPrefix"/>
+    /// controls.
+    /// </summary>
+    internal static async Task WriteFlattenedFileAsync(
+        Stream stream,
+        string fileName,
+        Stream source,
+        long length,
+        IProgress<HotlineTransferProgress>? progress,
+        CancellationToken ct,
+        bool withLengthPrefix = true)
+    {
+        var info = BuildInfoFork(fileName);
+
+        if (withLengthPrefix)
+        {
+            var size = new byte[4];
+            BinaryPrimitives.WriteUInt32BigEndian(size, (uint)(24 + 16 + info.Length + 16 + length));
+            await stream.WriteAsync(size, ct).ConfigureAwait(false);
+        }
 
         var header = new byte[24];
         FlatFileMagic.CopyTo(header, 0);
@@ -135,6 +164,53 @@ public static class HotlineFileTransfer
         await stream.WriteAsync(ForkHeader(DataFork, (uint)length), ct).ConfigureAwait(false);
         await CopyExactlyAsync(source, stream, (uint)length, progress, ct).ConfigureAwait(false);
         await stream.FlushAsync(ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Fetches the server banner over its own transfer connection. Unlike a file, a banner is the
+    /// raw image bytes with no flattened-file wrapper around them — so this reads the stream
+    /// straight through rather than looking for forks.
+    ///
+    /// The transfer type is 2 (a banner), where a file is 0 and a folder is 1.
+    /// </summary>
+    public static async Task<byte[]?> DownloadBannerAsync(
+        string host,
+        int serverPort,
+        uint referenceNumber,
+        uint expectedSize,
+        CancellationToken ct = default)
+    {
+        try
+        {
+            using var client = new TcpClient();
+            await client.ConnectAsync(host, TransferPort(serverPort), ct).ConfigureAwait(false);
+            await using var stream = client.GetStream();
+
+            var header = new byte[16];
+            TransferMagic.CopyTo(header, 0);
+            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(4), referenceNumber);
+            BinaryPrimitives.WriteUInt32BigEndian(header.AsSpan(8), 0);
+            BinaryPrimitives.WriteUInt16BigEndian(header.AsSpan(12), 2); // type: banner
+            await stream.WriteAsync(header, ct).ConfigureAwait(false);
+
+            using var banner = new MemoryStream();
+            if (expectedSize > 0)
+            {
+                await CopyExactlyAsync(stream, banner, expectedSize, progress: null, ct).ConfigureAwait(false);
+            }
+            else
+            {
+                // A server that didn't say how big it is sends until it closes.
+                await stream.CopyToAsync(banner, ct).ConfigureAwait(false);
+            }
+
+            return banner.Length > 0 ? banner.ToArray() : null;
+        }
+        catch (Exception ex) when (ex is IOException or SocketException or EndOfStreamException)
+        {
+            // A banner is decoration — never worth failing a login over.
+            return null;
+        }
     }
 
     /// <summary>"HTXF", the reference number, how many bytes are about to be sent (0 when receiving), then four reserved bytes.</summary>

@@ -140,7 +140,17 @@
                                             <TextBox Grid.Column="0" Text="{Binding Profile.Host}" PlaceholderText="Host" />
                                             <NumericUpDown Grid.Column="1" Value="{Binding Profile.Port}" Minimum="1" Maximum="65535" Width="110" FormatString="0" />
                                         </Grid>
-                                        <TextBox Text="{Binding Profile.Nickname}" PlaceholderText="Nickname" />
+                                        <!-- Nickname and icon together: a Hotline icon is just a
+                                             number, so the preview beside it is what makes picking
+                                             one possible. Without this field a saved server was
+                                             stuck on the default 414 forever. -->
+                                        <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="8">
+                                            <TextBox Grid.Column="0" Text="{Binding Profile.Nickname}" PlaceholderText="Nickname" />
+                                            <NumericUpDown Grid.Column="1" Value="{Binding IconId}" Minimum="0" Maximum="65535"
+                                                           Width="120" FormatString="0" ToolTip.Tip="Icon number" />
+                                            <Image Grid.Column="2" Source="{Binding IconPreview}" Width="20" Height="20"
+                                                   Stretch="Uniform" VerticalAlignment="Center" />
+                                        </Grid>
                                         <TextBox Text="{Binding Profile.Login}" PlaceholderText="Login (optional)" />
                                         <TextBox Text="{Binding Profile.Password}" PlaceholderText="Password (optional)" PasswordChar="*" />
                                         <CheckBox Content="Auto-connect" IsChecked="{Binding Profile.AutoConnect}" />
@@ -158,6 +168,8 @@
                                                                IsEnabled="{Binding Profile.SendClientVersion}" HorizontalAlignment="Left" Width="130" />
                                                 <CheckBox Content="Try server-side chat history on connect (experimental — a brand-new field most servers have never seen; may cause connection issues on some)"
                                                           IsChecked="{Binding Profile.AdvertiseChatHistorySupport}" />
+                                                <CheckBox Content="Show this server's banner as the first line of chat when connecting"
+                                                          IsChecked="{Binding Profile.ShowServerBanner}" />
                                                 <CheckBox Content="Try secure login (HOPE) — sends the password as a MAC over a server challenge instead of the classic obfuscation, which anyone watching the connection can read. Falls back automatically on a server that doesn't support it."
                                                           IsChecked="{Binding Profile.UseSecureLogin}" />
                                             </StackPanel>

@@ -73,6 +73,17 @@ public partial class HotlineSessionView : UserControl
             return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
         };
 
+        vm.Files.AskWhatFolderToUpload = async () =>
+        {
+            var folders = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = "Choose a folder to upload",
+                AllowMultiple = false,
+            });
+
+            return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        };
+
         vm.Files.AskWhatToUpload = async () =>
         {
             var files = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

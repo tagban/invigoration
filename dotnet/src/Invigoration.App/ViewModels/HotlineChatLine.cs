@@ -12,9 +12,18 @@ namespace Invigoration.App.ViewModels;
 /// Discord-relay message (see HotlineSessionViewModel.TryAppendDiscordRelayMessage) — the small
 /// Discord mark shown before the (real, relayed) sender's name.
 /// </summary>
-public sealed record HotlineChatLine(string? Username, IBrush? UsernameColor, string Text, Bitmap? UsernameIcon = null)
+public sealed record HotlineChatLine(string? Username, IBrush? UsernameColor, string Text, Bitmap? UsernameIcon = null, Bitmap? Banner = null)
 {
     public static HotlineChatLine Plain(string text) => new(null, null, text);
+
+    /// <summary>
+    /// The server's own banner, shown as a line of chat on login rather than as permanent window
+    /// furniture — it scrolls away with everything else, which is the point: you get to see it
+    /// without it taking up room forever.
+    /// </summary>
+    public static HotlineChatLine ServerBanner(Bitmap image) => new(null, null, "", null, image);
+
+    public bool HasBanner => Banner is not null;
 
     /// <summary>Reconstructs the original full line — used by "Copy Log" so a colorized message still copies as plain, readable text.</summary>
     public string FullText => Username is null ? Text : Username + Text;

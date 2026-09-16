@@ -117,6 +117,10 @@ public sealed class HotlineTransactionClient : FramedTcpClient
     /// <summary>Where this client actually connected, for comparing against the address a HOPE session key claims.</summary>
     private (System.Net.IPAddress Address, int Port)? _connectedEndpoint;
 
+    /// <summary>The host and port as given, so transfers (files, folders, the banner) can open their own connection to the same place.</summary>
+    private string _host = "";
+    private int _port;
+
     /// <summary>The server's self-reported name and version, which only HOPE exposes. Null on a classic login.</summary>
     public string? ServerApplication { get; private set; }
 
@@ -255,6 +259,8 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         // The server only echoes back the bits it actually confirms — absent entirely means
         // "standard mode," per the spec's own absence-handling rule, not "everything denied but
         // present as zero." Either way SupportsChatHistory correctly ends up false.
+        HasBanner = loginReply.Field(HotlineFieldType.CommunityBannerId) is not null;
+
         var confirmedCapabilities = loginReply.Field(HotlineFieldType.Capabilities)?.AsUInt16() ?? 0;
         SupportsChatHistory = (confirmedCapabilities & HotlineCapabilityBits.ChatHistory) != 0;
         HistoryMaxMessages = loginReply.Field(HotlineFieldType.HistoryMaxMsgs)?.AsUInt32();
@@ -332,6 +338,8 @@ public sealed class HotlineTransactionClient : FramedTcpClient
 
         await ConnectAsync(host, port, ct).ConfigureAwait(false);
         _connectedEndpoint = System.Net.IPAddress.TryParse(host, out var parsed) ? (parsed, port) : null;
+        _host = host;
+        _port = port;
 
         var handshake = new byte[12];
         HotlineConstants.ProtocolId.CopyTo(handshake, 0);
@@ -548,6 +556,48 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         return new TransferTicket(refNum.AsUInt32(), (uint)fileSize, (uint)fileSize, reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
     }
 
+    /// <summary>A server's banner: either an image this client decoded, or a URL to open. Both may be empty when the server has none.</summary>
+    public sealed record ServerBanner(byte[]? Image, string? Url);
+
+    /// <summary>True when the login reply said this server has a banner at all — asking a server without one just wastes a round trip.</summary>
+    public bool HasBanner { get; private set; }
+
+    /// <summary>
+    /// Fetches the server's banner. Null when there isn't one, or the server wouldn't give it.
+    ///
+    /// Two shapes: a URL in the reply (type 1), or an image fetched over its own transfer
+    /// connection the same way a file is — except the banner stream is the raw image bytes, not a
+    /// flattened file with forks, so it's read straight through.
+    /// </summary>
+    public async Task<ServerBanner?> GetServerBannerAsync(CancellationToken ct = default)
+    {
+        var reply = await SendTransactionAsync(HotlineTransactionType.DownloadBanner, [], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 })
+        {
+            return null;
+        }
+
+        if (reply.Field(HotlineFieldType.ServerBannerUrl)?.AsString() is { Length: > 0 } url)
+        {
+            return new ServerBanner(null, url);
+        }
+
+        // Some servers just hand the bytes over inline rather than opening a transfer.
+        if (reply.Field(HotlineFieldType.ServerBannerData) is { Data.Length: > 0 } inline)
+        {
+            return new ServerBanner(inline.Data, null);
+        }
+
+        if (reply.Field(HotlineFieldType.TransferRefNum) is not { } refNum)
+        {
+            return null;
+        }
+
+        var size = reply.Field(HotlineFieldType.TransferSize)?.AsUInt32() ?? 0;
+        var image = await HotlineFileTransfer.DownloadBannerAsync(_host, _port, refNum.AsUInt32(), size, ct).ConfigureAwait(false);
+        return image is null ? null : new ServerBanner(image, null);
+    }
+
     /// <summary>What a folder download needs: the ticket, plus how many items the server will walk through.</summary>
     public sealed record FolderTicket(uint ReferenceNumber, int ItemCount, uint TransferSize, uint WaitingCount);
 
@@ -577,6 +627,38 @@ public sealed class HotlineTransactionClient : FramedTcpClient
             (int)(reply.Field(HotlineFieldType.FolderItemCount)?.AsUInt32() ?? 0),
             reply.Field(HotlineFieldType.TransferSize)?.AsUInt32() ?? 0,
             reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
+    }
+
+    /// <summary>
+    /// Asks to upload a whole folder. The server needs to know up front how many items are coming
+    /// and how many bytes in total, so the caller counts the tree before asking.
+    /// </summary>
+    public async Task<FolderTicket?> RequestFolderUploadAsync(
+        IReadOnlyList<string> directory,
+        string folderName,
+        int itemCount,
+        long totalBytes,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>
+        {
+            new(HotlineFieldType.FileName, folderName),
+            new(HotlineFieldType.TransferSize, (uint)totalBytes),
+            new(HotlineFieldType.FolderItemCount, (ushort)itemCount),
+        };
+
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Insert(1, pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.UploadFolder, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 } || reply.Field(HotlineFieldType.TransferRefNum) is not { } refNum)
+        {
+            return null;
+        }
+
+        return new FolderTicket(refNum.AsUInt32(), itemCount, (uint)totalBytes, reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
     }
 
     /// <summary>Whether this account may download files, per the access bitmap from login.</summary>

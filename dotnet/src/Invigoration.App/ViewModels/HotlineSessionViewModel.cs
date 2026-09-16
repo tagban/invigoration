@@ -356,6 +356,12 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
                 Title = serverName;
             }
 
+            // First, so it heads the log for this session. Only when the server said it has one.
+            if (_options.ShowServerBanner && _client.HasBanner)
+            {
+                await ShowServerBannerAsync().ConfigureAwait(true);
+            }
+
             if (_client.SecureLoginAlgorithm is { } algorithm)
             {
                 AppendMessage($"* Secure login: password sent as {algorithm}" +
@@ -383,6 +389,41 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             {
                 ShowLocalRecentMessages();
             }
+        }
+    }
+
+    /// <summary>
+    /// Puts the server's banner at the top of this session's chat. A URL banner is shown as a link
+    /// rather than fetched — following one would mean this client reaching out to an arbitrary
+    /// address the server named, which isn't something to do unasked.
+    ///
+    /// Anything that goes wrong is swallowed: a banner is decoration, and a server whose banner is
+    /// in a format Avalonia can't decode (PICT, in practice) shouldn't produce an error line.
+    /// </summary>
+    private async Task ShowServerBannerAsync()
+    {
+        try
+        {
+            if (await _client.GetServerBannerAsync().ConfigureAwait(true) is not { } banner)
+            {
+                return;
+            }
+
+            if (banner.Url is { Length: > 0 } url)
+            {
+                AppendMessage($"* Server banner: {url}");
+                return;
+            }
+
+            if (banner.Image is { Length: > 0 } bytes)
+            {
+                using var stream = new MemoryStream(bytes);
+                AppendLine(HotlineChatLine.ServerBanner(new Avalonia.Media.Imaging.Bitmap(stream)));
+            }
+        }
+        catch (Exception ex) when (ex is IOException or System.Net.Sockets.SocketException or ArgumentException or NotSupportedException)
+        {
+            // An undecodable or unreachable banner is not worth a word.
         }
     }
 

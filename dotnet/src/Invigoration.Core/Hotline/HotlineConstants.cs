@@ -86,6 +86,12 @@ public enum HotlineTransactionType : ushort
     /// <summary>Client -&gt; server: download a whole folder, recursively. The transfer connection then walks its contents item by item — see HotlineFolderTransfer.</summary>
     DownloadFolder = 210,
 
+    /// <summary>Client -&gt; server: fetch the server's banner image. Reply carries a reference number for a transfer, or a URL to fetch instead.</summary>
+    DownloadBanner = 212,
+
+    /// <summary>Server -&gt; client, unsolicited: a new banner is available.</summary>
+    ServerBanner = 122,
+
     /// <summary>Client -&gt; server: upload a whole folder.</summary>
     UploadFolder = 213,
 
@@ -228,6 +234,17 @@ public enum HotlineFieldType : ushort
     HopeClientCompression = 0x0ECA,
 
     ServerAgreement = 150,
+
+    /// <summary>The banner image's bytes, when a server sends them inline rather than over a transfer.</summary>
+    ServerBannerData = 151,
+
+    /// <summary>1 = the banner is a URL (field 153); 3/4/5/6 = JPEG/GIF/BMP/PICT fetched over a transfer.</summary>
+    ServerBannerType = 152,
+
+    ServerBannerUrl = 153,
+
+    /// <summary>Present in the login reply when the server has a banner at all — its absence is how a client knows not to ask.</summary>
+    CommunityBannerId = 161,
     NoServerAgreement = 154,
     VersionNumber = 160,
     ServerName = 162,

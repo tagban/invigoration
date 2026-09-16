@@ -57,9 +57,16 @@
             <ListBox.ItemTemplate>
                 <DataTemplate x:DataType="vm:HotlineChatLine">
                     <Grid ColumnDefinitions="Auto,*">
+                        <!-- A banner line carries the server's own image, shown once on login and
+                             then scrolling away like any other line. Left-aligned at its natural
+                             size, capped so a large one can't shove the chat log around. -->
+                        <Image Grid.Column="0" Grid.ColumnSpan="2" Source="{Binding Banner}"
+                               MaxHeight="90" HorizontalAlignment="Left" Stretch="Uniform"
+                               StretchDirection="DownOnly" Margin="0,4"
+                               IsVisible="{Binding HasBanner}" />
                         <Image Grid.Column="0" Source="{Binding UsernameIcon}" Height="18" Width="18" Margin="0,0,4,0"
                                VerticalAlignment="Top" IsVisible="{Binding UsernameIcon, Converter={x:Static conv:ObjectConverters.IsNotNull}}" />
-                        <SelectableTextBlock Grid.Column="1" TextWrapping="Wrap">
+                        <SelectableTextBlock Grid.Column="1" TextWrapping="Wrap" IsVisible="{Binding !HasBanner}">
                             <Run Text="{Binding Username}" Foreground="{Binding UsernameColor}" FontWeight="Bold" />
                             <Run Text="{Binding Text}" />
                         </SelectableTextBlock>
@@ -74,6 +81,8 @@
                     <DockPanel Grid.Row="0" Margin="6">
                         <Button DockPanel.Dock="Left" Content="↑" Command="{Binding GoUpCommand}" IsEnabled="{Binding CanGoUp}"
                                 ToolTip.Tip="Up one folder" Padding="8,3" />
+                        <Button DockPanel.Dock="Right" Content="Upload Folder..." Command="{Binding UploadFolderCommand}"
+                                IsVisible="{Binding CanUpload}" Padding="8,3" Margin="6,0,0,0" />
                         <Button DockPanel.Dock="Right" Content="Upload..." Command="{Binding UploadCommand}"
                                 IsVisible="{Binding CanUpload}" Padding="8,3" Margin="6,0,0,0" />
                         <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshCommand}" Padding="8,3" />

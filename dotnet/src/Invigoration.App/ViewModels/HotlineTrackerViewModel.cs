@@ -345,7 +345,7 @@ public sealed partial class HotlineTrackerViewModel : ViewModelBase
 
     [RelayCommand]
     private void ConnectToProfile(HotlineServerProfile profile) =>
-        _parent.Connect(new HotlineConnectOptions(profile.Host, profile.Port, profile.Login, profile.Password, profile.Nickname, profile.IconId, profile.Name, profile.AutoAcceptAgreement, profile.DiscordRelayUsername, profile.DiscordRelayPrefix, profile.ClientVersion, profile.SendClientVersion, profile.Id, profile.TriviaEnabled, profile.AdvertiseChatHistorySupport, profile.UseSecureLogin));
+        _parent.Connect(new HotlineConnectOptions(profile.Host, profile.Port, profile.Login, profile.Password, profile.Nickname, profile.IconId, profile.Name, profile.AutoAcceptAgreement, profile.DiscordRelayUsername, profile.DiscordRelayPrefix, profile.ClientVersion, profile.SendClientVersion, profile.Id, profile.TriviaEnabled, profile.AdvertiseChatHistorySupport, profile.UseSecureLogin, profile.ShowServerBanner));
 
     /// <summary>The saved-servers row's quick action when already connected — switches to the existing session tab instead of opening a second, redundant connection to the same server.</summary>
     [RelayCommand]
@@ -358,8 +358,15 @@ public sealed partial class HotlineTrackerViewModel : ViewModelBase
         }
     }
 
+    /// <summary>A new profile inherits this tracker's nickname and icon — the identity the user already set — rather than starting on the built-in defaults.</summary>
     [RelayCommand]
-    private void AddProfile() => HotlineServerProfileStore.CreateAndSave("New Server", "", HotlineConstants.DefaultServerPort);
+    private void AddProfile()
+    {
+        var profile = HotlineServerProfileStore.CreateAndSave("New Server", "", HotlineConstants.DefaultServerPort);
+        profile.Nickname = DefaultNickname;
+        profile.IconId = _parent.Config.DefaultIconId;
+        HotlineServerProfileStore.Save();
+    }
 
     [RelayCommand]
     private void SaveProfile(HotlineServerProfile profile) => HotlineServerProfileStore.Save();
@@ -375,7 +382,7 @@ public sealed partial class HotlineTrackerViewModel : ViewModelBase
     {
         foreach (var profile in SavedProfiles.Select(vm => vm.Profile).Where(p => p.AutoConnect).ToList())
         {
-            _parent.Connect(new HotlineConnectOptions(profile.Host, profile.Port, profile.Login, profile.Password, profile.Nickname, profile.IconId, profile.Name, profile.AutoAcceptAgreement, profile.DiscordRelayUsername, profile.DiscordRelayPrefix, profile.ClientVersion, profile.SendClientVersion, profile.Id, profile.TriviaEnabled, profile.AdvertiseChatHistorySupport, profile.UseSecureLogin));
+            _parent.Connect(new HotlineConnectOptions(profile.Host, profile.Port, profile.Login, profile.Password, profile.Nickname, profile.IconId, profile.Name, profile.AutoAcceptAgreement, profile.DiscordRelayUsername, profile.DiscordRelayPrefix, profile.ClientVersion, profile.SendClientVersion, profile.Id, profile.TriviaEnabled, profile.AdvertiseChatHistorySupport, profile.UseSecureLogin, profile.ShowServerBanner));
         }
     }
 }

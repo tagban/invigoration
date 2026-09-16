@@ -89,4 +89,12 @@ public sealed class HotlineServerProfile
     /// real servers out there — same reasoning as AdvertiseChatHistorySupport above.
     /// </summary>
     public bool UseSecureLogin { get; set; }
+
+    /// <summary>
+    /// Show the server's own banner image as the first line of chat when logging in. On by
+    /// default: it's a one-off line that scrolls away like any other, and half the character of a
+    /// Hotline server is its banner. Costs nothing on a server that doesn't have one — the login
+    /// reply says whether to even ask.
+    /// </summary>
+    public bool ShowServerBanner { get; set; } = true;
 }

@@ -300,6 +300,61 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
         }
     }
 
+    /// <summary>Set by the view: asks which folder to upload. Null means cancelled.</summary>
+    public Func<Task<string?>>? AskWhatFolderToUpload { get; set; }
+
+    [RelayCommand]
+    private async Task UploadFolderAsync()
+    {
+        if (AskWhatFolderToUpload is null)
+        {
+            return;
+        }
+
+        var source = await AskWhatFolderToUpload().ConfigureAwait(true);
+        if (source is null || !Directory.Exists(source))
+        {
+            return;
+        }
+
+        var name = new DirectoryInfo(source).Name;
+        var items = HotlineFolderTransfer.Enumerate(source);
+        var totalBytes = items.Where(i => !i.IsFolder)
+            .Sum(i => HotlineFileTransfer.FlattenedSize(i.Path[^1], i.Size));
+
+        StatusMessage = $"Uploading {name} ({items.Count} items)...";
+        try
+        {
+            var ticket = await client.RequestFolderUploadAsync(_path, name, items.Count, totalBytes).ConfigureAwait(true);
+            if (ticket is null)
+            {
+                StatusMessage = "The server wouldn't accept a folder upload here.";
+                return;
+            }
+
+            var done = 0;
+            var progress = new Progress<HotlineFolderItem>(item => Dispatcher.UIThread.Post(() =>
+            {
+                if (!item.IsFolder)
+                {
+                    done++;
+                }
+
+                StatusMessage = $"Uploading {name}: {item.Name} ({done} of {items.Count})";
+            }));
+
+            var sent = await HotlineFolderTransfer.UploadAsync(host, port, ticket.ReferenceNumber, source, progress)
+                .ConfigureAwait(true);
+
+            StatusMessage = $"Uploaded {name} — {sent} file{(sent == 1 ? "" : "s")}.";
+            await RefreshAsync().ConfigureAwait(true);
+        }
+        catch (Exception ex) when (ex is IOException or System.Net.Sockets.SocketException)
+        {
+            StatusMessage = $"Folder upload failed: {ex.Message}";
+        }
+    }
+
     [RelayCommand]
     private async Task UploadAsync()
     {
