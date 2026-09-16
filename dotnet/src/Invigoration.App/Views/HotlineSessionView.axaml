@@ -103,9 +103,17 @@
                     </ListBox>
 
                     <DockPanel Grid.Row="2" Margin="6">
+                        <!-- Works for a folder too: that downloads the whole thing, recreating its
+                             structure under a directory you pick. Double-clicking a folder still
+                             browses into it. -->
                         <Button DockPanel.Dock="Right" Content="Download" Command="{Binding DownloadCommand}"
                                 CommandParameter="{Binding SelectedEntry}" Padding="10,3"
+                                ToolTip.Tip="Download the selected file, or the whole selected folder"
                                 IsEnabled="{Binding SelectedEntry, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <Button DockPanel.Dock="Right" Content="Open" Command="{Binding OpenCommand}"
+                                CommandParameter="{Binding SelectedEntry}" Padding="10,3" Margin="0,0,6,0"
+                                ToolTip.Tip="Browse into the selected folder"
+                                IsVisible="{Binding SelectedEntry.IsFolder, FallbackValue=False}" />
                         <TextBlock Text="{Binding StatusMessage}" Opacity="0.7" FontSize="11" VerticalAlignment="Center"
                                    TextWrapping="Wrap" />
                     </DockPanel>

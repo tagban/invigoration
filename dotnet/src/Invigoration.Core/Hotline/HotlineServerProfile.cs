@@ -80,4 +80,13 @@ public sealed class HotlineServerProfile
     /// for a nice-to-have nobody explicitly asked to always have on.
     /// </summary>
     public bool AdvertiseChatHistorySupport { get; set; }
+
+    /// <summary>
+    /// Offer HOPE's secure login (see HotlineHope) before falling back to the classic
+    /// bitwise-inverted password, so the password is MAC'd against a server challenge rather than
+    /// sent obfuscated. Off by default and per-server: it costs a round trip against a server that
+    /// doesn't speak it, and an unfamiliar login shape is a stability risk against the range of
+    /// real servers out there — same reasoning as AdvertiseChatHistorySupport above.
+    /// </summary>
+    public bool UseSecureLogin { get; set; }
 }

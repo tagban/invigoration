@@ -50,7 +50,23 @@ public static class HotlineFileTransfer
         await using var stream = client.GetStream();
 
         await stream.WriteAsync(TransferHeader(referenceNumber, dataSize: 0), ct).ConfigureAwait(false);
+        return await ReadFlattenedFileAsync(stream, destination, expectedTotal: 0, progress, ct).ConfigureAwait(false);
+    }
 
+    /// <summary>
+    /// Reads one flattened file object off an already-open transfer stream and writes its DATA
+    /// fork to <paramref name="destination"/>, returning how many bytes that was. Shared by a
+    /// single-file download and by each item of a folder download, which differ only in how the
+    /// connection got here.
+    /// </summary>
+    /// <param name="expectedTotal">The flattened size when the caller was told it up front (folder items are), else 0 — used only to make progress reporting meaningful.</param>
+    internal static async Task<long> ReadFlattenedFileAsync(
+        Stream stream,
+        Stream destination,
+        uint expectedTotal,
+        IProgress<HotlineTransferProgress>? progress,
+        CancellationToken ct)
+    {
         var header = new byte[24];
         await stream.ReadExactlyAsync(header, ct).ConfigureAwait(false);
         if (!header.AsSpan(0, 4).SequenceEqual(FlatFileMagic))

@@ -52,6 +52,12 @@ public enum HotlineTransactionType : ushort
     /// <summary>Client -&gt; server: ask to upload a file. Same shape as DownloadFile — the reply hands back a reference number to push the bytes with.</summary>
     UploadFile = 203,
 
+    /// <summary>Client -&gt; server: download a whole folder, recursively. The transfer connection then walks its contents item by item — see HotlineFolderTransfer.</summary>
+    DownloadFolder = 210,
+
+    /// <summary>Client -&gt; server: upload a whole folder.</summary>
+    UploadFolder = 213,
+
     // --- News, threaded (Hotline 1.5+): categories and bundles form a tree, each category holding
     // articles. See HotlineNewsPath for how a location in that tree goes on the wire. ---
 
@@ -109,8 +115,17 @@ public enum HotlineFieldType : ushort
     /// <summary>The token the separate transfer connection presents to claim this transfer.</summary>
     TransferRefNum = 107,
 
-    /// <summary>How many transfers are queued ahead of this one; 0 means it can start now.</summary>
-    WaitingCount = 212,
+    /// <summary>How many transfers are queued ahead of this one; 0 means it can start now. (116 — an earlier draft here had 212, which is File New Path.)</summary>
+    WaitingCount = 116,
+
+    /// <summary>How many items a folder transfer will carry, so both sides know when the item loop is done.</summary>
+    FolderItemCount = 220,
+
+    /// <summary>Flags for a transfer — resume and so on. Sent on an upload request.</summary>
+    FileTransferOptions = 204,
+
+    /// <summary>Where a partially-transferred file left off, for resuming.</summary>
+    FileResumeData = 203,
 
     // --- News (threaded) ---
 
@@ -137,6 +152,36 @@ public enum HotlineFieldType : ushort
 
     /// <summary>The article body itself.</summary>
     NewsArticleData = 333,
+
+    // --- HOPE (Hotline One-time Password Extension), the "3.x"-era secure login. See HotlineHope. ---
+
+    /// <summary>DATA_HOPE_APP_ID — the client's 4-character application identifier.</summary>
+    HopeAppId = 0x0E01,
+
+    /// <summary>DATA_HOPE_APP_STRING — a human-readable name and version. HOPE is the only way a client can tell a server what it is.</summary>
+    HopeAppString = 0x0E02,
+
+    /// <summary>DATA_HOPE_SESSION_KEY — the server's 64-byte challenge, which the password is MAC'd against.</summary>
+    HopeSessionKey = 0x0E03,
+
+    /// <summary>DATA_HOPE_MAC_ALGORITHM — the client's list of supported MACs, and the server's single choice in the reply.</summary>
+    HopeMacAlgorithm = 0x0E04,
+
+    /// <summary>DATA_HOPE_SERVER_CIPHER — the cipher the server will encrypt with, when transport encryption is negotiated.</summary>
+    HopeServerCipher = 0x0EC1,
+
+    /// <summary>DATA_HOPE_CLIENT_CIPHER — the cipher the client will encrypt with.</summary>
+    HopeClientCipher = 0x0EC2,
+
+    HopeServerCipherMode = 0x0EC3,
+    HopeClientCipherMode = 0x0EC4,
+    HopeServerChecksum = 0x0EC7,
+    HopeClientChecksum = 0x0EC8,
+
+    /// <summary>DATA_HOPE_SERVER_COMPRESSION. Never sent as an empty list — per the spec that crashes some clients outright.</summary>
+    HopeServerCompression = 0x0EC9,
+
+    HopeClientCompression = 0x0ECA,
 
     ServerAgreement = 150,
     NoServerAgreement = 154,

@@ -144,6 +144,7 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         _hasExplicitDisplayName = !string.IsNullOrEmpty(options.DisplayName);
         Title = options.DisplayName is { Length: > 0 } ? options.DisplayName : $"{options.Host}:{options.Port}";
         _client.AutoAcceptAgreement = options.AutoAcceptAgreement;
+        _client.UseSecureLogin = options.UseSecureLogin;
         _client.Debug = parent.Config.Debug;
         Files = new HotlineFilesViewModel(_client, options.Host, options.Port);
         News = new HotlineNewsViewModel(_client);
@@ -157,6 +158,12 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         _client.ProtocolError += ex => Dispatcher.UIThread.Post(() => AppendMessage($"* (internal) couldn't parse a message from the server: {ex.Message}"));
         _client.DisconnectMessageReceived += msg => Dispatcher.UIThread.Post(() => AppendMessage($"* Server says: {msg}"));
         _client.DebugLog += line => Dispatcher.UIThread.Post(() => AppendMessage($"* [debug] {line}"));
+
+        // Advisory, never fatal: a NAT in front of a server is ordinary. Worth saying out loud all
+        // the same — the whole point of the address inside a HOPE session key is that a client can
+        // notice something sitting in the middle.
+        _client.SecureLoginAddressMismatch += detail => Dispatcher.UIThread.Post(() =>
+            AppendMessage($"* Note: {detail}."));
         _client.Disconnected += ex => Dispatcher.UIThread.Post(() =>
         {
             IsConnected = false;
@@ -261,6 +268,12 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             if (!_hasExplicitDisplayName && _client.ServerName is { Length: > 0 } serverName)
             {
                 Title = serverName;
+            }
+
+            if (_client.SecureLoginAlgorithm is { } algorithm)
+            {
+                AppendMessage($"* Secure login: password sent as {algorithm}" +
+                    (_client.ServerApplication is { Length: > 0 } app ? $" to {app}." : "."));
             }
 
             ReplaceUsers(_client.Users);

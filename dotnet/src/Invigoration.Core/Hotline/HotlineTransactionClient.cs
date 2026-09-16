@@ -89,6 +89,26 @@ public sealed class HotlineTransactionClient : FramedTcpClient
     /// <summary>Off by default — never silently agree to a server's rules on the user's behalf. Set before ConnectAndLoginAsync; per-tracker, from HotlineTrackerConfig.AutoAcceptAgreement.</summary>
     public bool AutoAcceptAgreement { get; set; }
 
+    /// <summary>
+    /// Whether to offer HOPE's secure login (see <see cref="HotlineHope"/>) before falling back to
+    /// the classic bitwise-inverted password. Off by default and opt-in per server: it costs an
+    /// extra round trip against a server that doesn't speak it, and an unfamiliar login shape is a
+    /// stability risk against the range of real servers out there.
+    /// </summary>
+    public bool UseSecureLogin { get; set; }
+
+    /// <summary>Which MAC a HOPE login actually used, or null when the login was the classic one — shown in the session log so it's clear whether the password crossed the wire obfuscated or MAC'd.</summary>
+    public string? SecureLoginAlgorithm { get; private set; }
+
+    /// <summary>Where this client actually connected, for comparing against the address a HOPE session key claims.</summary>
+    private (System.Net.IPAddress Address, int Port)? _connectedEndpoint;
+
+    /// <summary>The server's self-reported name and version, which only HOPE exposes. Null on a classic login.</summary>
+    public string? ServerApplication { get; private set; }
+
+    /// <summary>Raised when the address embedded in a HOPE session key isn't the one we connected to — a NAT or proxy in the path, possibly something worse. Advisory: the login still proceeds.</summary>
+    public event Action<string>? SecureLoginAddressMismatch;
+
     /// <summary>Off by default — logs every inbound transaction via DebugLog. Set before ConnectAndLoginAsync; per-tracker, from HotlineTrackerConfig.Debug.</summary>
     public bool Debug { get; set; }
 
@@ -142,6 +162,18 @@ public sealed class HotlineTransactionClient : FramedTcpClient
             }
         }
 
+        // Ask whether this server speaks HOPE before sending anything secret. A server that does
+        // answers with a challenge to MAC the password against; one that doesn't just refuses the
+        // null login, costing one round trip and telling it nothing. Opt-in per server
+        // (HotlineServerProfile.UseSecureLogin) for the same reason the chat-history capability is:
+        // an unfamiliar login shape against the wide range of real servers out there is a
+        // connection-stability risk, not a free win.
+        if (UseSecureLogin &&
+            await TrySecureLoginAsync(login, password, nickname, iconId, clientVersion, advertiseChatHistory, ct).ConfigureAwait(false) is { } secureResult)
+        {
+            return secureResult;
+        }
+
         List<HotlineField> loginFields =
         [
             new HotlineField(HotlineFieldType.UserLogin, XorObfuscate(login)),
@@ -190,6 +222,16 @@ public sealed class HotlineTransactionClient : FramedTcpClient
             return false;
         }
 
+        return await FinishLoginAsync(loginReply, ct).ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Everything that happens once a login — classic or HOPE — has been accepted: read what the
+    /// server reported about itself, settle any agreement it pushed, fetch the user list, and
+    /// start the keepalive. Shared so the two login paths can't drift apart.
+    /// </summary>
+    private async Task<bool> FinishLoginAsync(HotlineTransactionFrame loginReply, CancellationToken ct)
+    {
         var serverName = loginReply.Field(HotlineFieldType.ServerName)?.AsString();
         if (!string.IsNullOrEmpty(serverName))
         {
@@ -275,6 +317,7 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         _handshakeTcs = new TaskCompletionSource<bool>();
 
         await ConnectAsync(host, port, ct).ConfigureAwait(false);
+        _connectedEndpoint = System.Net.IPAddress.TryParse(host, out var parsed) ? (parsed, port) : null;
 
         var handshake = new byte[12];
         HotlineConstants.ProtocolId.CopyTo(handshake, 0);
@@ -491,6 +534,37 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         return new TransferTicket(refNum.AsUInt32(), (uint)fileSize, (uint)fileSize, reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
     }
 
+    /// <summary>What a folder download needs: the ticket, plus how many items the server will walk through.</summary>
+    public sealed record FolderTicket(uint ReferenceNumber, int ItemCount, uint TransferSize, uint WaitingCount);
+
+    /// <summary>
+    /// Asks to download a whole folder. Null when the server refuses. The item count matters —
+    /// the folder transfer walks exactly that many items and the server sends no end marker.
+    /// </summary>
+    public async Task<FolderTicket?> RequestFolderDownloadAsync(
+        IReadOnlyList<string> directory,
+        string folderName,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField> { new(HotlineFieldType.FileName, folderName) };
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.DownloadFolder, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 } || reply.Field(HotlineFieldType.TransferRefNum) is not { } refNum)
+        {
+            return null;
+        }
+
+        return new FolderTicket(
+            refNum.AsUInt32(),
+            (int)(reply.Field(HotlineFieldType.FolderItemCount)?.AsUInt32() ?? 0),
+            reply.Field(HotlineFieldType.TransferSize)?.AsUInt32() ?? 0,
+            reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
+    }
+
     /// <summary>Whether this account may download files, per the access bitmap from login.</summary>
     public bool CanDownloadFiles => HasOwnAccess(HotlineAccessBits.DownloadFile);
 
@@ -605,6 +679,72 @@ public sealed class HotlineTransactionClient : FramedTcpClient
 
     /// <summary>Whether this account may post news.</summary>
     public bool CanPostNews => HasOwnAccess(HotlineAccessBits.NewsPostArticle);
+
+    /// <summary>
+    /// The HOPE exchange (see <see cref="HotlineHope"/>): announce ourselves with a null login,
+    /// and if the server answers with a challenge, log in with the password MAC'd against it.
+    ///
+    /// Returns null — meaning "carry on with the classic login" — whenever this server turns out
+    /// not to speak HOPE, or picked a MAC this client can't compute. Returns true/false only once
+    /// a real HOPE login has been attempted and answered, so a refusal here is a genuine refusal
+    /// and not something to retry the old way (which would send the password obfuscated to a
+    /// server that just proved it wanted a MAC).
+    /// </summary>
+    private async Task<bool?> TrySecureLoginAsync(
+        string login,
+        string password,
+        string nickname,
+        ushort iconId,
+        ushort? clientVersion,
+        bool advertiseChatHistory,
+        CancellationToken ct)
+    {
+        var hello = await SendTransactionAsync(HotlineTransactionType.Login, HotlineHope.IdentificationFields(), ct).ConfigureAwait(false);
+        if (HotlineHope.ReadServerIdentification(hello) is not { } identification)
+        {
+            DebugLog?.Invoke("Secure login: this server answered the way a classic one does; using the classic login.");
+            return null;
+        }
+
+        var fields = HotlineHope.AuthenticatedLoginFields(identification, login, password, nickname, iconId, clientVersion);
+        if (fields is null)
+        {
+            DebugLog?.Invoke($"Secure login: the server chose {identification.MacAlgorithm}, which this client can't compute; using the classic login.");
+            return null;
+        }
+
+        // Advisory only — the login still goes ahead. A NAT in front of a server is ordinary and
+        // common; the point is that the operator can see it rather than it passing unnoticed.
+        if (identification.EmbeddedEndpoint is { } embedded && _connectedEndpoint is { } actual &&
+            (!embedded.Address.Equals(actual.Address) || embedded.Port != actual.Port))
+        {
+            SecureLoginAddressMismatch?.Invoke(
+                $"the server identifies itself as {embedded.Address}:{embedded.Port} but was reached at {actual.Address}:{actual.Port}");
+        }
+
+        var loginFields = fields.ToList();
+        if (advertiseChatHistory)
+        {
+            loginFields.Add(new HotlineField(HotlineFieldType.Capabilities, (ushort)HotlineCapabilityBits.ChatHistory));
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.Login, [.. loginFields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 })
+        {
+            LoginRefusedReason = reply?.Field(HotlineFieldType.ErrorText)?.AsString() is { Length: > 0 } text
+                ? text
+                : "the server refused the login";
+            return false;
+        }
+
+        SecureLoginAlgorithm = identification.MacAlgorithm;
+        ServerApplication = identification.ServerApp;
+        DebugLog?.Invoke($"Secure login: authenticated with {identification.MacAlgorithm}" +
+            (identification.ServerApp is { Length: > 0 } app ? $" to {app}." : "."));
+
+        await FinishLoginAsync(reply, ct).ConfigureAwait(false);
+        return true;
+    }
 
     /// <summary>Classic Hotline's login/password obfuscation — bitwise-NOT every byte (pydora-style "not encryption, just enough to not be plaintext on the wire"). Confirmed against Hotline-Navigator's source: Rust's `!byte` is this exact operation. Public (not just used internally) so it's directly unit-testable without a live server.</summary>
     public static byte[] XorObfuscate(string value)

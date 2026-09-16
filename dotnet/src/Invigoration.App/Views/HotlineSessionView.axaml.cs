@@ -60,6 +60,17 @@ public partial class HotlineSessionView : UserControl
             return file?.TryGetLocalPath();
         };
 
+        vm.Files.AskWhereToSaveFolder = async folderName =>
+        {
+            var folders = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
+            {
+                Title = $"Where should \"{folderName}\" be saved?",
+                AllowMultiple = false,
+            });
+
+            return folders.Count > 0 ? folders[0].TryGetLocalPath() : null;
+        };
+
         vm.Files.AskWhatToUpload = async () =>
         {
             var files = await TopLevel.GetTopLevel(this)!.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions

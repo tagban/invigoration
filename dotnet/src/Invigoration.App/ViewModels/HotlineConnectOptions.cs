@@ -26,4 +26,5 @@ public sealed record HotlineConnectOptions(
     bool SendClientVersion = true,
     string? ProfileId = null,
     bool TriviaEnabled = false,
-    bool AdvertiseChatHistorySupport = false);
+    bool AdvertiseChatHistorySupport = false,
+    bool UseSecureLogin = false);

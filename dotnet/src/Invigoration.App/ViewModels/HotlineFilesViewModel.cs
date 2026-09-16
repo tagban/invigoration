@@ -147,11 +147,25 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
         await RefreshAsync().ConfigureAwait(true);
     }
 
+    /// <summary>Set by the view: asks which folder to download into. Null means cancelled.</summary>
+    public Func<string, Task<string?>>? AskWhereToSaveFolder { get; set; }
+
     [RelayCommand]
     public async Task DownloadAsync(HotlineFileRowViewModel? row)
     {
         row ??= SelectedEntry;
-        if (row is null || row.IsFolder || AskWhereToSave is null)
+        if (row is null)
+        {
+            return;
+        }
+
+        if (row.IsFolder)
+        {
+            await DownloadFolderAsync(row).ConfigureAwait(true);
+            return;
+        }
+
+        if (AskWhereToSave is null)
         {
             return;
         }
@@ -202,6 +216,70 @@ public sealed partial class HotlineFilesViewModel(HotlineTransactionClient clien
             row.DownloadProgress = 0;
             row.Status = $"Failed: {ex.Message}";
             TryDeletePartial(destination + ".part");
+        }
+    }
+
+    /// <summary>
+    /// Downloads a whole folder, recreating its structure under a directory the user picks. The
+    /// server walks its contents item by item (see HotlineFolderTransfer) — the item count from
+    /// the request is how both sides know when it's done.
+    /// </summary>
+    private async Task DownloadFolderAsync(HotlineFileRowViewModel row)
+    {
+        if (AskWhereToSaveFolder is null)
+        {
+            return;
+        }
+
+        var destination = await AskWhereToSaveFolder(row.Name).ConfigureAwait(true);
+        if (destination is null)
+        {
+            return;
+        }
+
+        row.Status = "Starting...";
+        try
+        {
+            var ticket = await client.RequestFolderDownloadAsync(_path, row.Name).ConfigureAwait(true);
+            if (ticket is null)
+            {
+                row.Status = "The server wouldn't send this folder.";
+                return;
+            }
+
+            if (ticket.ItemCount == 0)
+            {
+                row.Status = "The server says this folder is empty.";
+                return;
+            }
+
+            var done = 0;
+            var progress = new Progress<HotlineFolderItem>(item => Dispatcher.UIThread.Post(() =>
+            {
+                if (!item.IsFolder)
+                {
+                    done++;
+                }
+
+                row.DownloadProgress = ticket.ItemCount > 0 ? Math.Min(100.0 * done / ticket.ItemCount, 100) : 0;
+                row.Status = $"{item.Name} ({done} of {ticket.ItemCount})";
+            }));
+
+            // Into a subfolder named after the folder itself, so picking a destination twice
+            // doesn't scatter two servers' folders through the same directory.
+            var into = Path.Combine(destination, HotlineFolderTransfer.SafePath([row.Name]).FirstOrDefault() ?? "download");
+            Directory.CreateDirectory(into);
+
+            var written = await HotlineFolderTransfer.DownloadAsync(
+                host, port, ticket.ReferenceNumber, ticket.ItemCount, into, progress).ConfigureAwait(true);
+
+            row.DownloadProgress = 100;
+            row.Status = $"Saved {written} file{(written == 1 ? "" : "s")}.";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or System.Net.Sockets.SocketException)
+        {
+            row.DownloadProgress = 0;
+            row.Status = $"Failed: {ex.Message}";
         }
     }
 

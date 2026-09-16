@@ -158,6 +158,8 @@
                                                                IsEnabled="{Binding Profile.SendClientVersion}" HorizontalAlignment="Left" Width="130" />
                                                 <CheckBox Content="Try server-side chat history on connect (experimental — a brand-new field most servers have never seen; may cause connection issues on some)"
                                                           IsChecked="{Binding Profile.AdvertiseChatHistorySupport}" />
+                                                <CheckBox Content="Try secure login (HOPE) — sends the password as a MAC over a server challenge instead of the classic obfuscation, which anyone watching the connection can read. Falls back automatically on a server that doesn't support it."
+                                                          IsChecked="{Binding Profile.UseSecureLogin}" />
                                             </StackPanel>
                                         </Expander>
 
