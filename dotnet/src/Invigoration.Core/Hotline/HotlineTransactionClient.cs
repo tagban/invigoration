@@ -404,6 +404,208 @@ public sealed class HotlineTransactionClient : FramedTcpClient
         return (entries, hasMore);
     }
 
+    // --- Files. The transaction connection negotiates; the bytes move over their own connection
+    // (see HotlineFileTransfer), which is why these return a reference number rather than data. ---
+
+    /// <summary>Lists one directory — empty path for the server's root. Empty when the server says no (usually the account lacking the download privilege).</summary>
+    public async Task<IReadOnlyList<HotlineFileEntry>> GetFileListAsync(
+        IReadOnlyList<string>? path = null,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>();
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, path ?? []) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.GetFileNameList, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 })
+        {
+            return [];
+        }
+
+        return reply.Fields
+            .Where(f => f.Type == (ushort)HotlineFieldType.FileNameWithInfo)
+            .Select(f => HotlineFileEntry.TryParse(f.Data))
+            .Where(e => e is not null)
+            .Select(e => e!)
+            .ToList();
+    }
+
+    /// <summary>What the server hands back when it agrees to a transfer: the ticket, how much will move, and how many transfers are queued ahead.</summary>
+    public sealed record TransferTicket(uint ReferenceNumber, uint TransferSize, uint FileSize, uint WaitingCount);
+
+    /// <summary>
+    /// Asks to download a file. Null when the server refuses (no such file, or no permission).
+    /// The returned ticket is presented by <see cref="HotlineFileTransfer.DownloadAsync"/> on its
+    /// own connection; a non-zero WaitingCount means the server has queued it behind others.
+    /// </summary>
+    public async Task<TransferTicket?> RequestDownloadAsync(
+        IReadOnlyList<string> directory,
+        string fileName,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField> { new(HotlineFieldType.FileName, fileName) };
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.DownloadFile, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 } || reply.Field(HotlineFieldType.TransferRefNum) is not { } refNum)
+        {
+            return null;
+        }
+
+        return new TransferTicket(
+            refNum.AsUInt32(),
+            reply.Field(HotlineFieldType.TransferSize)?.AsUInt32() ?? 0,
+            reply.Field(HotlineFieldType.FileSize)?.AsUInt32() ?? 0,
+            reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
+    }
+
+    /// <summary>Asks to upload a file into a directory. Null when the server refuses — usually the account lacking the upload privilege, or the folder being read-only.</summary>
+    public async Task<TransferTicket?> RequestUploadAsync(
+        IReadOnlyList<string> directory,
+        string fileName,
+        long fileSize,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>
+        {
+            new(HotlineFieldType.FileName, fileName),
+            new(HotlineFieldType.TransferSize, (uint)fileSize),
+        };
+
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.FilePath, directory) is { } pathField)
+        {
+            fields.Insert(1, pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.UploadFile, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 } || reply.Field(HotlineFieldType.TransferRefNum) is not { } refNum)
+        {
+            return null;
+        }
+
+        return new TransferTicket(refNum.AsUInt32(), (uint)fileSize, (uint)fileSize, reply.Field(HotlineFieldType.WaitingCount)?.AsUInt32() ?? 0);
+    }
+
+    /// <summary>Whether this account may download files, per the access bitmap from login.</summary>
+    public bool CanDownloadFiles => HasOwnAccess(HotlineAccessBits.DownloadFile);
+
+    /// <summary>Whether this account may upload files.</summary>
+    public bool CanUploadFiles => HasOwnAccess(HotlineAccessBits.UploadFile);
+
+    // --- News. Threaded news (Hotline 1.5+): bundles hold categories, categories hold articles,
+    // and every request names where in that tree it applies (see HotlineNewsPath). A server
+    // without news, or an account without the news privilege, answers with an error code, which
+    // surfaces here as an empty list rather than an exception — asking is not a failure. ---
+
+    /// <summary>The bundles and categories at <paramref name="path"/> — empty path for the root of the news tree.</summary>
+    public async Task<IReadOnlyList<HotlineNewsCategory>> GetNewsCategoriesAsync(
+        IReadOnlyList<string>? path = null,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>();
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.NewsPath, path ?? []) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.GetNewsCategoryNameList, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 })
+        {
+            return [];
+        }
+
+        return reply.Field(HotlineFieldType.NewsCategoryListData) is { } list
+            ? HotlineNewsCategory.ParseList(list.Data)
+            : [];
+    }
+
+    /// <summary>The articles in one category. Ordered as the server sent them — oldest first on every server seen so far.</summary>
+    public async Task<IReadOnlyList<HotlineNewsArticle>> GetNewsArticlesAsync(
+        IReadOnlyList<string> categoryPath,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>();
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.NewsPath, categoryPath) is { } pathField)
+        {
+            fields.Add(pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.GetNewsArticleNameList, [.. fields], ct).ConfigureAwait(false);
+        if (reply is not { ErrorCode: 0 })
+        {
+            return [];
+        }
+
+        return reply.Field(HotlineFieldType.NewsArticleListData) is { } list
+            ? HotlineNewsArticle.ParseList(list.Data)
+            : [];
+    }
+
+    /// <summary>One article's body, or null if the server wouldn't give it up.</summary>
+    public async Task<string?> GetNewsArticleBodyAsync(
+        IReadOnlyList<string> categoryPath,
+        uint articleId,
+        string flavor = "text/plain",
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>
+        {
+            new(HotlineFieldType.NewsArticleId, articleId),
+            new(HotlineFieldType.NewsArticleDataFlavor, string.IsNullOrEmpty(flavor) ? "text/plain" : flavor),
+        };
+
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.NewsPath, categoryPath) is { } pathField)
+        {
+            fields.Insert(0, pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.GetNewsArticleData, [.. fields], ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 } ? reply.Field(HotlineFieldType.NewsArticleData)?.AsString() ?? "" : null;
+    }
+
+    /// <summary>
+    /// Posts an article, or a reply to one when <paramref name="parentArticleId"/> is given. Returns
+    /// whether the server accepted it — a "no" is usually the account lacking the post privilege.
+    /// </summary>
+    public async Task<bool> PostNewsArticleAsync(
+        IReadOnlyList<string> categoryPath,
+        string title,
+        string body,
+        uint parentArticleId = 0,
+        CancellationToken ct = default)
+    {
+        var fields = new List<HotlineField>
+        {
+            new(HotlineFieldType.NewsArticleTitle, title),
+            new(HotlineFieldType.NewsArticleDataFlavor, "text/plain"),
+            new(HotlineFieldType.NewsArticleData, body),
+        };
+
+        if (parentArticleId != 0)
+        {
+            fields.Add(new HotlineField(HotlineFieldType.NewsArticleParent, parentArticleId));
+        }
+
+        if (HotlineNewsPath.ToFieldOrNull(HotlineFieldType.NewsPath, categoryPath) is { } pathField)
+        {
+            fields.Insert(0, pathField);
+        }
+
+        var reply = await SendTransactionAsync(HotlineTransactionType.PostNewsArticle, [.. fields], ct).ConfigureAwait(false);
+        return reply is { ErrorCode: 0 };
+    }
+
+    /// <summary>Whether this account may read news, per the access bitmap the server sent at login.</summary>
+    public bool CanReadNews => HasOwnAccess(HotlineAccessBits.NewsReadArticle);
+
+    /// <summary>Whether this account may post news.</summary>
+    public bool CanPostNews => HasOwnAccess(HotlineAccessBits.NewsPostArticle);
+
     /// <summary>Classic Hotline's login/password obfuscation — bitwise-NOT every byte (pydora-style "not encryption, just enough to not be plaintext on the wire"). Confirmed against Hotline-Navigator's source: Rust's `!byte` is this exact operation. Public (not just used internally) so it's directly unit-testable without a live server.</summary>
     public static byte[] XorObfuscate(string value)
     {

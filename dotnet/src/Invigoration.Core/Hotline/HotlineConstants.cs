@@ -40,6 +40,33 @@ public enum HotlineTransactionType : ushort
     NotifyChatOfUserChange = 117,
     NotifyChatOfUserDelete = 118,
     Agreed = 121,
+    // --- Files. Listing is a plain transaction; the bytes themselves move over a second,
+    // short-lived connection on port+1 (see HotlineFileTransfer). ---
+
+    /// <summary>Client -&gt; server: list one directory. Reply carries a FileNameWithInfo field per entry.</summary>
+    GetFileNameList = 200,
+
+    /// <summary>Client -&gt; server: ask to download a file. The reply's TransferRefNum is what the transfer connection presents.</summary>
+    DownloadFile = 202,
+
+    /// <summary>Client -&gt; server: ask to upload a file. Same shape as DownloadFile — the reply hands back a reference number to push the bytes with.</summary>
+    UploadFile = 203,
+
+    // --- News, threaded (Hotline 1.5+): categories and bundles form a tree, each category holding
+    // articles. See HotlineNewsPath for how a location in that tree goes on the wire. ---
+
+    /// <summary>Client -&gt; server: list the categories/bundles at one path.</summary>
+    GetNewsCategoryNameList = 370,
+
+    /// <summary>Client -&gt; server: list the articles in one category.</summary>
+    GetNewsArticleNameList = 371,
+
+    /// <summary>Client -&gt; server: fetch one article's body.</summary>
+    GetNewsArticleData = 400,
+
+    /// <summary>Client -&gt; server: post an article (or a reply to one).</summary>
+    PostNewsArticle = 410,
+
     GetUserNameList = 300,
     NotifyUserChange = 301,
     NotifyUserDelete = 302,
@@ -64,6 +91,53 @@ public enum HotlineFieldType : ushort
     ChatOptions = 109,
     Options = 113,
     ChatId = 114,
+    // --- Files ---
+
+    /// <summary>Reply to GetFileNameList, repeated once per entry — see HotlineFileEntry for the packed layout.</summary>
+    FileNameWithInfo = 200,
+
+    FileName = 201,
+
+    /// <summary>A directory, packed as a count followed by one length-prefixed component each — see HotlineNewsPath, which uses the same encoding.</summary>
+    FilePath = 202,
+
+    /// <summary>Total bytes the transfer will carry (the flattened file, forks and headers included) — not the data fork's own size.</summary>
+    TransferSize = 108,
+
+    FileSize = 207,
+
+    /// <summary>The token the separate transfer connection presents to claim this transfer.</summary>
+    TransferRefNum = 107,
+
+    /// <summary>How many transfers are queued ahead of this one; 0 means it can start now.</summary>
+    WaitingCount = 212,
+
+    // --- News (threaded) ---
+
+    /// <summary>Where in the news tree a request applies — same packed encoding as FilePath. Absent means the root.</summary>
+    NewsPath = 325,
+
+    /// <summary>Reply to GetNewsCategoryNameList: the packed category/bundle listing.</summary>
+    NewsCategoryListData = 323,
+
+    /// <summary>Reply to GetNewsArticleNameList: the packed article listing.</summary>
+    NewsArticleListData = 321,
+
+    NewsArticleId = 326,
+
+    /// <summary>MIME type of an article body — servers use "text/plain" in practice.</summary>
+    NewsArticleDataFlavor = 327,
+
+    NewsArticleTitle = 328,
+    NewsArticlePoster = 329,
+    NewsArticleDate = 330,
+
+    /// <summary>The article being replied to, when posting a reply rather than a new thread.</summary>
+    NewsArticleParent = 335,
+
+    /// <summary>The article body itself.</summary>
+    NewsArticleData = 333,
+
     ServerAgreement = 150,
     NoServerAgreement = 154,
     VersionNumber = 160,
