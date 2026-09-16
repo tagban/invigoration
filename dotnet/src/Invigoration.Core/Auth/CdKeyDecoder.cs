@@ -64,10 +64,22 @@ public static class CdKeyDecoder
     private static readonly int[] ModernAlpha = [5, 6, 0, 1, 2, 3, 4, 9, 10, 11, 12, 13, 14, 15, 7, 8];
     private const string ModernChars = "246789BCDEFGHJKMNPRTVWXZ";
 
+    /// <summary>
+    /// A CD key with the formatting people actually type stripped out — dashes, spaces, and
+    /// anything else that isn't a letter or digit — uppercased. Keys are printed on the box and
+    /// copied from other bots in grouped form ("ABCD-EFGH-JKMN-PRTV"), but the wire format and
+    /// every length check here want the bare 13 or 16 characters: a dashed key is 19 characters
+    /// long and would otherwise be rejected as an unsupported length, or sent to Battle.net with
+    /// the dashes still in it. Normalize once, here, and use it everywhere the key is decoded,
+    /// measured, or sent.
+    /// </summary>
+    public static string Normalize(string? rawKey) =>
+        rawKey is null ? "" : string.Concat(rawKey.Where(char.IsAsciiLetterOrDigit)).ToUpperInvariant();
+
     /// <summary>Decodes a key, dispatching on its length. Returns null if the key is malformed, uses an unsupported length, or fails its checksum.</summary>
     public static DecodedCdKey? Decode(string rawKey)
     {
-        var key = rawKey.Trim().ToUpperInvariant();
+        var key = Normalize(rawKey);
         return key.Length switch
         {
             13 => DecodeClassic(key),

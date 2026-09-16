@@ -82,13 +82,13 @@ public sealed partial class BotEngine
                 .WriteByte(2) // Number of CD-keys
                 .WriteDword(1) // Flags: CDKEY_SAME_SESSION_KEY
                 .WriteDword(_auth.ServerToken) // shared server session key
-                .WriteNTString(Config.CdKey)
-                .WriteNTString(Config.ExpansionCdKey);
+                .WriteNTString(CdKeyDecoder.Normalize(Config.CdKey))
+                .WriteNTString(CdKeyDecoder.Normalize(Config.ExpansionCdKey));
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CDKEY_EX).ConfigureAwait(false);
         }
         else
         {
-            var writer = new PacketWriter().WriteDword(_auth.ServerToken).WriteNTString(Config.CdKey);
+            var writer = new PacketWriter().WriteDword(_auth.ServerToken).WriteNTString(CdKeyDecoder.Normalize(Config.CdKey));
             await SendBnlsAsync(writer, BnlsPacketId.BNLS_CDKEY).ConfigureAwait(false);
         }
     }
@@ -121,10 +121,12 @@ public sealed partial class BotEngine
         }
 
         var clientToken = (uint)Random.Shared.Next();
-        var blocks = new List<byte>(primary.Value.GetAuthCheckBlock(Config.CdKey.Trim().Length, clientToken, _auth.ServerToken));
+        // The length the server is told must match the key as sent (see CdKeyDecoder.Normalize) —
+        // a dashed key would otherwise report 19 for a 16-character key and fail the check.
+        var blocks = new List<byte>(primary.Value.GetAuthCheckBlock(CdKeyDecoder.Normalize(Config.CdKey).Length, clientToken, _auth.ServerToken));
         if (expansion is not null)
         {
-            blocks.AddRange(expansion.Value.GetAuthCheckBlock(Config.ExpansionCdKey.Trim().Length, clientToken, _auth.ServerToken));
+            blocks.AddRange(expansion.Value.GetAuthCheckBlock(CdKeyDecoder.Normalize(Config.ExpansionCdKey).Length, clientToken, _auth.ServerToken));
         }
 
         _auth.ClientToken = clientToken;
@@ -134,7 +136,7 @@ public sealed partial class BotEngine
 
     private Task HandleVersionCheckAsync()
     {
-        var writer = new PacketWriter().WriteDword(_auth.ServerToken).WriteNTString(Config.CdKey);
+        var writer = new PacketWriter().WriteDword(_auth.ServerToken).WriteNTString(CdKeyDecoder.Normalize(Config.CdKey));
         return SendBnlsAsync(writer, BnlsPacketId.BNLS_CDKEY);
     }
 

@@ -52,6 +52,44 @@ public class CdKeyDecoderTests
         Assert.Equal(expected, actual);
     }
 
+    /// <summary>
+    /// Keys are printed and shared in grouped form, so people paste them with dashes (and
+    /// sometimes spaces). Before this, a dashed 16-character key was 19 characters long and
+    /// rejected outright as an unsupported length.
+    /// </summary>
+    [Theory]
+    [InlineData("D2XP-D2XP-D2XP-D2XP")]
+    [InlineData("D2XP D2XP D2XP D2XP")]
+    [InlineData("  d2xp-d2xp-d2xp-d2xp  ")]
+    public void Decode_ModernKeyAsPeopleActuallyTypeIt_DecodesTheSameAsBareCharacters(string formatted)
+    {
+        Assert.Equal(CdKeyDecoder.Decode("D2XPD2XPD2XPD2XP"), CdKeyDecoder.Decode(formatted));
+    }
+
+    [Fact]
+    public void Decode_ClassicKeyWithDashes_StillDecodes()
+    {
+        var key = EncodeClassic(6, 1234567, 890);
+        var dashed = $"{key[..4]}-{key[4..8]}-{key[8..]}";
+
+        Assert.Equal(CdKeyDecoder.Decode(key), CdKeyDecoder.Decode(dashed));
+    }
+
+    /// <summary>
+    /// The length reported to Battle.net in the auth-check block is measured from the normalized
+    /// key (see BotEngine.Bnls.cs), so normalizing has to leave exactly the characters that go on
+    /// the wire — 16 for a modern key, dashes or no dashes.
+    /// </summary>
+    [Theory]
+    [InlineData("D2XP-D2XP-D2XP-D2XP", "D2XPD2XPD2XPD2XP")]
+    [InlineData("  1234567890123  ", "1234567890123")]
+    [InlineData("", "")]
+    [InlineData(null, "")]
+    public void Normalize_KeepsOnlyWhatGoesOnTheWire(string? raw, string expected)
+    {
+        Assert.Equal(expected, CdKeyDecoder.Normalize(raw));
+    }
+
     [Fact]
     public void Decode_UnsupportedLength_ReturnsNull()
     {
