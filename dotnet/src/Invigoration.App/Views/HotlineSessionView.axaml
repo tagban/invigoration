@@ -235,8 +235,8 @@
                     <!-- Composer, shown in place of the footer while writing a post or a reply. -->
                     <Grid Grid.Row="2" Margin="6" RowDefinitions="Auto,Auto,Auto,Auto" IsVisible="{Binding IsComposing}">
                         <TextBlock Grid.Row="0" Text="{Binding ComposeHeading}" FontWeight="Bold" FontSize="12" Margin="0,0,0,4" />
-                        <TextBox Grid.Row="1" Watermark="Subject" Text="{Binding ComposeTitle}" />
-                        <TextBox Grid.Row="2" Watermark="Write your post..." Text="{Binding ComposeBody}"
+                        <TextBox Grid.Row="1" PlaceholderText="Subject" Text="{Binding ComposeTitle}" />
+                        <TextBox Grid.Row="2" PlaceholderText="Write your post..." Text="{Binding ComposeBody}"
                                  AcceptsReturn="True" Height="90" TextWrapping="Wrap" Margin="0,6" />
                         <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
                             <Button Content="Cancel" Command="{Binding CancelPostCommand}" Padding="10,3" />
