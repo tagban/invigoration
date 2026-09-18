@@ -35,13 +35,15 @@
             <ColumnDefinition Width="180" MinWidth="120" MaxWidth="500" />
         </Grid.ColumnDefinitions>
 
-        <!-- Status / connect bar -->
+        <!-- Status / connect bar. Connect shows only while the bot is disconnected (CanConnect) —
+             idle, or just waiting out an auto-reconnect's delay, which Connect skips — never while
+             it's connected or an attempt is under way. Disconnect and Debug Logging moved to the
+             Bot menu. MinHeight keeps the row the button's height, so the chat
+             below doesn't jump when the button comes and goes. -->
         <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal"
-                    Spacing="8" Margin="8">
-            <Button Content="Connect" Command="{Binding ConnectCommand}" IsEnabled="{Binding !IsConnected}" />
-            <Button Content="Disconnect" Command="{Binding DisconnectCommand}" IsEnabled="{Binding IsConnected}" />
-            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Margin="8,0,0,0" />
-            <CheckBox Content="Debug logging" IsChecked="{Binding DebugMode}" Margin="16,0,0,0" />
+                    Spacing="8" Margin="8" MinHeight="32">
+            <Button Content="Connect" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnect}" />
+            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
         </StackPanel>
 
         <!-- Chat log: one continuous SelectableTextBlock (built up in code-behind)

@@ -297,7 +297,19 @@ public sealed partial class BotEngine
 
         _bncs.Close();
         LogInfo($"Battle.net connecting to {Config.BattlenetServer}...");
-        await _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, proxy: BuildProxyOptions()).ConfigureAwait(false);
+        Volatile.Write(ref _bncsLogonAttempt, Volatile.Read(ref _logonAttempt));
+        try
+        {
+            await TrackConnectAsync(
+                token => _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, token, BuildProxyOptions()),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch
+        {
+            // BNLS has done its part and no Battle.net connection came up to drop — nothing else ends this attempt.
+            EndPendingLogon();
+            throw;
+        }
     }
 
     /// <summary>"0x"-prefixed hex (e.g. "0x1A") or plain decimal; blank/unparsable is treated as "no override".</summary>

@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Collections.Specialized;
+using System.ComponentModel;
 using System.Diagnostics;
 using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
@@ -67,6 +68,126 @@ public partial class MainWindowViewModel : ViewModelBase
             IconSetStore.ApplySet(value.Config.IconSetName);
         }
     }
+
+    partial void OnSelectedBotChanged(BotTabViewModel? oldValue, BotTabViewModel? newValue)
+    {
+        if (oldValue is not null)
+        {
+            oldValue.PropertyChanged -= OnSelectedBotPropertyChanged;
+        }
+
+        if (newValue is not null)
+        {
+            newValue.PropertyChanged += OnSelectedBotPropertyChanged;
+        }
+
+        RefreshBotMenu();
+    }
+
+    // --- The Bot menu. Everything in it acts on SelectedBot: the bot whose tab is showing, or from
+    // a tab that isn't a bot (Whispers, Music, Hotline), the last one that was — which is why the
+    // menu opens with that bot's name. Both menus (the macOS menu bar and the in-window one) bind
+    // here rather than through SelectedBot.X paths: a native menu item only enables itself for a
+    // Command or a Click handler, and never flips its own checkmark, so each toggle is a command
+    // plus a one-way IsChecked that these properties keep current. ---
+
+    /// <summary>The Bot menu's greyed-out first line. Underscores doubled, since both menus would otherwise read one as an access-key marker and drop it.</summary>
+    public string SelectedBotMenuLabel => SelectedBot is { } bot ? bot.Title.Replace("_", "__") : "No bot selected";
+
+    public bool HasSelectedBot => SelectedBot is not null;
+
+    public bool SelectedBotDebugMode => SelectedBot?.DebugMode == true;
+
+    public bool SelectedBotShowsAllJoinLeave => SelectedBot?.Config.JoinLeaveDisplay == JoinLeaveDisplay.ShowAll;
+
+    public bool SelectedBotHidesJoinLeaveSpam => SelectedBot?.Config.JoinLeaveDisplay == JoinLeaveDisplay.HideSpam;
+
+    public bool SelectedBotHidesAllJoinLeave => SelectedBot?.Config.JoinLeaveDisplay == JoinLeaveDisplay.HideAll;
+
+    private void OnSelectedBotPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(BotTabViewModel.CanConnect) or nameof(BotTabViewModel.CanDisconnect)
+            or nameof(BotTabViewModel.DebugMode) or nameof(BotTabViewModel.Config) or nameof(BotTabViewModel.Title))
+        {
+            RefreshBotMenu();
+        }
+    }
+
+    private void RefreshBotMenu()
+    {
+        OnPropertyChanged(nameof(SelectedBotMenuLabel));
+        OnPropertyChanged(nameof(HasSelectedBot));
+        OnPropertyChanged(nameof(SelectedBotDebugMode));
+        OnPropertyChanged(nameof(SelectedBotShowsAllJoinLeave));
+        OnPropertyChanged(nameof(SelectedBotHidesJoinLeaveSpam));
+        OnPropertyChanged(nameof(SelectedBotHidesAllJoinLeave));
+        ConnectSelectedBotCommand.NotifyCanExecuteChanged();
+        DisconnectSelectedBotCommand.NotifyCanExecuteChanged();
+        ToggleSelectedBotDebugModeCommand.NotifyCanExecuteChanged();
+        ShowAllJoinLeaveCommand.NotifyCanExecuteChanged();
+        HideJoinLeaveSpamCommand.NotifyCanExecuteChanged();
+        HideAllJoinLeaveCommand.NotifyCanExecuteChanged();
+    }
+
+    // AllowConcurrentExecutions: one command serves every bot, so without it a connect still
+    // pending on one bot would grey Connect out for all the others. Each bot's own CanConnect is
+    // the guard that matters.
+    [RelayCommand(CanExecute = nameof(CanConnectSelectedBot), AllowConcurrentExecutions = true)]
+    private Task ConnectSelectedBot() => SelectedBot?.ConnectCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    private bool CanConnectSelectedBot() => SelectedBot is { CanConnect: true };
+
+    [RelayCommand(CanExecute = nameof(CanDisconnectSelectedBot), AllowConcurrentExecutions = true)]
+    private Task DisconnectSelectedBot() => SelectedBot?.DisconnectCommand.ExecuteAsync(null) ?? Task.CompletedTask;
+
+    private bool CanDisconnectSelectedBot() => SelectedBot is { CanDisconnect: true };
+
+    /// <summary>Decides from the bot's own state, never the menu item's checkmark — the in-window item has already flipped by the time this runs and the macOS one never does.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelectedBot))]
+    private void ToggleSelectedBotDebugMode()
+    {
+        if (SelectedBot is { } bot)
+        {
+            bot.DebugMode = !bot.DebugMode;
+        }
+    }
+
+    // Three parameterless commands rather than one taking the choice: a native menu item asks
+    // CanExecute once with whatever CommandParameter it has at that moment (possibly none yet) and
+    // doesn't ask again when the parameter arrives.
+    [RelayCommand(CanExecute = nameof(HasSelectedBot))]
+    private void ShowAllJoinLeave() => SetSelectedBotJoinLeaveDisplay(JoinLeaveDisplay.ShowAll);
+
+    [RelayCommand(CanExecute = nameof(HasSelectedBot))]
+    private void HideJoinLeaveSpam() => SetSelectedBotJoinLeaveDisplay(JoinLeaveDisplay.HideSpam);
+
+    [RelayCommand(CanExecute = nameof(HasSelectedBot))]
+    private void HideAllJoinLeave() => SetSelectedBotJoinLeaveDisplay(JoinLeaveDisplay.HideAll);
+
+    /// <summary>Takes effect on the next join or leave (the engine reads the config live) and is saved straight away, same as a Config-window edit.</summary>
+    private void SetSelectedBotJoinLeaveDisplay(JoinLeaveDisplay display)
+    {
+        if (SelectedBot is not { } bot)
+        {
+            return;
+        }
+
+        bot.Config.JoinLeaveDisplay = display;
+        SaveAll();
+        RefreshBotMenu();
+    }
+
+    // The Customize menu's on/off items, as commands for the same reason as the Bot menu's: bound
+    // TwoWay alone, the macOS menu showed them greyed out and a click did nothing.
+
+    [RelayCommand]
+    private void ToggleMusicEnabled() => IsMusicEnabled = !IsMusicEnabled;
+
+    [RelayCommand]
+    private void ToggleMusicBarEnabled() => IsMusicBarEnabled = !IsMusicBarEnabled;
+
+    [RelayCommand]
+    private void ToggleUpdateCheckEnabled() => IsUpdateCheckEnabled = !IsUpdateCheckEnabled;
 
     /// <summary>
     /// True once at least one configured bot has ClanFeatureEnabled on — the

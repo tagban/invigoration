@@ -65,12 +65,23 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     public string? OwnChatIdentity { get; private set; }
 
-    /// <summary>When on, logs every raw BNCS/BNLS packet sent and received as a hex dump.</summary>
+    /// <summary>When on, logs every raw BNCS/BNLS packet sent and received as a hex dump. Switched from the Bot menu or the /debug command — DebugModeChanged lets a menu checkmark follow either.</summary>
     public bool DebugMode
     {
         get => _session.DebugMode;
-        set => _session.DebugMode = value;
+        set
+        {
+            if (_session.DebugMode == value)
+            {
+                return;
+            }
+
+            _session.DebugMode = value;
+            DebugModeChanged?.Invoke();
+        }
     }
+
+    public event Action? DebugModeChanged;
 
     /// <summary>The active named color set (StarCraft/Diablo II/Warcraft III) this bot's chat log renders with.</summary>
     public ChatPalette Palette => ChatPalette.ForScheme(Config);
@@ -138,6 +149,14 @@ public sealed partial class BotEngine : IAsyncDisposable
                 return;
             }
 
+            // Only a drop of this logon's own connection ends it. A Disconnect-then-Connect (the
+            // password-casing retry, Normalize Password, /reconnect) closes the old connection and
+            // starts the new logon before that close is reported.
+            if (Volatile.Read(ref _bncsLogonAttempt) == Volatile.Read(ref _logonAttempt))
+            {
+                _logonPending = false;
+            }
+
             LogError($"Battle.net disconnected{(ex is null ? "." : $": {ex.Message}")}");
             if (!_isIntentionalDisconnect && _lastBncsSend is { } last)
             {
@@ -154,6 +173,7 @@ public sealed partial class BotEngine : IAsyncDisposable
 
         WireChatTelnet();
         WireDiscordBridge();
+        WireActivity();
     }
 
     private bool _isIntentionalDisconnect;
@@ -294,7 +314,16 @@ public sealed partial class BotEngine : IAsyncDisposable
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         _autoReconnectCts?.Cancel();
-        await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            // DisconnectAsync stopped this connect while its socket was still coming up — the
+            // user's answer, not a failure, and several callers (Normalize Password, /reconnect)
+            // have nowhere to catch it.
+        }
     }
 
     private async Task ConnectCoreAsync(CancellationToken cancellationToken = default)
@@ -313,7 +342,7 @@ public sealed partial class BotEngine : IAsyncDisposable
         // No BNLS hop, no version check, no CD key — straight to the server (see BotEngine.Chat.cs).
         if (UsesChatTelnet)
         {
-            await ConnectChatTelnetAsync(cancellationToken).ConfigureAwait(false);
+            await TrackConnectAsync(ConnectChatTelnetAsync, cancellationToken).ConfigureAwait(false);
             return;
         }
 
@@ -325,7 +354,19 @@ public sealed partial class BotEngine : IAsyncDisposable
         }
 
         LogInfo($"Battle.net Login Server connecting to {Config.BnlsServer}...");
-        await _bnls.ConnectAsync(Config.BnlsServer, Config.BnlsPort, cancellationToken, BuildProxyOptions()).ConfigureAwait(false);
+        Interlocked.Increment(ref _logonAttempt);
+        _logonPending = true;
+        try
+        {
+            await TrackConnectAsync(
+                token => _bnls.ConnectAsync(Config.BnlsServer, Config.BnlsPort, token, BuildProxyOptions()),
+                cancellationToken).ConfigureAwait(false);
+        }
+        catch
+        {
+            EndPendingLogon();
+            throw;
+        }
     }
 
     /// <summary>Null unless the user turned proxying on for this bot — passed through to every ConnectAsync call so BNCS/BNLS/realm all tunnel through the same proxy.</summary>
@@ -343,6 +384,8 @@ public sealed partial class BotEngine : IAsyncDisposable
         _isIntentionalDisconnect = true;
         _retryOtherPasswordCasing = false;
         _autoReconnectCts?.Cancel();
+        Interlocked.Exchange(ref _connectCts, new CancellationTokenSource()).Cancel();
+        _logonPending = false;
         // A password change only ever rides the connect that NormalizePasswordAsync starts — never
         // left armed for some later, unrelated Connect.
         _auth.ChangePasswordRequested = false;
@@ -354,6 +397,10 @@ public sealed partial class BotEngine : IAsyncDisposable
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
         LogInfo("Disconnected.");
+
+        // Nothing above raises anything when there was only a reconnect countdown or a pending
+        // logon to stop — no socket was up to report closing.
+        RaiseActivityChanged();
     }
 
     /// <summary>
@@ -557,6 +604,10 @@ public sealed partial class BotEngine : IAsyncDisposable
     /// </summary>
     private void OnBnlsDisconnected(Exception? ex)
     {
+        // Whatever logon this was helping can't get any further without it. A Battle.net
+        // connection already up keeps the bot busy on its own (see IsIdle).
+        _logonPending = false;
+
         if (ex is null && _auth.LoggedOnToBncs)
         {
             LogDebug("BNLS connection closed.");
@@ -707,6 +758,10 @@ public sealed partial class BotEngine : IAsyncDisposable
         {
             await task.ConfigureAwait(false);
         }
+        catch (OperationCanceledException) when (_isIntentionalDisconnect)
+        {
+            // Disconnect stopped a connect this work had started — nothing went wrong.
+        }
         catch (Exception ex)
         {
             LogError($"Error while {context}: {ex.Message}");
@@ -717,9 +772,17 @@ public sealed partial class BotEngine : IAsyncDisposable
     public async ValueTask DisposeAsync()
     {
         Trivia.TriviaGroupRegistry.UnregisterEngine(this);
+
+        // A removed bot is gone for good: closing its connection is no drop to reconnect from, and
+        // a reconnect already counting down would otherwise bring it back online unseen.
+        _isIntentionalDisconnect = true;
+        _autoReconnectCts?.Cancel();
+        _connectCts.Cancel();
+        _logonPending = false;
         _bncs.Close();
         _bnls.Close();
         _realm.Close();
+        _chatTelnet.Close();
         await DisconnectSc2Async().ConfigureAwait(false);
         await StopDiscordBridgeAsync().ConfigureAwait(false);
     }

@@ -41,7 +41,7 @@ Each bot gets its own settings — connection, proxy, account, clan, trivia, and
 
 ### Chat color schemes
 
-Every chat message category — usernames, whispers, errors, and more — gets its own color, fully customizable per bot. Each bot's theme, colors, icon set and tab group live together under **Customize → Selected Bot's Appearance**, so the bot's own settings stay about connecting: game, login, server, then everything else.
+Every chat message category — usernames, whispers, errors, and more — gets its own color, fully customizable per bot. Each bot's theme, colors and icon set live together under **Bot → Appearance**, so the bot's own settings stay about connecting: game, login, server, then everything else.
 
 <p align="center">
   <img src="screenshots/colors-appearance.png" width="500" alt="Bot Appearance window showing the theme picker, chat color scheme picker and swatch legend">

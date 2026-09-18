@@ -162,15 +162,73 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     public partial string InputText { get; set; } = "";
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect))]
     public partial bool IsConnected { get; set; }
+
+    /// <summary>The engine's own "nothing connected, connecting, or waiting to reconnect" (BotEngine.IsIdle), refreshed on the UI thread whenever it says to look again.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect))]
+    public partial bool IsIdle { get; set; } = true;
+
+    /// <summary>An auto-reconnect sitting out its delay with nothing in flight (BotEngine.IsWaitingToReconnect) — the bot's disconnected, and Connect skips the wait.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanConnect))]
+    public partial bool IsWaitingToReconnect { get; set; }
+
+    /// <summary>
+    /// Whether Connect makes sense right now — what the Connect button's visibility and the Bot
+    /// menu's Connect item follow: the bot is disconnected with nothing under way, or only
+    /// counting down to a reconnect. Also requires !IsConnected so a path the engine's own check
+    /// ever missed still can't show Connect on a bot that's plainly online.
+    /// </summary>
+    public bool CanConnect => !IsConnected && (IsIdle || IsWaitingToReconnect);
+
+    /// <summary>Anything to stop — a live connection, an attempt still under way, or a reconnect counting down.</summary>
+    public bool CanDisconnect => IsConnected || !IsIdle;
 
     [ObservableProperty]
     public partial string StatusText { get; set; } = "Disconnected";
 
+    /// <summary>Not saved — like /debug, it's for chasing a problem in this session. The Bot menu's checkmark follows it through PropertyChanged whichever way it's switched.</summary>
     public bool DebugMode
     {
         get => Engine.DebugMode;
-        set => Engine.DebugMode = value;
+        set
+        {
+            Engine.DebugMode = value;
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>Everything a lost connection takes with it: the connected flag and whoever was in the channel or on the friends list.</summary>
+    private void MarkDisconnected()
+    {
+        IsConnected = false;
+        ChannelUsers.Clear();
+        _channelUsersByName.Clear();
+        CurrentChannelName = "";
+        Friends.Clear();
+    }
+
+    /// <summary>Re-reads the engine's connection state and words the status to match: an attempt or countdown in progress says so rather than looking like a plain "Disconnected" with no Connect button beside it.</summary>
+    private void RefreshConnectionState()
+    {
+        IsIdle = Engine.IsIdle;
+        IsWaitingToReconnect = Engine.IsWaitingToReconnect;
+
+        // IsConnected is only ever cleared by a BncsDisconnected, and a few ends raise none — an
+        // SC2 session lost to the network, say, which Stimpak only reports as a stage change. An
+        // engine with nothing up can't be online, so its own state wins over the latched flag.
+        if (IsConnected && (IsIdle || IsWaitingToReconnect))
+        {
+            MarkDisconnected();
+        }
+
+        StatusText = IsConnected ? "Connected"
+            : IsWaitingToReconnect ? "Waiting to reconnect..."
+            : Engine.IsReconnecting ? "Reconnecting..."
+            : IsIdle ? "Disconnected"
+            : "Connecting...";
     }
 
     /// <summary>Swaps in an edited config (from the config window's Save) and refreshes anything derived from it, like the tab title.</summary>
@@ -200,16 +258,14 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         Engine.BncsConnected += () => Dispatcher.UIThread.Post(() =>
         {
             IsConnected = true;
-            StatusText = "Connected";
+            RefreshConnectionState();
         });
+        Engine.ActivityChanged += () => Dispatcher.UIThread.Post(RefreshConnectionState);
+        Engine.DebugModeChanged += () => Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(DebugMode)));
         Engine.BncsDisconnected += _ => Dispatcher.UIThread.Post(() =>
         {
-            IsConnected = false;
-            StatusText = "Disconnected";
-            ChannelUsers.Clear();
-            _channelUsersByName.Clear();
-            CurrentChannelName = "";
-            Friends.Clear();
+            MarkDisconnected();
+            RefreshConnectionState();
         });
         Engine.Sc2ChannelJoined += OnSc2ChannelJoined;
         Engine.Sc2ChannelLeft += OnSc2ChannelLeft;
@@ -308,8 +364,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         catch (Exception ex)
         {
             ChatLines.Add(new ChatLineViewModel($"Connect failed: {ex.Message}", Engine.Palette.Error));
-            StatusText = "Disconnected";
         }
+
+        RefreshConnectionState();
     }
 
     [RelayCommand]

@@ -56,6 +56,8 @@ public sealed partial class BotEngine
             return;
         }
 
+        RaiseActivityChanged();
+
         var rapid = RapidReconnectApplies;
         var interval = TimeSpan.FromSeconds(Math.Max(1, Config.AutoReconnectDelaySeconds));
         var maxAttempts = Math.Max(0, Config.AutoReconnectMaxAttempts);
@@ -121,6 +123,7 @@ public sealed partial class BotEngine
         finally
         {
             Interlocked.Exchange(ref _reconnectRunning, 0);
+            RaiseActivityChanged();
         }
 
         if (_auth.LoggedOnToBncs && attempts > 0)
@@ -159,7 +162,9 @@ public sealed partial class BotEngine
         _auth.VersionByte = TryParseVersionByteOverride(Config.VersionByteOverride, out var overrideByte) ? overrideByte : versionByte;
         StartDiscordBridgeIfEnabled();
         LogDebug($"Rapid reconnect: connecting straight to {Config.BattlenetServer} (no BNLS).");
-        await _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, cancellationToken, BuildProxyOptions()).ConfigureAwait(false);
+        await TrackConnectAsync(
+            token => _bncs.ConnectAsync(Config.BattlenetServer, Config.BattlenetPort, token, BuildProxyOptions()),
+            cancellationToken).ConfigureAwait(false);
     }
 
     /// <summary>Closes whatever a previous attempt left half-open, without it counting as a drop.</summary>
@@ -173,5 +178,6 @@ public sealed partial class BotEngine
         _bncs.Close();
         _bnls.Close();
         _chatTelnet.Close();
+        EndPendingLogon();
     }
 }

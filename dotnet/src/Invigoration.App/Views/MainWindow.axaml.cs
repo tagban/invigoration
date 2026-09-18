@@ -136,7 +136,7 @@ public partial class MainWindow : Window
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
 
-    /// <summary>Keeps MainWindowViewModel.SelectedBot in sync with whichever tab is actually showing — TabControl.SelectedItem can't bind directly to it two-way any more since TopLevelTabs is a mixed BotTabViewModel/GlobalWhispersTabViewModel collection; selecting the Whispers tab leaves SelectedBot as whatever bot was last actually selected, which is a reasonable "last bot you were looking at" fallback for the Edit/Remove Selected Bot menu actions. Also feeds SetActiveTopLevelItem, which drives every bot's IsActive/HasUnread state (see RecomputeActiveBot).</summary>
+    /// <summary>Keeps MainWindowViewModel.SelectedBot in sync with whichever tab is actually showing — TabControl.SelectedItem can't bind directly to it two-way any more since TopLevelTabs is a mixed BotTabViewModel/GlobalWhispersTabViewModel collection; selecting the Whispers tab leaves SelectedBot as whatever bot was last actually selected, which is a reasonable "last bot you were looking at" fallback for the Bot menu (which names that bot at the top so it's never a guess). Also feeds SetActiveTopLevelItem, which drives every bot's IsActive/HasUnread state (see RecomputeActiveBot).</summary>
     private void OnTopLevelTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (ViewModel is not { } vm)
@@ -220,13 +220,13 @@ public partial class MainWindow : Window
     private async void OnBotAppearanceClick(object? sender, RoutedEventArgs e) => await EditSelectedBotAppearance();
     private async void OnBotAppearanceNativeClick(object? sender, EventArgs e) => await EditSelectedBotAppearance();
 
-    /// <summary>Customize → Selected Bot's Appearance: theme, colors, icons and tab group, applied the same way as a settings edit.</summary>
+    /// <summary>Bot → Appearance: theme, colors and icons, applied the same way as a settings edit.</summary>
     private async Task EditSelectedBotAppearance()
     {
         var vm = ViewModel;
         if (vm?.SelectedBot is not { } selected)
         {
-            await InformAsync("Bot Appearance", "Select a bot first", "Open the tab of the bot whose appearance you want to change, then choose Customize → Selected Bot's Appearance.");
+            await InformAsync("Bot Appearance", "Select a bot first", "Open the tab of the bot whose appearance you want to change, then choose Bot → Appearance.");
             return;
         }
 
@@ -444,13 +444,28 @@ public partial class MainWindow : Window
         return await dialog.ShowDialog<bool?>(this);
     }
 
-    private void OnRemoveBotClick(object? sender, RoutedEventArgs e) => RemoveSelectedBot();
-    private void OnRemoveBotNativeClick(object? sender, EventArgs e) => RemoveSelectedBot();
+    private async void OnRemoveBotClick(object? sender, RoutedEventArgs e) => await RemoveSelectedBot();
+    private async void OnRemoveBotNativeClick(object? sender, EventArgs e) => await RemoveSelectedBot();
 
-    private void RemoveSelectedBot()
+    /// <summary>
+    /// Asks first: it deletes the bot's settings for good, and from a tab that isn't a bot the
+    /// "selected" bot is only the last one that was showing — the question names it, so the wrong
+    /// bot can't go quietly.
+    /// </summary>
+    private async Task RemoveSelectedBot()
     {
         var vm = ViewModel;
-        if (vm?.SelectedBot is { } selected)
+        if (vm?.SelectedBot is not { } selected)
+        {
+            return;
+        }
+
+        var confirmed = await ConfirmAsync(
+            "Remove Bot",
+            $"Remove \"{selected.Title}\"?",
+            "Its settings are deleted from Invigoration and it disconnects if it's online. There's no undo — it would have to be added again from scratch.",
+            "Remove");
+        if (confirmed)
         {
             vm.RemoveBot(selected);
         }

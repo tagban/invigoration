@@ -340,6 +340,8 @@ public sealed partial class BotEngine
         }
 
         _sc2Client = client;
+        Volatile.Write(ref _sc2LiveClient, client);
+        RaiseActivityChanged();
         _sc2Friends.Clear();
         _sc2Channels.Clear();
         _sc2ActiveChannelIndex = null;
@@ -366,6 +368,7 @@ public sealed partial class BotEngine
         catch (StimpakException ex)
         {
             LogError($"StarCraft II connect failed: {ex.Message}");
+            EndSc2Activity(client);
         }
 
         return Task.CompletedTask;
@@ -390,6 +393,12 @@ public sealed partial class BotEngine
             BncsDisconnected?.Invoke(ex);
             MaybeScheduleAutoReconnect();
         }
+        finally
+        {
+            // However the loop ended, this client's session is over — after the catch above has
+            // already scheduled any reconnect, so the bot never looks idle in between.
+            EndSc2Activity(client);
+        }
     }
 
     private async Task HandleSc2EventAsync(StimpakClient client, SC2Event next)
@@ -402,6 +411,14 @@ public sealed partial class BotEngine
                 // see ConnectSc2Async) already tells Stimpak natively which channels to restore,
                 // General included if that list is empty.
                 LogInfo("Connected — joining chat...");
+                break;
+
+            case StageChanged { Stage: Stage.Disconnected }:
+                // Stimpak's word that this attempt or session is over — the only one a failed
+                // connect or an abandoned sign-in ever gives, since the client stays open (and its
+                // event stream running) for a later connect.
+                LogDebug("StarCraft II stage: Disconnected");
+                EndSc2Activity(client);
                 break;
 
             case StageChanged stage:
@@ -525,6 +542,7 @@ public sealed partial class BotEngine
                 LogError("StarCraft II session ended — another bot may have signed in with the same Battle.net profile.");
                 BncsDisconnected?.Invoke(null);
                 MaybeScheduleAutoReconnect();
+                EndSc2Activity(client);
                 break;
 
             // Not surfaced anywhere yet: roster snapshots (the UI binds Stimpak's own
@@ -540,6 +558,7 @@ public sealed partial class BotEngine
         if (Sc2ChallengeHandler is null)
         {
             LogError("StarCraft II needs a sign-in, but no login window is available in this build.");
+            CancelSc2SignIn(client, auth);
             return;
         }
 
@@ -552,6 +571,32 @@ public sealed partial class BotEngine
         catch (Exception ex)
         {
             LogError($"StarCraft II sign-in failed: {ex.Message}");
+            CancelSc2SignIn(client, auth);
+        }
+    }
+
+    /// <summary>
+    /// Tells Stimpak nobody is going to finish this sign-in (the login window was closed, or there
+    /// isn't one) — it otherwise waits for an answer forever, and the bot looks busy connecting
+    /// with no way to try again. Stimpak ends the attempt with a Disconnected stage (see above).
+    /// </summary>
+    private void CancelSc2SignIn(StimpakClient client, AuthenticationRequired auth)
+    {
+        // A login window left open across a Disconnect (or a removed bot) belongs to a client
+        // that's already gone — disposed, maybe already replaced by a newer connect. There's no
+        // sign-in left to cancel, and a disposed client throws rather than saying so.
+        if (!ReferenceEquals(Volatile.Read(ref _sc2LiveClient), client))
+        {
+            return;
+        }
+
+        try
+        {
+            client.CancelAuth(auth.AuthId);
+        }
+        catch (Exception ex) when (ex is StimpakException or ObjectDisposedException)
+        {
+            // Already answered, cancelled, disconnected, or disposed in the meantime.
         }
     }
 
@@ -672,6 +717,11 @@ public sealed partial class BotEngine
         _sc2Channels.Clear();
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
+
+        if (Interlocked.Exchange(ref _sc2LiveClient, null) is not null)
+        {
+            RaiseActivityChanged();
+        }
 
         if (_sc2Client is { } client)
         {

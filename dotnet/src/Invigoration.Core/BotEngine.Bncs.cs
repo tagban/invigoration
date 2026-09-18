@@ -307,6 +307,7 @@ public sealed partial class BotEngine
     {
         LogInfo("Battle.net Logon Passed!");
         _auth.LoggedOnToBncs = true;
+        _logonPending = false;
 
         // Back on: any reconnect still counting down from an earlier drop has nothing left to do.
         _autoReconnectCts?.Cancel();
@@ -833,9 +834,25 @@ public sealed partial class BotEngine
     private async Task HandleLegacyCreateAccountReplyAsync()
     {
         LogInfo("Account created! Reconnecting with your new account...");
+
+        // This engine's own close to log on again, not a drop: no error, no auto-reconnect, and
+        // the bot stays busy through the new logon. Through the proxy like every other connect.
+        Interlocked.Exchange(ref _replacingBncsConnection, 1);
+        Interlocked.Increment(ref _logonAttempt);
+        _logonPending = true;
         _bncs.Close();
         LogInfo($"Battle.net Login Server connecting to {Config.BnlsServer}...");
-        await _bnls.ConnectAsync(Config.BnlsServer, Config.BnlsPort).ConfigureAwait(false);
+        try
+        {
+            await TrackConnectAsync(
+                token => _bnls.ConnectAsync(Config.BnlsServer, Config.BnlsPort, token, BuildProxyOptions()),
+                CancellationToken.None).ConfigureAwait(false);
+        }
+        catch
+        {
+            EndPendingLogon();
+            throw;
+        }
     }
 
     private Task HandleSetEmail()

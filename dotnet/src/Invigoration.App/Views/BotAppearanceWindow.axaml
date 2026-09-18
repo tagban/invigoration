@@ -101,7 +101,7 @@
 
                 <TextBlock Classes="step" Text="Tab" />
                 <TextBlock Classes="hint"
-                           Text="Tab group and group icon moved to the bot's own settings (File → Edit Selected Bot → Tab group) — grouping decides how bots are organized rather than how one looks, and it was too easy to miss in here." />
+                           Text="Tab group and group icon moved to the bot's own settings (Bot → Edit Settings → Tab group) — grouping decides how bots are organized rather than how one looks, and it was too easy to miss in here." />
             </StackPanel>
         </ScrollViewer>
     </Grid>

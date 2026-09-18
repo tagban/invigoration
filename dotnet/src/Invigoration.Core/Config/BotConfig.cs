@@ -242,6 +242,29 @@ public sealed class BotConfig
     public int HideJoinLeaveSpamWindowSeconds { get; set; } = 60;
 
     /// <summary>
+    /// The two switches above as the single three-way choice the Bot menu offers. Not stored in
+    /// its own right: it reads and writes SuppressJoinLeaveNotifications and
+    /// HideJoinLeaveSpamEnabled, so saved configs keep their meaning and the Config window's
+    /// checkboxes stay the very same settings. Hiding everything leaves the spam switch as it was,
+    /// so going back to "hide spam" later doesn't need it set again.
+    /// </summary>
+    [JsonIgnore]
+    public JoinLeaveDisplay JoinLeaveDisplay
+    {
+        get => SuppressJoinLeaveNotifications ? JoinLeaveDisplay.HideAll
+            : HideJoinLeaveSpamEnabled ? JoinLeaveDisplay.HideSpam
+            : JoinLeaveDisplay.ShowAll;
+        set
+        {
+            SuppressJoinLeaveNotifications = value == JoinLeaveDisplay.HideAll;
+            if (value != JoinLeaveDisplay.HideAll)
+            {
+                HideJoinLeaveSpamEnabled = value == JoinLeaveDisplay.HideSpam;
+            }
+        }
+    }
+
+    /// <summary>
     /// When on, a small game/client icon is shown next to a speaker's name on their chat/emote
     /// lines — the same icon key the userlist/friends list already derive from a classic BNCS
     /// user's statstring (Chat.ChatIcon.GetProductIconKey), or this bot's own product icon for
@@ -401,3 +424,15 @@ public sealed class DiscordBridgeConfig
     public bool PostAsBattlenetUsers { get; set; } = true;
 }
 
+/// <summary>How a bot's chat log shows people joining and leaving — see BotConfig.JoinLeaveDisplay.</summary>
+public enum JoinLeaveDisplay
+{
+    /// <summary>Every join and leave gets a line.</summary>
+    ShowAll,
+
+    /// <summary>Someone bouncing in and out faster than the spam threshold stops getting lines until they settle.</summary>
+    HideSpam,
+
+    /// <summary>No join or leave lines at all.</summary>
+    HideAll,
+}

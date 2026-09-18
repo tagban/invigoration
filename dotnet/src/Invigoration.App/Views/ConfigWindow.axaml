@@ -51,7 +51,7 @@
 
             <!-- The essentials, in the order they depend on each other: the game decides which
                  login fields and servers apply. Everything else is folded away below; how the
-                 bot looks lives under Customize → Bot Appearance. -->
+                 bot looks lives under Bot → Appearance. -->
 
             <!-- 1. Game -->
             <TextBlock Classes="step" Text="1. Game" Margin="0" />
@@ -156,7 +156,7 @@
             <!-- Everything else -->
             <TextBlock Classes="step" Text="More settings" Margin="0,14,0,0" />
 
-            <!-- Grouping lives here, not under Customize → Bot Appearance: it decides how bots are
+            <!-- Grouping lives here, not under Bot → Appearance: it decides how bots are
                  organized, not how one looks, and nobody went looking for it in an appearance
                  window (reported 2026-09-15: "I don't see the grouping as an option at all"). -->
             <Expander Header="Tab group" HorizontalAlignment="Stretch">
@@ -345,7 +345,7 @@
             </Expander>
 
             <TextBlock Classes="hint" Margin="0,8,0,0"
-                       Text="Theme, chat colors and icon set: Customize → Bot Appearance." />
+                       Text="Theme, chat colors and icon set: Bot → Appearance." />
         </StackPanel>
         </ScrollViewer>
     </Grid>

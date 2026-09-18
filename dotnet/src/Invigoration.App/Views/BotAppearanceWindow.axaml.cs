@@ -6,7 +6,7 @@ using Invigoration.Core.Config;
 namespace Invigoration.App.Views;
 
 /// <summary>
-/// Customize → Bot Appearance: one bot's theme, chat colors, icon set and tab group — everything
+/// Bot → Appearance: one bot's theme, chat colors, icon set and tab group — everything
 /// about how a bot looks, kept out of the bot settings so those stay about connecting. Same
 /// contract as ConfigWindow: edits a clone and returns it on Save (null on Cancel), so the caller
 /// applies it exactly as it applies a settings edit.

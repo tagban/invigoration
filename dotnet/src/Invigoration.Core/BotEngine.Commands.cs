@@ -272,8 +272,8 @@ public sealed partial class BotEngine
                 break;
 
             case "debug":
-                _session.DebugMode = !_session.DebugMode;
-                LogInfo($"Debug mode {(_session.DebugMode ? "enabled" : "disabled")}.");
+                DebugMode = !DebugMode;
+                LogInfo($"Debug mode {(DebugMode ? "enabled" : "disabled")}.");
                 break;
 
             case "leetspeak":
