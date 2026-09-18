@@ -36,16 +36,15 @@
                 </DrawingGroup>
             </DrawingBrush.Drawing>
         </DrawingBrush>
-        <!-- Long, uneven streaks for wood grain. -->
-        <DrawingBrush x:Key="WoodGrain" TileMode="Tile" DestinationRect="0,0,53,11" Stretch="None">
-            <DrawingBrush.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 53 V 11 H 0 Z" />
-                    <GeometryDrawing Brush="#3A000000" Geometry="M 0,2 h 23 v 1 h -23 Z M 29,6 h 19 v 1 h -19 Z M 8,9 h 31 v 1 h -31 Z M 44,1 h 9 v 1 h -9 Z" />
-                    <GeometryDrawing Brush="#16FFFFFF" Geometry="M 3,4 h 17 v 1 h -17 Z M 33,8 h 14 v 1 h -14 Z" />
-                </DrawingGroup>
-            </DrawingBrush.Drawing>
-        </DrawingBrush>
+        <!-- Wood grain for Warcraft III: the app icon's plank grain, as a light/dark overlay on the
+             theme's own band colour (so a custom colour still shows through), with a board joint
+             every so often. Made by dotnet/art/build-wood-grain.sh; 2x pixels, sized here in DIPs.
+             A brush per side so the grain runs along every board, each starting at a different
+             point in the strip so no two sides repeat each other. -->
+        <ImageBrush x:Key="WoodGrain" Source="/Assets/Themes/wood-grain.png" TileMode="Tile" DestinationRect="0,0,512,32" Stretch="Fill" />
+        <ImageBrush x:Key="WoodGrainBottom" Source="/Assets/Themes/wood-grain.png" TileMode="Tile" DestinationRect="-211,-13,512,32" Stretch="Fill" />
+        <ImageBrush x:Key="WoodGrainLeft" Source="/Assets/Themes/wood-grain-vertical.png" TileMode="Tile" DestinationRect="-7,-97,32,512" Stretch="Fill" />
+        <ImageBrush x:Key="WoodGrainRight" Source="/Assets/Themes/wood-grain-vertical.png" TileMode="Tile" DestinationRect="-19,-331,32,512" Stretch="Fill" />
         <!-- Warcraft II: dense pitting and short scratches, so panels read as worn and gritty. -->
         <DrawingBrush x:Key="Grit" TileMode="Tile" DestinationRect="0,0,13,11" Stretch="None">
             <DrawingBrush.Drawing>
@@ -331,11 +330,16 @@
             </Border>
         </Panel>
 
-        <!-- ================= Warcraft III: dark wood planks, blackened-iron brackets and trim ================= -->
+        <!-- ================= Warcraft III: oak planks, blackened-iron brackets and trim ================= -->
         <Panel IsVisible="{Binding IsWarcraftIIIFrame}">
             <Border BorderBrush="#0E0804" BorderThickness="1" />
             <Border Margin="1" BorderBrush="{Binding BandBrush}" BorderThickness="10" />
-            <Border Margin="1" BorderBrush="{StaticResource WoodGrain}" BorderThickness="10" />
+            <Panel Margin="1">
+                <Border Height="10" VerticalAlignment="Top" Background="{StaticResource WoodGrain}" />
+                <Border Height="10" VerticalAlignment="Bottom" Background="{StaticResource WoodGrainBottom}" />
+                <Border Width="10" HorizontalAlignment="Left" Margin="0,10" Background="{StaticResource WoodGrainLeft}" />
+                <Border Width="10" HorizontalAlignment="Right" Margin="0,10" Background="{StaticResource WoodGrainRight}" />
+            </Panel>
             <Border Margin="1" BorderBrush="{Binding BevelBrush}" BorderThickness="1,1,0,0" Opacity="0.6" />
             <Border Margin="10" BorderBrush="{Binding TrimBrush}" BorderThickness="1" />
             <Border Margin="11" BorderBrush="#0E0804" BorderThickness="1" />

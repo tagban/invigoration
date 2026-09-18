@@ -5,11 +5,11 @@
 set -euo pipefail
 
 HERE="$(cd "$(dirname "$0")" && pwd)"
-PACKAGING="$(cd "$HERE/.." && pwd)"
+PACKAGING="$(cd "$HERE/../packaging" && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 
-sips -s format png "$HERE/../../src/Invigoration.App/Assets/flag.ico" --out "$WORK/flag.png" >/dev/null
+sips -s format png "$HERE/../src/Invigoration.App/Assets/flag.ico" --out "$WORK/flag.png" >/dev/null
 swiftc -O "$HERE/make-icon.swift" -o "$WORK/make-icon"
 "$WORK/make-icon" "$WORK/flag.png" "$WORK/icon-1024.png"
 

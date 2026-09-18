@@ -19,15 +19,9 @@
                 </DrawingGroup>
             </DrawingBrush.Drawing>
         </DrawingBrush>
-        <DrawingBrush x:Key="WoodGrain" TileMode="Tile" DestinationRect="0,0,53,11" Stretch="None">
-            <DrawingBrush.Drawing>
-                <DrawingGroup>
-                    <GeometryDrawing Brush="#00000000" Geometry="M 0,0 H 53 V 11 H 0 Z" />
-                    <GeometryDrawing Brush="#3A000000" Geometry="M 0,2 h 23 v 1 h -23 Z M 29,6 h 19 v 1 h -19 Z M 8,9 h 31 v 1 h -31 Z" />
-                    <GeometryDrawing Brush="#16FFFFFF" Geometry="M 3,4 h 17 v 1 h -17 Z M 33,8 h 14 v 1 h -14 Z" />
-                </DrawingGroup>
-            </DrawingBrush.Drawing>
-        </DrawingBrush>
+        <!-- Warcraft III's wood grain — the same overlay as ThemeFrame's (see its remarks), started
+             part-way along so the beam doesn't line up with the frame's top board. -->
+        <ImageBrush x:Key="WoodGrain" Source="/Assets/Themes/wood-grain.png" TileMode="Tile" DestinationRect="-157,-5,512,32" Stretch="Fill" />
         <!-- Warcraft II: dense pitting and short scratches, so panels read as worn and gritty. -->
         <DrawingBrush x:Key="Grit" TileMode="Tile" DestinationRect="0,0,13,11" Stretch="None">
             <DrawingBrush.Drawing>
@@ -87,7 +81,7 @@
             <Ellipse Width="6" Height="6" Fill="{Binding StudBrush}" Stroke="#000000" StrokeThickness="0.5" HorizontalAlignment="Right" VerticalAlignment="Center" Margin="0,0,3,0" />
         </Panel>
 
-        <!-- Warcraft III: a dark wood beam with a trim line and iron rivets. -->
+        <!-- Warcraft III: an oak beam with a trim line and iron rivets. -->
         <Panel IsVisible="{Binding IsWarcraftIIIFrame}">
             <Border Background="{Binding BandBrush}" BorderBrush="#0E0804" BorderThickness="0,1" />
             <Border Background="{StaticResource WoodGrain}" Margin="0,1" />
