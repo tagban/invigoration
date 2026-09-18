@@ -52,17 +52,6 @@ public partial class BotTabView : UserControl
             return;
         }
 
-        // Resolved lazily inside the delegate (not here) since the Window ancestor may not
-        // be attached yet at DataContextChanged time — by the time Connect actually fires,
-        // it will be.
-        _attachedViewModel.Engine.Sc2ChallengeHandler = (url, _) =>
-        {
-            var owner = this.FindAncestorOfType<Window>();
-            return owner is null
-                ? throw new InvalidOperationException("No window available to show the Battle.net login popup.")
-                : Sc2LoginChallenge.ShowAsync(owner, url);
-        };
-
         RebuildChatInlines();
 
         _attachedViewModel.ChatLines.CollectionChanged += OnChatLinesChanged;

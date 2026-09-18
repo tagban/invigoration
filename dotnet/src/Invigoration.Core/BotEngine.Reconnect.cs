@@ -30,6 +30,9 @@ public sealed partial class BotEngine
 
     private int _reconnectRunning;
 
+    /// <summary>Logged on in the sense a reconnect is waiting for: classic Battle.net or Chat logged on, or SC2 in chat.</summary>
+    private bool IsLoggedOn => _auth.LoggedOnToBncs || _sc2InChat;
+
     public static bool IsOfficialBattlenetServer(string server) =>
         BncsProduct.OfficialBattlenetServers.Contains(server.Trim(), StringComparer.OrdinalIgnoreCase);
 
@@ -83,11 +86,15 @@ public sealed partial class BotEngine
                 await Task.Delay(interval, cancellationToken).ConfigureAwait(false);
             }
 
-            while (!_auth.LoggedOnToBncs && _logonRejection is null)
+            while (!IsLoggedOn && _logonRejection is null)
             {
-                var attemptInFlight = attemptStartedAt is { } started &&
-                    (_bncs.IsConnected || _bnls.IsConnected || _chatTelnet.IsConnected) &&
-                    clock.Elapsed - started < AttemptTimeout;
+                // An SC2 attempt is in flight for as long as its client is live — Stimpak times out
+                // its own stalled connects (then says Disconnected), and a sign-in waiting on the
+                // user mustn't be abandoned for a fresh one that would only pop another window.
+                var attemptInFlight = Volatile.Read(ref _sc2LiveClient) is not null ||
+                    (attemptStartedAt is { } started &&
+                     (_bncs.IsConnected || _bnls.IsConnected || _chatTelnet.IsConnected) &&
+                     clock.Elapsed - started < AttemptTimeout);
                 if (!attemptInFlight)
                 {
                     if (maxAttempts > 0 && attempts >= maxAttempts)
@@ -126,9 +133,13 @@ public sealed partial class BotEngine
             RaiseActivityChanged();
         }
 
-        if (_auth.LoggedOnToBncs && attempts > 0)
+        if (IsLoggedOn && attempts > 0)
         {
             LogInfo($"Reconnected after {attempts} attempt{(attempts == 1 ? "" : "s")} in {clock.Elapsed.TotalSeconds:0.0}s.");
+        }
+        else if (_logonRejection is { } rejection && attempts > 0 && !IsLoggedOn)
+        {
+            LogWarning($"Stopped reconnecting: {rejection}");
         }
         else if (gaveUp)
         {

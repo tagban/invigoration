@@ -96,11 +96,16 @@ public sealed partial class BotEngine
         RaiseActivityChanged();
     }
 
-    /// <summary>Marks a Stimpak session over — only if it's still the current one, so an older client winding down can't make a newer connection look idle.</summary>
+    /// <summary>
+    /// Marks a Stimpak attempt or session over — only if it's still the current one, so an older
+    /// client winding down can't make a newer connection look idle. Lets go of the Battle.net sign-in
+    /// with it: Stimpak is done with the credential file until the next connect.
+    /// </summary>
     private void EndSc2Activity(StimpakClient client)
     {
         if (Interlocked.CompareExchange(ref _sc2LiveClient, null, client) == client)
         {
+            Interlocked.Exchange(ref _sc2Lease, null)?.Dispose();
             RaiseActivityChanged();
         }
     }

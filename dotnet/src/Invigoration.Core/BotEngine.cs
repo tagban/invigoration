@@ -314,6 +314,7 @@ public sealed partial class BotEngine : IAsyncDisposable
     public async Task ConnectAsync(CancellationToken cancellationToken = default)
     {
         _autoReconnectCts?.Cancel();
+        _sc2QuickSessionLosses = 0;
         try
         {
             await ConnectCoreAsync(cancellationToken).ConfigureAwait(false);

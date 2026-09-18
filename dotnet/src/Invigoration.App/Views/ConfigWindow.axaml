@@ -100,7 +100,7 @@
                         <Button Content="Create" Command="{Binding CreateProfileCommand}" />
                     </StackPanel>
                     <TextBlock Classes="hint"
-                               Text="Reuse a profile to share one Battle.net login across bots; pick + New Profile for a separate login. Signing in happens on Connect, or from File → Manage Battle.net Profiles." />
+                               Text="Reuse a profile to share one Battle.net login across bots, one of them connected at a time; pick + New Profile for a separate login. Signing in happens on Connect, or from File → Manage Battle.net Profiles." />
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">

@@ -242,9 +242,26 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             : "Connecting...";
     }
 
+    /// <summary>Which bot the Battle.net sign-in window is for, and which of its logins it saves to: several can ask at once.</summary>
+    private string SignInWindowTitle()
+    {
+        var login = BattlenetCredentialProfileStore.Find(Config.BattlenetCredentialProfileId)?.DisplayLabel;
+        return string.IsNullOrEmpty(login) || login == Config.DisplayName
+            ? $"Battle.net Sign-In \u2014 {Config.DisplayName}"
+            : $"Battle.net Sign-In \u2014 {Config.DisplayName} ({login})";
+    }
+
     /// <summary>Swaps in an edited config (from the config window's Save) and refreshes anything derived from it, like the tab title.</summary>
     public void ApplyConfig(BotConfig newConfig)
     {
+        // The edit started from a copy. A Battle.net profile the engine made for this bot meanwhile
+        // (its first connect) isn't in it, and the picker has no way to choose "none", so an empty
+        // one here only means the copy is older. Dropping it would sign the bot in from scratch.
+        if (string.IsNullOrEmpty(newConfig.BattlenetCredentialProfileId))
+        {
+            newConfig.BattlenetCredentialProfileId = Engine.Config.BattlenetCredentialProfileId;
+        }
+
         Engine.Config = newConfig;
         OnPropertyChanged(nameof(Config));
         OnPropertyChanged(nameof(Title));
@@ -278,6 +295,10 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             MarkDisconnected();
             RefreshConnectionState();
         });
+        // The Battle.net sign-in for SC2/SC:R/WC3:R, over the main window rather than this bot's
+        // tab: it used to be set by the tab's view, so a bot whose tab wasn't showing (connected at
+        // startup, reconnecting in the background) had no one to ask.
+        Engine.Sc2ChallengeHandler = (url, token) => Sc2LoginChallenge.ShowAsync(url, SignInWindowTitle(), token);
         Engine.Sc2ChannelJoined += OnSc2ChannelJoined;
         Engine.Sc2ChannelLeft += OnSc2ChannelLeft;
         Engine.Sc2ChannelJoinRejected += OnSc2ChannelJoinRejected;
@@ -598,16 +619,29 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     private void OnSc2ChannelJoined(byte channelIndex, ChatChannel channel, ObservableCollection<Person> users) =>
         Dispatcher.UIThread.Post(() =>
         {
-            // Defensive: a duplicate Joined for an index this UI already has a tab for would
-            // otherwise add a second ChannelTabViewModel with the same ChannelIndex, and every
-            // later lookup-by-index (leave, active-channel tracking) only ever finds the first
-            // match — the second becomes an orphaned, stuck tab with no way to close it.
-            if (Channels.Any(c => c.ChannelIndex == channelIndex))
+            // Never two tabs for one index: every later lookup-by-index (leave, active-channel
+            // tracking) only finds the first, leaving the second stuck. The same join repeated is
+            // ignored; a tab left over from an earlier session is replaced, since a reconnect
+            // reuses channel numbers and the old tab's roster belongs to the old session.
+            var tab = new ChannelTabViewModel(channelIndex, channel, users);
+            if (Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex) is { } existing)
             {
+                if (ReferenceEquals(existing.Users, users))
+                {
+                    return;
+                }
+
+                tab.AttachChatLineTrimmer();
+                var wasSelected = SelectedChannel == existing;
+                Channels[Channels.IndexOf(existing)] = tab;
+                if (wasSelected || SelectedChannel is null)
+                {
+                    SelectedChannel = tab;
+                }
+
                 return;
             }
 
-            var tab = new ChannelTabViewModel(channelIndex, channel, users);
             tab.AttachChatLineTrimmer();
             Channels.Add(tab);
             SelectedChannel ??= tab;

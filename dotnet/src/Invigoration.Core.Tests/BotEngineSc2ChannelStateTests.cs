@@ -34,7 +34,7 @@ public class BotEngineSc2ChannelStateTests
     {
         var client = (StimpakClient)typeof(BotEngine).GetField("_sc2Client", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(engine)!;
         var method = typeof(BotEngine).GetMethod("HandleSc2EventAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
-        return (Task)method.Invoke(engine, [client, next])!;
+        return (Task)method.Invoke(engine, [client, next, CancellationToken.None])!;
     }
 
     private static Dictionary<byte, object> GetChannels(BotEngine engine)

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
@@ -59,7 +60,44 @@ public sealed partial class BotEngine
     private sealed record Sc2ChannelSession(byte ChannelIndex, ChatChannel Channel);
 
     private StimpakClient? _sc2Client;
+
+    /// <summary>Cancelled when the current client is retired, closing a login window it has open. Only the sign-in uses it; the client's events are read until it's disposed.</summary>
     private CancellationTokenSource? _sc2ReceiveCts;
+
+    /// <summary>The Battle.net profile the current client saves its sign-in to. Fixed when the client is made, so a bot moved to another profile needs a new client.</summary>
+    private string? _sc2ClientProfileId;
+
+    /// <summary>This bot's hold on its Battle.net profile's sign-in, from a connect until that attempt or session is over. See BattlenetSignInLease.</summary>
+    private BattlenetSignInLease? _sc2Lease;
+
+    /// <summary>Retired clients still finishing an attempt, each with what completes once Stimpak says it has stopped.</summary>
+    private readonly ConcurrentDictionary<StimpakClient, TaskCompletionSource> _sc2WindingDown = new();
+
+    /// <summary>
+    /// Longest a retired client gets to finish the attempt it was making before it's released
+    /// anyway. Stimpak only takes a Disconnect once it's in chat, and each stage before that can take
+    /// about 30 seconds.
+    /// </summary>
+    private static readonly TimeSpan Sc2WindDownTimeout = TimeSpan.FromMinutes(2);
+
+    /// <summary>How old the saved sign-in was when this attempt started, or null if there was none. Said if Battle.net turns it down, which is how its real lifetime shows up in the log.</summary>
+    private TimeSpan? _sc2SavedSignInAge;
+
+    /// <summary>Sessions lost in a row soon after getting into chat. See NoteSc2SessionLost.</summary>
+    private int _sc2QuickSessionLosses;
+
+    private const int MaxSc2QuickSessionLosses = 3;
+
+    /// <summary>
+    /// In chat: Stimpak said Connected (chat set up, first channel joined) and hasn't since said
+    /// Disconnected. SC2's equivalent of classic Battle.net's logged-on flag — what ends an
+    /// auto-reconnect, and what tells a Disconnected that a live session was lost rather than an
+    /// attempt failing.
+    /// </summary>
+    private volatile bool _sc2InChat;
+
+    /// <summary>The current client's worker has gone (SessionEnded): it can't connect again, so the next connect needs a new one.</summary>
+    private bool _sc2ClientEnded;
     private readonly Dictionary<byte, Sc2ChannelSession> _sc2Channels = new();
 
     /// <summary>Which channel an operator-typed send (as opposed to a reply to a specific incoming message) targets — kept in sync with whichever sub-tab the UI has focused.</summary>
@@ -293,9 +331,6 @@ public sealed partial class BotEngine
         }
     }
 
-    /// <summary>Where this bot's Stimpak session caches its signed-in credential.</summary>
-    private string Sc2CredentialPath => BattlenetCredentialProfileStore.CredentialFilePath(EnsureBattlenetCredentialProfileId());
-
     /// <summary>
     /// Resolves this bot's assigned Battle.net credential profile, auto-creating
     /// one (named after the bot) if none is assigned yet or the assigned one
@@ -319,38 +354,79 @@ public sealed partial class BotEngine
         return profile.Id;
     }
 
-    private Task ConnectSc2Async(CancellationToken cancellationToken)
+    /// <remarks>
+    /// One client serves every attempt while it can: after any attempt or session ends (Stimpak's
+    /// Disconnected stage) the same client connects again, which is what Stimpak intends. A new client
+    /// is only made the first time, after SessionEnded (its worker gone), when the bot has been moved
+    /// to another Battle.net profile, or when the current one is somehow still busy. A busy one is
+    /// left to finish before it lets go of the sign-in (see RetireSc2Client).
+    /// </remarks>
+    private async Task ConnectSc2Async(CancellationToken cancellationToken)
     {
         StimpakNativeResolver.Register();
         LogInfo("Connecting to Battle.net (StarCraft II)...");
-        Directory.CreateDirectory(Path.GetDirectoryName(Sc2CredentialPath)!);
+        var profileId = EnsureBattlenetCredentialProfileId();
 
-        StimpakClient client;
-        try
+        if (_sc2Client is not null &&
+            (_sc2ClientEnded || Volatile.Read(ref _sc2LiveClient) is not null || _sc2ClientProfileId != profileId))
         {
-            // ApplicationId is required but doesn't matter for us — CredentialPath overrides
-            // the per-user cache location it would otherwise derive, since credential storage
-            // is already fully owned by BattlenetCredentialProfileStore (see Sc2CredentialPath).
-            client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration") { CredentialPath = Sc2CredentialPath });
-        }
-        catch (Exception ex)
-        {
-            LogError($"StarCraft II connect failed: {ex.Message}");
-            return Task.CompletedTask;
+            RetireSc2Client();
         }
 
-        _sc2Client = client;
-        Volatile.Write(ref _sc2LiveClient, client);
-        RaiseActivityChanged();
+        CloseSc2Channels();
+        _sc2InChat = false;
         _sc2Friends.Clear();
-        _sc2Channels.Clear();
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
         _sc2PublicChannelCatalog = [];
 
-        _sc2ReceiveCts = new CancellationTokenSource();
-        var token = _sc2ReceiveCts.Token;
-        _ = SafeSc2ConsumeLoopAsync(client, token);
+        // Nothing is live by now, so a hold still here has outlived its attempt.
+        Interlocked.Exchange(ref _sc2Lease, null)?.Dispose();
+        if (await AcquireSc2SignInAsync(profileId, cancellationToken).ConfigureAwait(false) is not { } lease)
+        {
+            return;
+        }
+
+        if (_sc2Client is not { } client)
+        {
+            try
+            {
+                // ApplicationId is required but doesn't matter for us. CredentialPath overrides
+                // the per-user cache location it would otherwise derive, since credential storage
+                // is already fully owned by BattlenetCredentialProfileStore.
+                client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration")
+                {
+                    CredentialPath = BattlenetCredentialProfileStore.CredentialFilePath(profileId),
+                });
+            }
+            catch (Exception ex)
+            {
+                lease.Dispose();
+                LogError($"StarCraft II connect failed: {ex.Message}");
+                return;
+            }
+
+            _sc2Client = client;
+            _sc2ClientProfileId = profileId;
+            _sc2ClientEnded = false;
+            _sc2ReceiveCts = new CancellationTokenSource();
+
+            // Stimpak's own thread, so a retired client's stopping is seen even while the event loop
+            // is busy — it can be the one waiting on it, when a "reconnect" command came in over chat.
+            client.EventReceived += next =>
+            {
+                if (next is StageChanged { Stage: Stage.Disconnected } or SessionEnded)
+                {
+                    StoppedSc2Client(client);
+                }
+            };
+            _ = SafeSc2ConsumeLoopAsync(client, _sc2ReceiveCts.Token);
+        }
+
+        _sc2Lease = lease;
+        NoteSavedSignIn(profileId);
+        Volatile.Write(ref _sc2LiveClient, client);
+        RaiseActivityChanged();
 
         try
         {
@@ -367,58 +443,190 @@ public sealed partial class BotEngine
         }
         catch (StimpakException ex)
         {
+            // Stimpak only refuses a connect once the client's worker is gone — make a new one next time.
             LogError($"StarCraft II connect failed: {ex.Message}");
+            _sc2ClientEnded = true;
             EndSc2Activity(client);
         }
-
-        return Task.CompletedTask;
     }
 
-    private async Task SafeSc2ConsumeLoopAsync(StimpakClient client, CancellationToken cancellationToken)
+    /// <summary>
+    /// This bot's turn with its Battle.net profile's sign-in (see BattlenetSignInLease). Null when
+    /// another bot or another copy of the app has it: that's logged, and any auto-reconnect stops.
+    /// This bot's own previous client, retired mid-attempt and still finishing, is waited for instead.
+    /// </summary>
+    private async Task<BattlenetSignInLease?> AcquireSc2SignInAsync(string profileId, CancellationToken cancellationToken)
+    {
+        if (BattlenetSignInLease.TryAcquire(profileId, this, Config.DisplayName, out var lease, out var holder))
+        {
+            return lease;
+        }
+
+        if (holder is not null && ReferenceEquals(holder.Owner, this))
+        {
+            LogDebug("Waiting for the previous StarCraft II connection to finish closing...");
+            try
+            {
+                // Counted as a connect in flight, so the bot looks busy and Disconnect can stop it.
+                await TrackConnectAsync(
+                    token => holder.Released.WaitAsync(Sc2WindDownTimeout + TimeSpan.FromSeconds(5), token),
+                    cancellationToken).ConfigureAwait(false);
+            }
+            catch (TimeoutException)
+            {
+                // Released by then regardless; see ReleaseSc2ClientAsync.
+            }
+
+            if (BattlenetSignInLease.TryAcquire(profileId, this, Config.DisplayName, out lease, out holder))
+            {
+                return lease;
+            }
+        }
+
+        var login = BattlenetCredentialProfileStore.Find(profileId)?.DisplayLabel ?? "this bot's Battle.net profile";
+        var who = holder?.OwnerName ?? "another copy of Invigoration";
+        var fix = holder is null ? "quit the other copy" : $"disconnect {holder.OwnerName}";
+        LogError(
+            $"The Battle.net login \"{login}\" is in use by {who}. One Battle.net login can only be connected once at a time: " +
+            $"{fix} first, or give this bot a Battle.net profile of its own (Edit Bot, then Battle.net Profile).");
+        _logonRejection = $"its Battle.net login is in use by {who}.";
+        return null;
+    }
+
+    /// <summary>
+    /// Says whether this attempt has a saved sign-in to use, and how old it is. Every login replaces
+    /// it, so its age is the time since the last one. If Battle.net then asks for a fresh sign-in, the
+    /// warning names that age (see HandleSc2AuthenticationRequiredAsync). Only the file's timestamp is
+    /// read, never its contents.
+    /// </summary>
+    private void NoteSavedSignIn(string profileId)
+    {
+        var path = BattlenetCredentialProfileStore.CredentialFilePath(profileId);
+        _sc2SavedSignInAge = BattlenetCredentialProfileStore.HasCachedCredential(profileId)
+            ? DateTime.UtcNow - File.GetLastWriteTimeUtc(path)
+            : null;
+
+        var login = BattlenetCredentialProfileStore.Find(profileId)?.DisplayLabel ?? "this bot";
+        var message = _sc2SavedSignInAge is { } age
+            ? $"Using the saved Battle.net sign-in for {login} (from {DescribeAge(age)} ago)."
+            : $"No saved Battle.net sign-in for {login} yet. A Battle.net sign-in window will open.";
+        if (IsReconnecting)
+        {
+            LogDebug(message);
+        }
+        else
+        {
+            LogInfo(message);
+        }
+    }
+
+    public static string DescribeAge(TimeSpan age) => age switch
+    {
+        { TotalDays: >= 2 } => $"{(int)age.TotalDays} days",
+        { TotalHours: >= 2 } => $"{(int)age.TotalHours} hours",
+        { TotalMinutes: >= 2 } => $"{(int)age.TotalMinutes} minutes",
+        _ => $"{Math.Max(0, (int)age.TotalSeconds)} seconds",
+    };
+
+    /// <remarks>
+    /// Reads until the client is disposed, which is after it's retired, so RetireSc2Client can see it
+    /// stop. The token only reaches the sign-in: cancelling it closes a login window this client has open.
+    /// </remarks>
+    private async Task SafeSc2ConsumeLoopAsync(StimpakClient client, CancellationToken signInCancellation)
     {
         try
         {
-            await foreach (var next in client.ReadEventsAsync(cancellationToken).ConfigureAwait(false))
+            await foreach (var next in client.ReadEventsAsync().ConfigureAwait(false))
             {
-                await HandleSc2EventAsync(client, next).ConfigureAwait(false);
+                await HandleSc2EventAsync(client, next, signInCancellation).ConfigureAwait(false);
             }
         }
         catch (OperationCanceledException)
         {
-            // Intentional disconnect — DisconnectAsync/DisposeAsync cancelled this loop.
+            // Nothing reads with a token now, but a handler's cancellation shouldn't end the process.
+        }
+        catch (Exception ex) when (ReferenceEquals(client, _sc2Client))
+        {
+            _sc2ClientEnded = true;
+            LoseSc2Session($"StarCraft II connection lost: {ex.Message}", ex);
         }
         catch (Exception ex)
         {
-            LogError($"StarCraft II connection lost: {ex.Message}");
-            BncsDisconnected?.Invoke(ex);
-            MaybeScheduleAutoReconnect();
+            LogDebug($"A replaced StarCraft II client's events ended: {ex.Message}");
         }
         finally
         {
             // However the loop ended, this client's session is over — after the catch above has
             // already scheduled any reconnect, so the bot never looks idle in between.
+            StoppedSc2Client(client);
             EndSc2Activity(client);
         }
     }
 
-    private async Task HandleSc2EventAsync(StimpakClient client, SC2Event next)
+    private async Task HandleSc2EventAsync(StimpakClient client, SC2Event next, CancellationToken cancellationToken = default)
     {
         client.People.Apply(next);
+
+        // A client that's been replaced or disconnected can still have events queued up; acting
+        // on them would close the current session's channel tabs or flip its status. Its stopping is
+        // the one thing that matters: then it can be released (see RetireSc2Client).
+        if (!ReferenceEquals(client, _sc2Client))
+        {
+            switch (next)
+            {
+                case StageChanged { Stage: Stage.Disconnected } or SessionEnded:
+                    StoppedSc2Client(client);
+                    break;
+
+                // Battle.net turned down its saved sign-in after it was retired. Its Disconnect only
+                // cancelled a sign-in already pending, so Stimpak would wait on this one forever; saying
+                // no ends the attempt, and a Disconnected follows.
+                case AuthenticationRequired auth:
+                    try
+                    {
+                        client.CancelAuth(auth.AuthId);
+                    }
+                    catch (Exception ex) when (ex is StimpakException or ObjectDisposedException)
+                    {
+                        // Already over, or released.
+                    }
+
+                    break;
+            }
+
+            return;
+        }
+
         switch (next)
         {
             case StageChanged { Stage: Stage.Connected }:
-                // No manual join here — StimpakConnectOptions.Channels (passed at Connect time,
-                // see ConnectSc2Async) already tells Stimpak natively which channels to restore,
-                // General included if that list is empty.
-                LogInfo("Connected — joining chat...");
+                // Chat is set up and the first channel joined (it arrives before this; any further
+                // remembered channels arrive after, restored natively by Stimpak from
+                // StimpakConnectOptions.Channels). That's "logged on" for SC2: an auto-reconnect
+                // still running has nothing left to do.
+                _sc2InChat = true;
+                _autoReconnectCts?.Cancel();
+                _connectedAt = DateTimeOffset.UtcNow;
+                LogInfo("Connected to StarCraft II chat.");
                 break;
 
             case StageChanged { Stage: Stage.Disconnected }:
-                // Stimpak's word that this attempt or session is over — the only one a failed
-                // connect or an abandoned sign-in ever gives, since the client stays open (and its
-                // event stream running) for a later connect.
+                // Stimpak's one signal that an attempt or a session is over, however it ended —
+                // including a live session dropped by the network or taken over by a sign-in
+                // elsewhere, which Stimpak reports as SessionFailed then this (never SessionEnded;
+                // that's only its worker dying). The client stays open for the next connect.
                 LogDebug("StarCraft II stage: Disconnected");
+                if (_sc2InChat || _sc2Channels.Count > 0)
+                {
+                    NoteSc2SessionLost();
+                    LoseSc2Session("StarCraft II connection lost.", null);
+                }
+
                 EndSc2Activity(client);
+
+                // A Disconnect that got in after this event was taken for the current client's is
+                // waiting for a Disconnected that isn't coming: the worker is idle already.
+                StoppedSc2Client(client);
                 break;
 
             case StageChanged stage:
@@ -426,14 +634,22 @@ public sealed partial class BotEngine
                 break;
 
             case AuthenticationRequired auth:
-                await HandleSc2AuthenticationRequiredAsync(client, auth).ConfigureAwait(false);
+                // Stimpak has already deleted a saved sign-in Battle.net refused, before this arrives.
+                // With none saved, NoteSavedSignIn already said a window would open.
+                if (_sc2SavedSignInAge is { } age)
+                {
+                    LogWarning($"Battle.net didn't accept the saved sign-in (from {DescribeAge(age)} ago). Sign in again in the Battle.net window.");
+                    _sc2SavedSignInAge = null;
+                }
+
+                await HandleSc2AuthenticationRequiredAsync(client, auth, cancellationToken).ConfigureAwait(false);
                 break;
 
             case AccountConnected connected:
                 // Ties this profile to the real signed-in BattleTag so it's identifiable if the
                 // user has more than one Battle.net account — see BattlenetCredentialProfile
                 // .DisplayLabel. Config.BattlenetCredentialProfileId is already guaranteed set by
-                // now (ConnectSc2Async resolves it via Sc2CredentialPath before Connect is called).
+                // now (ConnectSc2Async resolves it before Connect is called).
                 BattlenetCredentialProfileStore.UpdateBattleTag(Config.BattlenetCredentialProfileId, connected.Account.BattleTag);
 
                 // Account.Games is presumably which Blizzard products this account can actually
@@ -516,33 +732,27 @@ public sealed partial class BotEngine
                 break;
 
             case SessionFailed failed:
-                LogError($"StarCraft II session failed: {failed.Message}");
+                // Why the attempt or session ended; Disconnected follows. A reconnect attempt
+                // failing is expected along the way, so it's a detail rather than an error there.
+                if (IsReconnecting && !_sc2InChat)
+                {
+                    LogDebug($"StarCraft II reconnect attempt failed: {failed.Message}");
+                }
+                else
+                {
+                    LogError($"StarCraft II session failed: {failed.Message}");
+                }
+
                 break;
 
             case SessionEnded:
-                // Used to close every sub-tab silently and stop there — this bot then sat there
-                // looking "connected" (no error, no BncsDisconnected) with a dead client
-                // underneath: any further join/send just failed quietly. A real Battle.net
-                // account can only run one live chat session at a time, so this reliably fires
-                // whenever a second Stimpak-backed bot (SC2/SC:R/WC3:R) signs in with the *same*
-                // shared Battle.net credential profile while this one is still connected — the
-                // account's session gets handed to whichever client authenticated most recently,
-                // and every other client sharing that profile is silently dropped. Surfacing it
-                // properly (LogError + BncsDisconnected + the same auto-reconnect path a real
-                // connection loss uses) at least makes that visible instead of silent — running
-                // more than one Stimpak-backed bot on the *same* profile at the same time isn't
-                // really supported by Battle.net itself, not something fixable purely client-side.
-                foreach (var channelIndex in _sc2Channels.Keys.ToList())
-                {
-                    Sc2ChannelLeft?.Invoke(channelIndex);
-                }
-
-                _sc2Channels.Clear();
-                _sc2ActiveChannelIndex = null;
-                LogError("StarCraft II session ended — another bot may have signed in with the same Battle.net profile.");
-                BncsDisconnected?.Invoke(null);
-                MaybeScheduleAutoReconnect();
+                // Stimpak's worker is gone — in practice only if it crashed; a dropped or
+                // taken-over session ends with a Disconnected stage instead (see above). This
+                // client can't connect again, so the next connect makes a new one.
+                _sc2ClientEnded = true;
+                LoseSc2Session("StarCraft II session ended unexpectedly.", null);
                 EndSc2Activity(client);
+                StoppedSc2Client(client);
                 break;
 
             // Not surfaced anywhere yet: roster snapshots (the UI binds Stimpak's own
@@ -553,11 +763,18 @@ public sealed partial class BotEngine
         }
     }
 
-    private async Task HandleSc2AuthenticationRequiredAsync(StimpakClient client, AuthenticationRequired auth)
+    /// <remarks>
+    /// The token is the client's own event loop's, cancelled by Disconnect (and by removing the
+    /// bot), which closes a login window still open — it used to stay up after the bot had moved
+    /// on. A sign-in that's closed or can't be shown also stops auto-reconnect: every attempt would
+    /// only ask again (a new window each time), and it's the user's call now.
+    /// </remarks>
+    private async Task HandleSc2AuthenticationRequiredAsync(StimpakClient client, AuthenticationRequired auth, CancellationToken cancellationToken)
     {
         if (Sc2ChallengeHandler is null)
         {
             LogError("StarCraft II needs a sign-in, but no login window is available in this build.");
+            _logonRejection = "StarCraft II needs a sign-in and none could be shown.";
             CancelSc2SignIn(client, auth);
             return;
         }
@@ -565,12 +782,17 @@ public sealed partial class BotEngine
         try
         {
             var url = new Uri(auth.Url);
-            var credential = await Sc2ChallengeHandler(url, CancellationToken.None).ConfigureAwait(false);
+            var credential = await Sc2ChallengeHandler(url, cancellationToken).ConfigureAwait(false);
             client.SubmitAuth(auth.AuthId, System.Text.Encoding.UTF8.GetString(credential));
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            // Disconnect closed the window — the client is being torn down, nothing to answer.
         }
         catch (Exception ex)
         {
             LogError($"StarCraft II sign-in failed: {ex.Message}");
+            _logonRejection = "the Battle.net sign-in wasn't completed.";
             CancelSc2SignIn(client, auth);
         }
     }
@@ -710,42 +932,146 @@ public sealed partial class BotEngine
     /// </summary>
     private Task DisconnectSc2Async()
     {
-        _sc2ReceiveCts?.Cancel();
-        _sc2ReceiveCts = null;
+        _sc2InChat = false;
+        _sc2QuickSessionLosses = 0;
+        var hadClient = _sc2Client is not null;
+        RetireSc2Client();
+        CloseSc2Channels();
 
-        var channelIndexes = _sc2Channels.Keys.ToList();
-        _sc2Channels.Clear();
-        _sc2ActiveChannelIndex = null;
-        _sc2TriviaChannelIndex = null;
-
-        if (Interlocked.Exchange(ref _sc2LiveClient, null) is not null)
+        if (hadClient)
         {
-            RaiseActivityChanged();
-        }
-
-        if (_sc2Client is { } client)
-        {
-            _sc2Client = null;
-            try
-            {
-                client.Disconnect();
-            }
-            catch (StimpakException)
-            {
-                // Already disconnected, or never got past the auth handshake — Dispose below
-                // still releases the client either way.
-            }
-
-            client.Dispose();
-
-            foreach (var channelIndex in channelIndexes)
-            {
-                Sc2ChannelLeft?.Invoke(channelIndex);
-            }
-
             BncsDisconnected?.Invoke(null);
         }
 
         return Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Ends the current client for good: a login window it has open closes, its session is
+    /// disconnected, and the client is released. That happens straight away if it was idle. If it was
+    /// part-way through an attempt, it waits until Stimpak says it has stopped: Stimpak only takes a
+    /// Disconnect once it's in chat, and until then it's still using the saved sign-in. The client's
+    /// hold on the Battle.net sign-in goes with it, so a new connect on the same login waits for it
+    /// rather than racing it. Tells nobody — the callers decide what the UI hears.
+    /// </summary>
+    private void RetireSc2Client()
+    {
+        _sc2ReceiveCts?.Cancel();
+        _sc2ReceiveCts = null;
+        var lease = Interlocked.Exchange(ref _sc2Lease, null);
+
+        if (_sc2Client is not { } client)
+        {
+            lease?.Dispose();
+            return;
+        }
+
+        _sc2Client = null;
+        _sc2ClientProfileId = null;
+        _sc2ClientEnded = false;
+
+        // Registered before anything else, so its Disconnected can't go by unnoticed — including one
+        // the event loop is handling for it right now as the current client's (see the Disconnected case).
+        var stopped = _sc2WindingDown.GetOrAdd(client, _ => new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously)).Task;
+        if (Interlocked.CompareExchange(ref _sc2LiveClient, null, client) == client)
+        {
+            RaiseActivityChanged();
+        }
+        else
+        {
+            // Idle: nothing to wait for.
+            StoppedSc2Client(client);
+        }
+
+        try
+        {
+            client.Disconnect();
+        }
+        catch (Exception ex) when (ex is StimpakException or ObjectDisposedException)
+        {
+            // Its worker is already gone, so there's nothing to wait for.
+            StoppedSc2Client(client);
+        }
+
+        _ = ReleaseSc2ClientAsync(client, stopped, lease);
+    }
+
+    /// <summary>A retired client said Disconnected, or its events ended: it has stopped.</summary>
+    private void StoppedSc2Client(StimpakClient client)
+    {
+        if (_sc2WindingDown.TryRemove(client, out var stopped))
+        {
+            stopped.TrySetResult();
+        }
+    }
+
+    private async Task ReleaseSc2ClientAsync(StimpakClient client, Task stopped, BattlenetSignInLease? lease)
+    {
+        try
+        {
+            await stopped.WaitAsync(Sc2WindDownTimeout).ConfigureAwait(false);
+        }
+        catch (TimeoutException)
+        {
+            LogDebug("A replaced StarCraft II connection didn't say it had stopped in time; releasing it anyway.");
+        }
+        finally
+        {
+            _sc2WindingDown.TryRemove(client, out _);
+            client.Dispose();
+            lease?.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// Closes every channel sub-tab — without touching Config.Sc2LastChannels, which is exactly
+    /// what the next connect restores.
+    /// </summary>
+    private void CloseSc2Channels()
+    {
+        var channelIndexes = _sc2Channels.Keys.ToList();
+        _sc2Channels.Clear();
+        _sc2ActiveChannelIndex = null;
+        _sc2TriviaChannelIndex = null;
+        foreach (var channelIndex in channelIndexes)
+        {
+            Sc2ChannelLeft?.Invoke(channelIndex);
+        }
+    }
+
+    /// <summary>
+    /// Counts a live session lost soon after getting into chat. A few of those in a row is another
+    /// sign-in on the same Battle.net account taking the session each time: another bot, another copy
+    /// of the app, or the game itself. Reconnecting would only take it back, and each would keep
+    /// knocking the other off. Stopping sets a rejection, which MaybeScheduleAutoReconnect honours;
+    /// a session that lasts resets the count, as does the user connecting or disconnecting.
+    /// </summary>
+    private void NoteSc2SessionLost()
+    {
+        if (!_sc2InChat)
+        {
+            return;
+        }
+
+        // A takeover partner comes back after its own reconnect delay plus a connect, so allow a
+        // minute beyond this bot's delay.
+        var window = TimeSpan.FromSeconds(Math.Max(1, Config.AutoReconnectDelaySeconds) + 60);
+        _sc2QuickSessionLosses = DateTimeOffset.UtcNow - _connectedAt < window ? _sc2QuickSessionLosses + 1 : 0;
+        if (_sc2QuickSessionLosses >= MaxSc2QuickSessionLosses)
+        {
+            _logonRejection =
+                "StarCraft II chat keeps being taken over by another sign-in on this Battle.net account " +
+                "(another bot, another copy of Invigoration, or the game itself).";
+        }
+    }
+
+    /// <summary>A session that had made it into chat is gone: say so, close its tabs, and reconnect if that's on.</summary>
+    private void LoseSc2Session(string message, Exception? ex)
+    {
+        _sc2InChat = false;
+        CloseSc2Channels();
+        LogError(message);
+        BncsDisconnected?.Invoke(ex);
+        MaybeScheduleAutoReconnect();
     }
 }

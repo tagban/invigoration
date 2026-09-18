@@ -10,7 +10,8 @@ namespace Invigoration.Core.Config;
 /// Id, under %AppData%/Invigoration/BattlenetCredentials/&lt;id&gt;.bin — see
 /// CredentialFilePath. Deliberately not product-namespaced: the whole point
 /// is that an SC2 bot and a future WC3:Reforged bot on the same Battle.net
-/// account can reference the same profile and share that one file.
+/// account can reference the same profile and share that one file — one of
+/// them connected at a time, which BattlenetSignInLease enforces.
 /// </summary>
 public static class BattlenetCredentialProfileStore
 {
@@ -62,12 +63,16 @@ public static class BattlenetCredentialProfileStore
         Profiles.RemoveAll(p => p.Id == id);
         Save();
 
-        var credentialPath = CredentialFilePath(id);
-        if (File.Exists(credentialPath))
+        foreach (var path in new[] { CredentialFilePath(id), BattlenetSignInLease.LockFilePath(id) })
         {
+            if (!File.Exists(path))
+            {
+                continue;
+            }
+
             try
             {
-                File.Delete(credentialPath);
+                File.Delete(path);
             }
             catch (IOException)
             {

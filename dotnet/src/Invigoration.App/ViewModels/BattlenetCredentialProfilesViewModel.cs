@@ -14,7 +14,8 @@ namespace Invigoration.App.ViewModels;
 /// Manages the shared (cross-bot) list of named Battle.net logins — see
 /// BattlenetCredentialProfileStore. Reusing one across bots (e.g. an SC2 bot
 /// and a future WC3:Reforged bot on the same account) shares that one
-/// signed-in session; separate profiles keep separate logins.
+/// signed-in session, one bot connected at a time; separate profiles keep
+/// separate logins.
 /// </summary>
 public partial class BattlenetCredentialProfilesViewModel : ObservableObject
 {
@@ -97,11 +98,21 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
     /// BotEngine.Sc2.cs will use for any bot assigned to this profile),
     /// forces the interactive flow, and waits for either a successful
     /// connect or a failure before disposing. Uses the same
-    /// Sc2LoginChallenge popup BotTabView's real connect path falls back to
-    /// when Stimpak's own native auth window isn't available.
+    /// Sc2LoginChallenge popup every SC2 bot's own connect uses.
+    /// Takes the profile's sign-in like a connecting bot does (see
+    /// BattlenetSignInLease): signing in here while a bot is connected on the
+    /// same login would take that bot's chat session and replace its saved
+    /// sign-in under it.
     /// </summary>
     public async Task SignInAsync(TopLevel owner)
     {
+        if (!BattlenetSignInLease.TryAcquire(Profile.Id, this, "the Battle.net Profiles window", out var lease, out var holder))
+        {
+            throw new InvalidOperationException(holder is null
+                ? $"\"{Profile.DisplayLabel}\" is in use by another copy of Invigoration. Quit it first, then sign in here."
+                : $"\"{Profile.DisplayLabel}\" is in use by {holder.OwnerName}, so it's already signed in. Disconnect that first to sign in again.");
+        }
+
         IsSigningIn = true;
         try
         {
@@ -148,6 +159,7 @@ public partial class BattlenetCredentialProfileViewModel : ObservableObject
         }
         finally
         {
+            lease.Dispose();
             IsSigningIn = false;
             RefreshIsSignedIn();
         }
