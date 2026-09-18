@@ -22,8 +22,10 @@ public sealed partial class ChatThemeViewModel : ObservableObject
 {
     // The frame's own gutter around the chat and input: every frame design draws inside these
     // bands, so none of them can ever paint over text. The top is taller for the name plate.
-    private static readonly Thickness FramedChatMargin = new(18, 26, 18, 4);
-    private static readonly Thickness FramedChatMarginNoPlate = new(18, 18, 18, 4);
+    // Four more at the top than the frame's own gutter: the frame sits 4px below the tab strip now
+    // that no status bar comes between them (see BotTabView.axaml).
+    private static readonly Thickness FramedChatMargin = new(18, 30, 18, 4);
+    private static readonly Thickness FramedChatMarginNoPlate = new(18, 22, 18, 4);
     private static readonly Thickness FramedInputMargin = new(18, 17, 18, 18);
 
     public ChatThemeViewModel(ChatTheme theme)
@@ -119,7 +121,8 @@ public sealed partial class ChatThemeViewModel : ObservableObject
     /// <summary>The chat spans the full width over a character dock, otherwise only the left column.</summary>
     public int ChatColumnSpan => UsesCharacterDock ? 3 : 1;
 
-    public Thickness ChatMargin => !HasFrame ? default : Theme.ShowNamePlate ? FramedChatMargin : FramedChatMarginNoPlate;
+    /// <summary>Unframed, just a 4px gap under the tab strip — the same the user list keeps.</summary>
+    public Thickness ChatMargin => !HasFrame ? new Thickness(0, 4, 0, 0) : Theme.ShowNamePlate ? FramedChatMargin : FramedChatMarginNoPlate;
 
     /// <summary>The input sits directly under the chat (row 2) whenever a frame has to wrap both, or a dock takes the bottom row; otherwise in its usual bottom row.</summary>
     public int InputRow => HasFrame || UsesCharacterDock ? 2 : 3;

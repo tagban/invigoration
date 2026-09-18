@@ -162,7 +162,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     public partial string InputText { get; set; } = "";
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect))]
+    [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect), nameof(StatusDotBrush))]
     public partial bool IsConnected { get; set; }
 
     /// <summary>The engine's own "nothing connected, connecting, or waiting to reconnect" (BotEngine.IsIdle), refreshed on the UI thread whenever it says to look again.</summary>
@@ -172,8 +172,19 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
 
     /// <summary>An auto-reconnect sitting out its delay with nothing in flight (BotEngine.IsWaitingToReconnect) — the bot's disconnected, and Connect skips the wait.</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanConnect))]
+    [NotifyPropertyChangedFor(nameof(CanConnect), nameof(ConnectButtonText), nameof(ConnectButtonTip))]
     public partial bool IsWaitingToReconnect { get; set; }
+
+    /// <summary>"Reconnect Now" while an auto-reconnect is only waiting, since that's what a click does — skips the wait.</summary>
+    public string ConnectButtonText => IsWaitingToReconnect ? "Reconnect Now" : "Connect";
+
+    public string? ConnectButtonTip => IsWaitingToReconnect ? "Auto-reconnect is waiting between attempts — connect right away instead" : null;
+
+    private static readonly IBrush ConnectedDot = new SolidColorBrush(Color.FromRgb(0x3F, 0xB9, 0x50));
+    private static readonly IBrush BusyDot = new SolidColorBrush(Color.FromRgb(0xD2, 0x99, 0x22));
+
+    /// <summary>Green once connected; amber while connecting or reconnecting (the only other time the dot shows).</summary>
+    public IBrush StatusDotBrush => IsConnected ? ConnectedDot : BusyDot;
 
     /// <summary>
     /// Whether Connect makes sense right now — what the Connect button's visibility and the Bot

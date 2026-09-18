@@ -16,7 +16,8 @@
         <StyleInclude Source="avares://Invigoration.App/Views/ThemeStyles.axaml" />
     </UserControl.Styles>
 
-    <!-- Rows: 0 connect bar, 1 chat, 2 input when a theme frames it or docks the user list,
+    <!-- Rows: 0 empty (it held a status bar; the connection line now sits under the user list),
+         1 chat, 2 input when a theme frames it or docks the user list,
          3 input otherwise or the character dock. Every coordinate that moves with the bot's theme
          (BotConfig.ThemeId) comes from ChatThemeViewModel's layout properties:
          - Default (no frame): chat left, Users/Friends/Clan panel in column 2, input in row 3
@@ -34,17 +35,6 @@
             <!-- User-resizable (drag the GridSplitter below) — 180 is just the initial width, not a cap. -->
             <ColumnDefinition Width="180" MinWidth="120" MaxWidth="500" />
         </Grid.ColumnDefinitions>
-
-        <!-- Status / connect bar. Connect shows only while the bot is disconnected (CanConnect) —
-             idle, or just waiting out an auto-reconnect's delay, which Connect skips — never while
-             it's connected or an attempt is under way. Disconnect and Debug Logging moved to the
-             Bot menu. MinHeight keeps the row the button's height, so the chat
-             below doesn't jump when the button comes and goes. -->
-        <StackPanel Grid.Row="0" Grid.Column="0" Grid.ColumnSpan="3" Orientation="Horizontal"
-                    Spacing="8" Margin="8" MinHeight="32">
-            <Button Content="Connect" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnect}" />
-            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" />
-        </StackPanel>
 
         <!-- Chat log: one continuous SelectableTextBlock (built up in code-behind)
              so drag-select and Ctrl+C work across whole lines and multiple
@@ -138,7 +128,7 @@
              ThemeFrame's own remarks — so neither ever covers text or takes a click. The wrapping
              Panels carry the Grid placement because the controls themselves take the theme as
              their DataContext. -->
-        <Panel Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="{Binding Theme.FrameColumnSpan}" Margin="4,0,4,4"
+        <Panel Grid.Row="1" Grid.RowSpan="2" Grid.Column="0" Grid.ColumnSpan="{Binding Theme.FrameColumnSpan}" Margin="4,4,4,4"
                IsVisible="{Binding Theme.HasFrame}" IsHitTestVisible="False">
             <views:ThemeFrame DataContext="{Binding Theme}" />
         </Panel>
@@ -153,9 +143,13 @@
              under the chat rather than eating half the tab. The 100000 "cap" in Normal layout is
              just an unreachable number standing in for "no cap" — Grid row sizing handles it
              there. -->
-        <TabControl Grid.Row="{Binding Theme.UsersRow}" Grid.Column="{Binding Theme.UsersColumn}"
-                    Grid.ColumnSpan="{Binding Theme.UsersColumnSpan}" Grid.RowSpan="{Binding Theme.UsersRowSpan}"
-                    MaxHeight="{Binding Theme.UsersMaxHeight}" Margin="{Binding Theme.UsersMargin}"
+        <!-- The panel plus, under it, the bot's connection line — which replaced the status bar
+             that used to run across the top of the tab. Wrapped together so the line stays under
+             the list wherever a theme puts it (right-hand column, or the bottom dock). -->
+        <Grid Grid.Row="{Binding Theme.UsersRow}" Grid.Column="{Binding Theme.UsersColumn}"
+              Grid.ColumnSpan="{Binding Theme.UsersColumnSpan}" Grid.RowSpan="{Binding Theme.UsersRowSpan}"
+              Margin="{Binding Theme.UsersMargin}" RowDefinitions="*,Auto">
+        <TabControl Grid.Row="0" MaxHeight="{Binding Theme.UsersMaxHeight}"
                     Background="#1B1B1B" BorderBrush="#3A3A3A" BorderThickness="1" CornerRadius="6" Padding="0">
             <TabControl.Styles>
                 <!-- Compact header text (this panel is otherwise all small/dense text — Fluent's default TabItem
@@ -493,6 +487,20 @@
             </TabItem>
 
         </TabControl>
+
+        <!-- At most one thing: the Connect button while the bot is disconnected (CanConnect —
+             idle, or only waiting out an auto-reconnect's delay, which it skips), otherwise a dot
+             and a word for where it's at. Disconnect and Debug Logging live in the Bot menu. -->
+        <Panel Grid.Row="1" Margin="0,6,0,0" MinHeight="28">
+            <!-- Fills the user list's width as a column; capped so under Diablo II's full-width dock it stays a button, not a bar. -->
+            <Button Content="{Binding ConnectButtonText}" Command="{Binding ConnectCommand}" IsVisible="{Binding CanConnect}"
+                    HorizontalAlignment="Stretch" MaxWidth="260" HorizontalContentAlignment="Center" ToolTip.Tip="{Binding ConnectButtonTip}" />
+            <StackPanel Orientation="Horizontal" Spacing="6" Margin="4,0" VerticalAlignment="Center" IsVisible="{Binding !CanConnect}">
+                <Ellipse Width="8" Height="8" Fill="{Binding StatusDotBrush}" VerticalAlignment="Center" />
+                <TextBlock Text="{Binding StatusText}" FontSize="12" Opacity="0.85" VerticalAlignment="Center" />
+            </StackPanel>
+        </Panel>
+        </Grid>
 
         <!-- Input. Row 3 by default; a framed or docked theme lifts it to row 2 directly under the
              chat, with the frame's divider above it (hence the framed top margin), and a theme
