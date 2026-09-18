@@ -120,6 +120,30 @@ public class ThemeLibraryTests : IDisposable
         Assert.Contains(ThemeLibrary.All(), t => t.Id == theme.Id);
     }
 
+    [Theory]
+    [InlineData(0xF0F0F0)]
+    [InlineData(null)]
+    public void Lettering_RoundTrips_AndStaysUnsetWhenATheme_NeverHadOne(int? lettering)
+    {
+        var theme = ThemeLibrary.Duplicate(ThemeLibrary.Resolve(ThemeLibrary.StarCraftId), "Lettered");
+        theme.Materials.Lettering = lettering;
+
+        ThemeLibrary.Save(theme);
+        ThemeLibrary.ResetCacheForTests();
+
+        // Unset has to survive a save as unset, not become black (0): themes saved before Lettering
+        // existed have no such field, and they must keep drawing it in their accent color.
+        Assert.Equal(lettering, ThemeLibrary.Resolve(theme.Id).Materials.Lettering);
+    }
+
+    [Fact]
+    public void OnlyWarcraftIII_SetsItsOwnLettering()
+    {
+        Assert.Equal(0xFFFFFF, ThemeLibrary.Resolve(ThemeLibrary.WarcraftIIIId).Materials.Lettering);
+        Assert.All(ThemeLibrary.All().Where(t => t.IsBuiltIn && t.Id != ThemeLibrary.WarcraftIIIId),
+            t => Assert.Null(t.Materials.Lettering));
+    }
+
     [Fact]
     public void BuiltIns_CantBeSavedOverOrDeleted()
     {

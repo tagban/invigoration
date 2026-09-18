@@ -88,7 +88,7 @@ public static class ThemeLibrary
         },
         // Warcraft III: warm oak planks with dark metal accents — the app icon's wood (its grain is
         // the frame's overlay, Assets/Themes/wood-grain.png), blackened-iron trim and hardware, and
-        // a muted gold for lettering. Was a near-black walnut, which hid the grain.
+        // white lettering on its plates. Was a near-black walnut, which hid the grain.
         new()
         {
             Id = WarcraftIIIId,
@@ -98,7 +98,7 @@ public static class ThemeLibrary
             Layout = ThemeLayout.Standard,
             ColorScheme = ChatColorScheme.Warcraft,
             HeaderFont = "Palatino,Palatino Linotype,Book Antiqua,Georgia",
-            Materials = new() { Band = 0x8A5E38, BandShade = 0x4A2E19, Trim = 0x5C5751, TrimShade = 0x1F1D1B, Metal = 0x4A4C50, Accent = 0xD9BE7C, Well = 0x0A0705 },
+            Materials = new() { Lettering = 0xFFFFFF, Band = 0x8A5E38, BandShade = 0x4A2E19, Trim = 0x5C5751, TrimShade = 0x1F1D1B, Metal = 0x4A4C50, Accent = 0xD9BE7C, Well = 0x0A0705 },
         },
     ];
 

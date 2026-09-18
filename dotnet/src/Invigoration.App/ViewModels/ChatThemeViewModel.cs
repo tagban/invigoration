@@ -41,8 +41,14 @@ public sealed partial class ChatThemeViewModel : ObservableObject
 
         BandBrush = Gradient(new RelativePoint(0, 0, RelativeUnit.Relative), new RelativePoint(1, 1, RelativeUnit.Relative),
             band, Mix(band, bandShade, 0.55), bandShade);
-        CapBrush = Gradient(new RelativePoint(0, 0, RelativeUnit.Relative), new RelativePoint(1, 1, RelativeUnit.Relative),
-            Mix(band, Colors.White, 0.22), Mix(band, bandShade, 0.5), Mix(bandShade, Colors.Black, 0.15));
+        // Plates — the name sign and the Send button's face. Warcraft III's are cut from darker
+        // boards than its frame, so white lettering stands out on them; every other design lifts
+        // its plates a little lighter than the band instead.
+        CapBrush = theme.Frame == ThemeFrameStyle.Warcraft
+            ? Gradient(new RelativePoint(0, 0, RelativeUnit.Relative), new RelativePoint(1, 1, RelativeUnit.Relative),
+                Mix(band, bandShade, 0.3), Mix(band, bandShade, 0.72), Mix(bandShade, Colors.Black, 0.35))
+            : Gradient(new RelativePoint(0, 0, RelativeUnit.Relative), new RelativePoint(1, 1, RelativeUnit.Relative),
+                Mix(band, Colors.White, 0.22), Mix(band, bandShade, 0.5), Mix(bandShade, Colors.Black, 0.15));
         TrimBrush = Gradient(new RelativePoint(0, 0, RelativeUnit.Relative), new RelativePoint(0, 1, RelativeUnit.Relative),
             Mix(trim, Colors.White, 0.35), trim, trimShade);
         TrimSolidBrush = new SolidColorBrush(trim);
@@ -62,6 +68,7 @@ public sealed partial class ChatThemeViewModel : ObservableObject
             },
         };
         AccentBrush = new SolidColorBrush(accent);
+        LetteringBrush = new SolidColorBrush(m.Lettering is { } lettering ? ToColor(lettering) : accent);
         AccentGlowBrush = new SolidColorBrush(Color.FromArgb(0xA0, accent.R, accent.G, accent.B));
         WellBrush = new SolidColorBrush(ToColor(m.Well));
         HeaderFontFamily = string.IsNullOrWhiteSpace(theme.HeaderFont) ? FontFamily.Default : new FontFamily(theme.HeaderFont);
@@ -109,6 +116,9 @@ public sealed partial class ChatThemeViewModel : ObservableObject
     public IBrush StudBrush { get; }
 
     public IBrush AccentBrush { get; }
+
+    /// <summary>The channel name on the plate and the Send label — ThemeMaterials.Lettering, or the accent when a theme doesn't set one.</summary>
+    public IBrush LetteringBrush { get; }
 
     public IBrush AccentGlowBrush { get; }
 

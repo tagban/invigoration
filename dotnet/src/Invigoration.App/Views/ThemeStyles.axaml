@@ -3,7 +3,7 @@
         xmlns:vm="using:Invigoration.App.ViewModels">
 
     <!-- A themed input row: the text box becomes a well in the theme's own color with a trim-colored
-         rim, the Send button a plate from the theme's frame materials with its accent-colored label
+         rim, the Send button a plate from the theme's frame materials with its label in the theme's lettering color
          in the theme's header font, and the chat gem sits in a trim-rimmed socket. Applied through
          the "themed" and "themegem" classes, only while the theme has a frame. Shared by BotTabView
          and the theme manager's preview; both DataContexts implement IThemedSurface.
@@ -47,7 +47,7 @@
         <Setter Property="Padding" Value="16,5" />
         <Setter Property="Background" Value="{Binding Theme.CapBrush}" />
         <Setter Property="BorderBrush" Value="{Binding Theme.TrimBrush}" />
-        <Setter Property="Foreground" Value="{Binding Theme.AccentBrush}" />
+        <Setter Property="Foreground" Value="{Binding Theme.LetteringBrush}" />
     </Style>
     <Style Selector="Button.themed:pointerover" x:DataType="vm:IThemedSurface">
         <Setter Property="Background" Value="{Binding Theme.BandBrush}" />

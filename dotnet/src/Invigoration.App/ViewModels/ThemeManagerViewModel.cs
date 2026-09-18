@@ -164,7 +164,8 @@ public sealed partial class ThemeManagerViewModel : ObservableObject, IThemedSur
             TrimShade = MaterialSlots[3].Packed,
             Metal = MaterialSlots[4].Packed,
             Accent = MaterialSlots[5].Packed,
-            Well = MaterialSlots[6].Packed,
+            Lettering = MaterialSlots[6].Packed,
+            Well = MaterialSlots[7].Packed,
         },
     };
 
@@ -229,7 +230,8 @@ public sealed partial class ThemeManagerViewModel : ObservableObject, IThemedSur
             MaterialSlots.Add(new("Trim", "Inlay and edges, lit", ToColor(m.Trim), EditorChanged));
             MaterialSlots.Add(new("Trim shadow", "Inlay and edges, shadowed", ToColor(m.TrimShade), EditorChanged));
             MaterialSlots.Add(new("Hardware", "Rivets, bolts and brackets", ToColor(m.Metal), EditorChanged));
-            MaterialSlots.Add(new("Accent", "Channel name, Send label, glow", ToColor(m.Accent), EditorChanged));
+            MaterialSlots.Add(new("Accent", "Glow, caret and edges", ToColor(m.Accent), EditorChanged));
+            MaterialSlots.Add(new("Lettering", "Channel name and Send label", ToColor(m.Lettering ?? m.Accent), EditorChanged));
             MaterialSlots.Add(new("Text box", "Behind what you type", ToColor(m.Well), EditorChanged));
         }
         finally

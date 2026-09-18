@@ -34,8 +34,8 @@ public enum ThemeLayout
 
 /// <summary>
 /// The colors a theme's frame is built from, each a packed 0xRRGGBB like CustomChatPalette. Every
-/// frame design draws from the same seven roles, so any design can be recolored in the theme
-/// manager without knowing its shapes.
+/// frame design draws from the same roles, so any design can be recolored in the theme
+/// manager without knowing its shapes. (Lettering is optional; see its remarks.)
 /// </summary>
 public sealed class ThemeMaterials
 {
@@ -54,8 +54,15 @@ public sealed class ThemeMaterials
     /// <summary>Hardware: rivets, bolts, studs and brackets.</summary>
     public int Metal { get; set; }
 
-    /// <summary>The channel name, Send label, and anything that glows.</summary>
+    /// <summary>Anything that glows: the text caret, focus and hover edges, inlay lines.</summary>
     public int Accent { get; set; }
+
+    /// <summary>
+    /// The channel name on the frame's name plate and the Send button's label. Unset means the
+    /// Accent color — what both used before they got a color of their own — so themes saved
+    /// earlier look exactly as they did.
+    /// </summary>
+    public int? Lettering { get; set; }
 
     /// <summary>The text box's background.</summary>
     public int Well { get; set; }

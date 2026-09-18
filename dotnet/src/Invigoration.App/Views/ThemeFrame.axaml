@@ -214,7 +214,7 @@
                 <Path Grid.Column="0" Data="M 14,0.5 L 0.5,12 L 14,23.5" Stroke="{Binding TrimBrush}" StrokeThickness="1" />
                 <Border Grid.Column="1" Background="{Binding CapBrush}" BorderBrush="{Binding TrimBrush}"
                         BorderThickness="0,1" Padding="16,0" MinWidth="150">
-                    <TextBlock Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                    <TextBlock Text="{Binding ChannelName}" Foreground="{Binding LetteringBrush}" FontFamily="{Binding HeaderFontFamily}"
                                FontSize="13" FontWeight="Bold" LetterSpacing="1"
                                HorizontalAlignment="Center" VerticalAlignment="Center" />
                 </Border>
@@ -272,7 +272,7 @@
                         BorderThickness="0,0,0,1" Padding="10,0" MinWidth="150">
                     <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center" VerticalAlignment="Center">
                         <ContentControl Classes="led" VerticalAlignment="Center" />
-                        <TextBlock Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                        <TextBlock Text="{Binding ChannelName}" Foreground="{Binding LetteringBrush}" FontFamily="{Binding HeaderFontFamily}"
                                    FontSize="12" FontWeight="Bold" LetterSpacing="1.5" VerticalAlignment="Center" />
                         <ContentControl Classes="led" VerticalAlignment="Center" />
                     </StackPanel>
@@ -321,7 +321,7 @@
                         <Panel Grid.Column="1" Margin="12,0" HorizontalAlignment="Center" VerticalAlignment="Center">
                             <TextBlock Text="{Binding ChannelName}" Foreground="#000000" FontFamily="{Binding HeaderFontFamily}"
                                        FontSize="13" FontWeight="Bold" Margin="1,1,0,0" />
-                            <TextBlock Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                            <TextBlock Text="{Binding ChannelName}" Foreground="{Binding LetteringBrush}" FontFamily="{Binding HeaderFontFamily}"
                                        FontSize="13" FontWeight="Bold" Margin="0,0,1,1" />
                         </Panel>
                         <ContentControl Grid.Column="2" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
@@ -366,7 +366,7 @@
                     <Border Margin="2" BorderBrush="{Binding TrimBrush}" BorderThickness="1" CornerRadius="1" />
                     <Grid ColumnDefinitions="Auto,*,Auto" Margin="7,0">
                         <ContentControl Grid.Column="0" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
-                        <TextBlock Grid.Column="1" Text="{Binding ChannelName}" Foreground="{Binding AccentBrush}" FontFamily="{Binding HeaderFontFamily}"
+                        <TextBlock Grid.Column="1" Text="{Binding ChannelName}" Foreground="{Binding LetteringBrush}" FontFamily="{Binding HeaderFontFamily}"
                                    FontSize="13" FontWeight="Bold" LetterSpacing="0.5" Margin="12,0"
                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
                         <ContentControl Grid.Column="2" Classes="stud" Width="6" Height="6" VerticalAlignment="Center" />
