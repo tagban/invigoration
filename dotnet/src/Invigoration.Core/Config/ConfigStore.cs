@@ -24,8 +24,21 @@ public sealed class ConfigStore
         FilePath = filePath ?? Path.Combine(DefaultConfigDirectory(), "bots.json");
     }
 
+    /// <summary>
+    /// When set, every store keeps its files here instead of the real per-user folder. Only the
+    /// test assembly sets it (TestConfigDirectory, before any test runs): several stores are shared
+    /// static files, and tests that used them against the real folder left over a thousand junk
+    /// entries in a real user's protocol-users.json and recent-messages.json.
+    /// </summary>
+    public static string? DirectoryOverride { get; set; }
+
     public static string DefaultConfigDirectory()
     {
+        if (DirectoryOverride is { } overridden)
+        {
+            return overridden;
+        }
+
         var appData = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
         return Path.Combine(appData, "Invigoration");
     }
