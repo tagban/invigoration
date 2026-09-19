@@ -265,9 +265,10 @@ public partial class ConfigViewModel : ObservableObject
     [ObservableProperty]
     public partial LibrarySchemeOption? SelectedLibraryScheme { get; set; }
 
-    private const string DefaultIconSetLabel = "Default (bundled icons)";
+    /// <summary>Config.IconSetName "": no set of the bot's own, so it keeps whichever is showing.</summary>
+    private const string DefaultIconSetLabel = "No preference (keep whichever is showing)";
 
-    /// <summary>Which saved IconSetStore set this bot uses — DefaultIconSetLabel (maps to Config.IconSetName = "") plus every set editable/creatable from "Manage Icons..." under the Customize menu.</summary>
+    /// <summary>Which icon set this bot uses: DefaultIconSetLabel, then the bundled sets and every saved one (IconSets.All), the same list as the Bot menu's Icon Set.</summary>
     public ObservableCollection<string> AvailableIconSets { get; } = [];
 
     [ObservableProperty]
@@ -418,7 +419,7 @@ public partial class ConfigViewModel : ObservableObject
         var selected = IconSetName;
         AvailableIconSets.Clear();
         AvailableIconSets.Add(DefaultIconSetLabel);
-        foreach (var name in IconSetStore.ListSets())
+        foreach (var name in IconSets.All())
         {
             AvailableIconSets.Add(name);
         }

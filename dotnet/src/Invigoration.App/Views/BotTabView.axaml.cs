@@ -280,6 +280,19 @@ public partial class BotTabView : UserControl
         {
             classicIconStyleItem.IsChecked = vm.Config.ClassicUserIconStyle;
         }
+
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "UserIconSetMenu") is { } iconSetMenu
+            && this.FindAncestorOfType<Window>()?.DataContext is MainWindowViewModel mainVm)
+        {
+            iconSetMenu.Items.Clear();
+            var current = MainWindowViewModel.IconSetNameFor(vm);
+            foreach (var name in mainVm.IconSetNames)
+            {
+                var item = new MenuItem { Header = name.Replace("_", "__"), ToggleType = MenuItemToggleType.Radio, GroupName = "UserIconSet", IsChecked = name == current };
+                item.Click += (_, _) => mainVm.UseIconSet(vm, name);
+                iconSetMenu.Items.Add(item);
+            }
+        }
     }
 
     private void OnToggleClassicIconStyleClick(object? sender, RoutedEventArgs e)

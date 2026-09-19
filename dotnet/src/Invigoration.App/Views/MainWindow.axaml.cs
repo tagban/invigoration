@@ -49,6 +49,7 @@ public partial class MainWindow : Window
                 }
 
                 vm.PropertyChanged += OnViewModelPropertyChanged;
+                RebuildIconSetMenus();
 
                 // A Hotline "Send Private Message..." opens the thread and asks to be shown.
                 // Selecting it is all that's needed — OnViewModelPropertyChanged already switches
@@ -119,6 +120,11 @@ public partial class MainWindow : Window
     /// </summary>
     private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
+        if (e.PropertyName is nameof(MainWindowViewModel.SelectedBotIconSetName) or nameof(MainWindowViewModel.IconSetNames))
+        {
+            RebuildIconSetMenus();
+        }
+
         if (ViewModel is not { } vm || this.FindControl<TabStrip>("TopLevelTabControl") is not { } tabControl)
         {
             return;
@@ -135,6 +141,87 @@ public partial class MainWindow : Window
     }
 
     private MainWindowViewModel? ViewModel => DataContext as MainWindowViewModel;
+
+    /// <summary>
+    /// Bot → Icon Set, in both menus: every set, the selected bot's ticked, then Manage Icons.
+    /// Built here rather than in XAML because saved sets come and go, and rebuilt whenever the list
+    /// or the tick changes; the macOS menu never moves a tick by itself.
+    /// </summary>
+    private void RebuildIconSetMenus()
+    {
+        if (ViewModel is not { } vm)
+        {
+            return;
+        }
+
+        var names = vm.IconSetNames;
+        var current = vm.SelectedBotIconSetName;
+        var built = string.Join("\n", names.Prepend(current));
+        if (built == _iconSetMenusBuiltFor)
+        {
+            return;
+        }
+
+        _iconSetMenusBuiltFor = built;
+
+        if (FindNativeMenuItem(NativeMenu.GetMenu(this), "Icon Set")?.Menu is { } nativeMenu)
+        {
+            nativeMenu.Items.Clear();
+            foreach (var name in names)
+            {
+                var item = new NativeMenuItem { Header = name.Replace("_", "__"), ToggleType = MenuItemToggleType.Radio, IsChecked = name == current };
+                item.Click += (_, _) => UseIconSetForSelectedBot(name);
+                nativeMenu.Items.Add(item);
+            }
+
+            nativeMenu.Items.Add(new NativeMenuItemSeparator());
+            var manage = new NativeMenuItem { Header = "Manage Icons..." };
+            manage.Click += OnManageIconsNativeClick;
+            nativeMenu.Items.Add(manage);
+        }
+
+        IconSetMenu.Items.Clear();
+        foreach (var name in names)
+        {
+            var item = new MenuItem { Header = name.Replace("_", "__"), ToggleType = MenuItemToggleType.Radio, GroupName = "IconSet", IsChecked = name == current };
+            item.Click += (_, _) => UseIconSetForSelectedBot(name);
+            IconSetMenu.Items.Add(item);
+        }
+
+        IconSetMenu.Items.Add(new Separator());
+        var manageItem = new MenuItem { Header = "Manage _Icons..." };
+        manageItem.Click += OnManageIconsClick;
+        IconSetMenu.Items.Add(manageItem);
+    }
+
+    /// <summary>The list and tick the Icon Set menus were last built for, so the frequent "look again" from the Bot menu only rebuilds them when something they show has changed.</summary>
+    private string? _iconSetMenusBuiltFor;
+
+    private void UseIconSetForSelectedBot(string name)
+    {
+        if (ViewModel is { SelectedBot: { } bot } vm)
+        {
+            vm.UseIconSet(bot, name);
+        }
+    }
+
+    private static NativeMenuItem? FindNativeMenuItem(NativeMenu? menu, string header)
+    {
+        foreach (var item in menu?.Items.OfType<NativeMenuItem>() ?? [])
+        {
+            if (item.Header == header)
+            {
+                return item;
+            }
+
+            if (FindNativeMenuItem(item.Menu, header) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
 
     /// <summary>Keeps MainWindowViewModel.SelectedBot in sync with whichever tab is actually showing — TabControl.SelectedItem can't bind directly to it two-way any more since TopLevelTabs is a mixed BotTabViewModel/GlobalWhispersTabViewModel collection; selecting the Whispers tab leaves SelectedBot as whatever bot was last actually selected, which is a reasonable "last bot you were looking at" fallback for the Bot menu (which names that bot at the top so it's never a guess). Also feeds SetActiveTopLevelItem, which drives every bot's IsActive/HasUnread state (see RecomputeActiveBot).</summary>
     private void OnTopLevelTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -245,6 +332,7 @@ public partial class MainWindow : Window
         if (result is not null)
         {
             selected.ApplyConfig(result);
+            Models.IconSets.ApplyIfNotShowing(selected.Config.IconSetName);
             vm.RefreshTopLevelTabs();
             vm.SaveAll();
             if (selected.Theme.UsesCharacterDock)

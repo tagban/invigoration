@@ -59,6 +59,15 @@
                                 </NativeMenu>
                             </NativeMenuItem.Menu>
                         </NativeMenuItem>
+                        <!-- Filled in code (MainWindow.RebuildIconSetMenus): the sets change as they're saved and deleted. -->
+                        <NativeMenuItem Header="Icon Set" IsEnabled="{Binding HasSelectedBot}">
+                            <NativeMenuItem.Menu>
+                                <NativeMenu />
+                            </NativeMenuItem.Menu>
+                        </NativeMenuItem>
+                        <NativeMenuItem Header="Show Icons in Chat" ToggleType="CheckBox"
+                                        IsChecked="{Binding SelectedBotShowsUserIconsInChat, Mode=OneWay}"
+                                        Command="{Binding ToggleSelectedBotUserIconsInChatCommand}" />
                         <NativeMenuItem Header="Debug Logging" ToggleType="CheckBox"
                                         IsChecked="{Binding SelectedBotDebugMode, Mode=OneWay}"
                                         Command="{Binding ToggleSelectedBotDebugModeCommand}" />
@@ -141,6 +150,10 @@
                               IsChecked="{Binding SelectedBotHidesAllJoinLeave, Mode=OneWay}"
                               Command="{Binding HideAllJoinLeaveCommand}" />
                 </MenuItem>
+                <MenuItem x:Name="IconSetMenu" Header="_Icon Set" IsEnabled="{Binding HasSelectedBot}" />
+                <MenuItem Header="_Show Icons in Chat" ToggleType="CheckBox"
+                          IsChecked="{Binding SelectedBotShowsUserIconsInChat, Mode=OneWay}"
+                          Command="{Binding ToggleSelectedBotUserIconsInChatCommand}" />
                 <MenuItem Header="Debug _Logging" ToggleType="CheckBox"
                           IsChecked="{Binding SelectedBotDebugMode, Mode=OneWay}"
                           Command="{Binding ToggleSelectedBotDebugModeCommand}" />

@@ -96,7 +96,7 @@
 
                 <TextBlock Classes="step" Text="Icons" />
                 <ComboBox ItemsSource="{Binding AvailableIconSets}" SelectedItem="{Binding IconSetName}" HorizontalAlignment="Stretch" />
-                <TextBlock Classes="hint" Text="Create or edit icon sets in Customize → Manage Icons." />
+                <TextBlock Classes="hint" Text="Also under Bot → Icon Set, and a right-click on the user list. Create or edit sets in Customize → Manage Icons." />
                 <CheckBox Content="Show game icons next to names in chat" IsChecked="{Binding Config.ShowUserIconsInChat}" Margin="0,4,0,0" />
 
                 <TextBlock Classes="step" Text="Tab" />

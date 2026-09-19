@@ -272,6 +272,8 @@
                                         <MenuItem Name="ClassicIconStyleMenuItem" Header="Classic Icon Style"
                                                   ToggleType="CheckBox" Click="OnToggleClassicIconStyleClick"
                                                   ToolTip.Tip="When on, a moderator/Blizzard Rep/etc.'s rank badge replaces their game icon (real classic Battle.net behavior) instead of showing both side by side." />
+                                        <!-- Filled when the menu opens (OnUserContextMenuOpened), same list as the Bot menu's. -->
+                                        <MenuItem Name="UserIconSetMenu" Header="Icon Set" />
                                     </ContextMenu>
                                 </Panel.ContextMenu>
                             <!-- Character dock tile, Diablo II lobby style: a full-body figure standing on

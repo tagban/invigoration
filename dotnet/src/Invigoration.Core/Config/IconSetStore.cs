@@ -15,6 +15,66 @@ public static class IconSetStore
     /// <summary>Raised whenever a set is saved or deleted, so a UI can refresh its list.</summary>
     public static event Action? SetsChanged;
 
+    /// <summary>Raised when <see cref="ActiveSetName"/> changes, so a menu can move its tick.</summary>
+    public static event Action? ActiveSetChanged;
+
+    private static string ActiveSetFilePath => Path.Combine(ConfigStore.DefaultConfigDirectory(), "icon-set.txt");
+
+    /// <summary>
+    /// The set last applied, bundled or saved, or "" when none has been (or every icon was reset).
+    /// Remembered across restarts in icon-set.txt, so a bot with no set of its own can show which
+    /// one it's getting, and switching to a bot whose set is already showing copies nothing.
+    /// </summary>
+    public static string ActiveSetName
+    {
+        get
+        {
+            lock (ActiveSetLock)
+            {
+                return _activeSetName ??= LoadActiveSetName();
+            }
+        }
+        set
+        {
+            var name = value.Trim();
+            lock (ActiveSetLock)
+            {
+                if (name == (_activeSetName ??= LoadActiveSetName()))
+                {
+                    return;
+                }
+
+                _activeSetName = name;
+                try
+                {
+                    System.IO.Directory.CreateDirectory(Path.GetDirectoryName(ActiveSetFilePath)!);
+                    File.WriteAllText(ActiveSetFilePath, name);
+                }
+                catch (IOException)
+                {
+                    // Best-effort: at worst, after a restart, a switch copies in a set that was already showing.
+                }
+            }
+
+            ActiveSetChanged?.Invoke();
+        }
+    }
+
+    private static readonly Lock ActiveSetLock = new();
+    private static string? _activeSetName;
+
+    private static string LoadActiveSetName()
+    {
+        try
+        {
+            return File.Exists(ActiveSetFilePath) ? File.ReadAllText(ActiveSetFilePath).Trim() : "";
+        }
+        catch (IOException)
+        {
+            return "";
+        }
+    }
+
     public static IReadOnlyList<string> ListSets()
     {
         if (!System.IO.Directory.Exists(Directory))
@@ -77,6 +137,8 @@ public static class IconSetStore
             File.Copy(file, Path.Combine(IconOverrideStore.Directory, fileName), overwrite: true);
             IconOverrideStore.NotifyOverrideChanged(Path.GetFileNameWithoutExtension(fileName));
         }
+
+        ActiveSetName = name.Trim();
     }
 
     public static void DeleteSet(string name)

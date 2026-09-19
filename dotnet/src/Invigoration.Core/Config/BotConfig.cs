@@ -335,13 +335,12 @@ public sealed class BotConfig
     public bool NegPing { get; set; }
 
     /// <summary>
-    /// Which saved <see cref="Config.IconSetStore"/> set this bot's icons come
-    /// from — "" means the bundled defaults (plus any global overrides set
-    /// via the old single-active-set model). Applied by swapping in that
-    /// set's files as the active <see cref="IconOverrideStore"/> overrides
-    /// whenever this bot's tab becomes selected (see MainWindowViewModel);
-    /// icon lookup itself has no per-bot concept, it's whichever set was
-    /// last swapped in.
+    /// Which icon set this bot's icons come from: one bundled with the app ("Battle.net 1.0
+    /// Classic", "Warcraft III Classic", "Battle.net 2.0") or one saved in
+    /// <see cref="Config.IconSetStore"/>. "" means none of its own, so it keeps whichever set is
+    /// showing. Applied as the <see cref="IconOverrideStore"/> overrides whenever this bot's tab
+    /// becomes selected (see MainWindowViewModel); icon lookup itself has no per-bot concept, it's
+    /// whichever set was last applied.
     /// </summary>
     public string IconSetName { get; set; } = "";
 

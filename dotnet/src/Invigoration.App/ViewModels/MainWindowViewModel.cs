@@ -52,20 +52,16 @@ public partial class MainWindowViewModel : ViewModelBase
     partial void OnSelectedGlobalWhisperThreadChanged(WhisperThreadViewModel? value) => value?.MarkRead();
 
     /// <summary>
-    /// Icon lookup has no per-bot concept — IconOverrideStore is one shared
-    /// folder, and IconSetStore.ApplySet swaps its contents wholesale. Since
-    /// each bot can now name its own preferred set (BotConfig.IconSetName),
-    /// the closest approximation to "per-bot" without threading a set name
-    /// through every icon lookup call site is re-applying the newly-selected
-    /// bot's set whenever the tab selection changes — icons are then correct
-    /// for whichever bot you're actually looking at, even though two tabs
-    /// can't render different sets *simultaneously*.
+    /// Icon lookup has no per-bot concept: there's one set of icon overrides, and applying a set
+    /// replaces them. So a bot's own set (BotConfig.IconSetName) is applied whenever its tab is
+    /// selected, which keeps the icons right for the bot you're looking at, though two tabs can't
+    /// show different sets at once. A bot with no set of its own keeps whatever is showing.
     /// </summary>
     partial void OnSelectedBotChanged(BotTabViewModel? value)
     {
-        if (!string.IsNullOrEmpty(value?.Config.IconSetName))
+        if (value is not null)
         {
-            IconSetStore.ApplySet(value.Config.IconSetName);
+            IconSets.ApplyIfNotShowing(value.Config.IconSetName);
         }
     }
 
@@ -104,6 +100,30 @@ public partial class MainWindowViewModel : ViewModelBase
 
     public bool SelectedBotHidesAllJoinLeave => SelectedBot?.Config.JoinLeaveDisplay == JoinLeaveDisplay.HideAll;
 
+    public bool SelectedBotShowsUserIconsInChat => SelectedBot?.Config.ShowUserIconsInChat == true;
+
+    /// <summary>What the Bot menu's Icon Set list offers: the bundled sets, then any saved ones.</summary>
+    public IReadOnlyList<string> IconSetNames => IconSets.All();
+
+    /// <summary>The set the Icon Set lists tick for the selected bot: its own, or with none of its own, whichever is showing.</summary>
+    public string SelectedBotIconSetName => IconSetNameFor(SelectedBot);
+
+    public static string IconSetNameFor(BotTabViewModel? bot) =>
+        bot is { Config.IconSetName: { Length: > 0 } name } ? name : IconSetStore.ActiveSetName;
+
+    /// <summary>
+    /// Gives <paramref name="bot"/> its own icon set and shows it, from the Bot menu or the Users
+    /// list's right-click. Saved straight away. Picking the set already showing changes nothing, so
+    /// an icon changed by hand in Manage Icons since isn't lost.
+    /// </summary>
+    public void UseIconSet(BotTabViewModel bot, string name)
+    {
+        bot.Config.IconSetName = name;
+        SaveAll();
+        IconSets.ApplyIfNotShowing(name);
+        RefreshBotMenu();
+    }
+
     private void OnSelectedBotPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(BotTabViewModel.CanConnect) or nameof(BotTabViewModel.CanDisconnect)
@@ -121,12 +141,16 @@ public partial class MainWindowViewModel : ViewModelBase
         OnPropertyChanged(nameof(SelectedBotShowsAllJoinLeave));
         OnPropertyChanged(nameof(SelectedBotHidesJoinLeaveSpam));
         OnPropertyChanged(nameof(SelectedBotHidesAllJoinLeave));
+        OnPropertyChanged(nameof(SelectedBotShowsUserIconsInChat));
+        OnPropertyChanged(nameof(SelectedBotIconSetName));
+        OnPropertyChanged(nameof(IconSetNames));
         ConnectSelectedBotCommand.NotifyCanExecuteChanged();
         DisconnectSelectedBotCommand.NotifyCanExecuteChanged();
         ToggleSelectedBotDebugModeCommand.NotifyCanExecuteChanged();
         ShowAllJoinLeaveCommand.NotifyCanExecuteChanged();
         HideJoinLeaveSpamCommand.NotifyCanExecuteChanged();
         HideAllJoinLeaveCommand.NotifyCanExecuteChanged();
+        ToggleSelectedBotUserIconsInChatCommand.NotifyCanExecuteChanged();
     }
 
     // AllowConcurrentExecutions: one command serves every bot, so without it a connect still
@@ -173,6 +197,20 @@ public partial class MainWindowViewModel : ViewModelBase
         }
 
         bot.Config.JoinLeaveDisplay = display;
+        SaveAll();
+        RefreshBotMenu();
+    }
+
+    /// <summary>Game icons beside names in chat. Lines from here on get them (or don't); ones already in the log stay as they are.</summary>
+    [RelayCommand(CanExecute = nameof(HasSelectedBot))]
+    private void ToggleSelectedBotUserIconsInChat()
+    {
+        if (SelectedBot is not { } bot)
+        {
+            return;
+        }
+
+        bot.Config.ShowUserIconsInChat = !bot.Config.ShowUserIconsInChat;
         SaveAll();
         RefreshBotMenu();
     }
@@ -302,6 +340,10 @@ public partial class MainWindowViewModel : ViewModelBase
         IsMusicEnabled = MusicSettingsStore.IsEnabled;
         IsMusicBarEnabled = MusicSettingsStore.ShowBottomBar;
         IsUpdateCheckEnabled = UpdateSettingsStore.CheckForUpdates;
+
+        // A set saved, deleted or applied (Manage Icons included) changes what the Icon Set lists show and tick.
+        IconSetStore.SetsChanged += RefreshBotMenu;
+        IconSetStore.ActiveSetChanged += RefreshBotMenu;
 
         foreach (var config in _store.Load())
         {

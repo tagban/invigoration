@@ -8,7 +8,7 @@ namespace Invigoration.App.Models;
 /// Loads and caches the chat icons: a user override from
 /// <see cref="IconOverrideStore"/> if one exists for the key, otherwise the
 /// bundled default under Assets/GameIcons. As of 2026-08-24 that default is the
-/// "Battle.net 2.0" icon set (see IconManagerViewModel.Bnet2Set) for every key
+/// "Battle.net 2.0" icon set (see IconSets.Bnet2Set) for every key
 /// it covers — modern account.battle.net game icons plus Warcraft III Classic's
 /// status badges (green-glow moderator gavel included) — "to keep it fresh," per
 /// explicit request, rather than the classic 28x14 look. "chat" is the one
