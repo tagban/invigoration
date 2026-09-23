@@ -93,10 +93,8 @@ public sealed partial class HotlineIconPickerViewModel : ObservableObject
 
     public async Task LoadAsync()
     {
-        var catalog = HotlineIconLoader.GetCatalogAsync();
-        var index = HotlineIconIndex.LoadAsync();
-        var ids = await catalog.ConfigureAwait(true);
-        _index = await index.ConfigureAwait(true);
+        _index = await HotlineIconIndex.LoadAsync().ConfigureAwait(true);
+        var ids = HotlineIconLoader.CatalogFrom(_index);
         _all = [.. ids.Select(id => new HotlineIconCellViewModel(id, _index.GetValueOrDefault(id)))];
         RebuildRows();
         StatusText = _all.Count == 0
@@ -211,8 +209,8 @@ public sealed partial class HotlineIconPickerViewModel : ObservableObject
 
             StatusText = $"Downloaded the icon pack — {count:N0} icons saved.";
             // Fresh cells, so any that had already come up empty read the newly saved files — from
-            // the catalog the pack just saved, so an icon taken off the site drops out of the list.
-            var ids = await HotlineIconLoader.GetCatalogAsync().ConfigureAwait(true);
+            // the current index, so an icon taken off the site drops out of the list.
+            var ids = HotlineIconLoader.CatalogFrom(_index);
             _all = [.. ids.Select(id => new HotlineIconCellViewModel(id, _index.GetValueOrDefault(id)))];
             RebuildRows();
             return true;

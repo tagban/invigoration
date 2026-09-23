@@ -1,5 +1,4 @@
 using System.IO.Compression;
-using System.Text.RegularExpressions;
 using Avalonia.Media;
 using Avalonia.Media.Imaging;
 using Invigoration.Core.Config;
@@ -14,7 +13,7 @@ namespace Invigoration.App.Models;
 /// user's own hlwiki.com icon archive (https://hlwiki.com/ik0ns/{iconId}.png, confirmed live) and
 /// cached to disk so the same icon number isn't re-downloaded every session.
 /// </summary>
-public static partial class HotlineIconLoader
+public static class HotlineIconLoader
 {
     /// <summary>hlwiki.com's own gallery of every icon it has — what the "ik0ns page" links open.</summary>
     public const string GalleryUrl = "https://hlwiki.com/ik0ns/";
@@ -312,52 +311,31 @@ public static partial class HotlineIconLoader
     public static bool IsCached(ushort iconId) => File.Exists(CachePath(iconId));
 
     /// <summary>
-    /// Every icon number hlwiki.com has art for, read off its gallery page. The numbers aren't
-    /// contiguous (thousands of gaps), so the picker can't just count upward. The list is kept on
-    /// disk and only re-read from the site when asked to, or when there's no saved copy yet.
+    /// Every icon number hlwiki.com has art for: the rows of its ik0ns.csv (see HotlineIconIndex),
+    /// which lists the whole archive minus anything taken down. The numbers aren't contiguous
+    /// (thousands of gaps), so the picker can't just count upward. Saved to disk each time, so
+    /// with the site unreachable the picker still has the last list it saw.
     /// </summary>
-    public static async Task<IReadOnlyList<ushort>> GetCatalogAsync(bool refresh = false, CancellationToken ct = default)
+    public static IReadOnlyList<ushort> CatalogFrom(IReadOnlyDictionary<ushort, HotlineIconInfo> index)
     {
-        if (!refresh && TryLoadCatalogFromDisk() is { Count: > 0 } saved)
+        if (index.Count == 0)
         {
-            return saved;
+            return TryLoadCatalogFromDisk() ?? [];
         }
 
+        var ids = index.Keys.Order().ToList();
         try
         {
-            var html = await Http.GetStringAsync(GalleryUrl, ct).ConfigureAwait(false);
-            var ids = ParseCatalog(html);
-            if (ids.Count > 0)
-            {
-                try
-                {
-                    Directory.CreateDirectory(CacheDirectory);
-                    await File.WriteAllLinesAsync(CatalogPath, ids.Select(id => id.ToString()), ct).ConfigureAwait(false);
-                }
-                catch (IOException)
-                {
-                    // Best-effort, same as the icon cache.
-                }
-
-                return ids;
-            }
+            Directory.CreateDirectory(CacheDirectory);
+            File.WriteAllLines(CatalogPath, ids.Select(id => id.ToString()));
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException)
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            // Fall back to whatever was saved before, if anything.
+            // Best-effort, same as the icon cache.
         }
 
-        return TryLoadCatalogFromDisk() ?? [];
+        return ids;
     }
-
-    /// <summary>The gallery page lists each icon as <c>&lt;img src="./NNN.png"&gt;</c>; anything outside a ushort (the page has a -1) isn't a usable icon number.</summary>
-    public static List<ushort> ParseCatalog(string html) =>
-        [.. GalleryImageRegex().Matches(html)
-            .Select(m => int.TryParse(m.Groups[1].Value, out var n) ? n : -1)
-            .Where(n => n is >= 0 and <= ushort.MaxValue)
-            .Select(n => (ushort)n)
-            .Distinct()
-            .Order()];
 
     private static List<ushort>? TryLoadCatalogFromDisk()
     {
@@ -372,7 +350,4 @@ public static partial class HotlineIconLoader
             return null;
         }
     }
-
-    [GeneratedRegex(@"src=""\./(-?\d+)\.png""")]
-    private static partial Regex GalleryImageRegex();
 }
