@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:vm="using:Invigoration.App.ViewModels"
+        mc:Ignorable="d" d:DesignWidth="1040" d:DesignHeight="640"
+        x:Class="Invigoration.App.Views.HotlineIconPickerWindow"
+        x:DataType="vm:HotlineIconPickerViewModel"
+        Width="1040" Height="640" MinWidth="600" MinHeight="300"
+        Title="Choose a Hotline Icon">
+
+    <Grid RowDefinitions="Auto,*,Auto" Margin="10">
+        <DockPanel Grid.Row="0" Margin="0,0,0,8">
+            <Button DockPanel.Dock="Right" Content="{Binding DownloadAllLabel}" Command="{Binding ToggleDownloadAllCommand}"
+                    Margin="8,0,0,0" ToolTip.Tip="Saves every icon locally (one zip when the site has it, otherwise a few at a time) so browsing is instant afterwards" />
+            <Button DockPanel.Dock="Right" Content="Open ik0ns page" Command="{Binding OpenGalleryCommand}" Margin="8,0,0,0" />
+            <TextBox Text="{Binding FilterText}" PlaceholderText="Filter by number (e.g. 41 shows 41, 410-419, 4100...)" />
+        </DockPanel>
+
+        <!-- Rows of cells, not one WrapPanel: only rows virtualize, and that's what keeps the
+             pictures loading as they scroll into view rather than all at once. Cells are wide
+             because some Hotline icons are wide banners (up to 232px). -->
+        <ListBox Grid.Row="1" ItemsSource="{Binding Rows}" Background="Transparent">
+            <ListBox.Styles>
+                <Style Selector="ListBoxItem">
+                    <Setter Property="Padding" Value="0" />
+                </Style>
+            </ListBox.Styles>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:HotlineIconRow">
+                    <ItemsControl ItemsSource="{Binding Cells}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="6" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:HotlineIconCellViewModel">
+                                <Button Width="244" Height="56" Padding="4" Margin="0,3"
+                                        HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                        Command="{Binding $parent[Window].((vm:HotlineIconPickerViewModel)DataContext).PickCommand}"
+                                        CommandParameter="{Binding}">
+                                    <StackPanel Spacing="2" HorizontalAlignment="Center">
+                                        <Image Source="{Binding Image}" MaxWidth="232" MaxHeight="32" Stretch="None" HorizontalAlignment="Center" />
+                                        <TextBlock Text="{Binding Id}" FontSize="10" Opacity="0.6" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <DockPanel Grid.Row="2" Margin="0,8,0,0">
+            <Button DockPanel.Dock="Right" Content="Cancel" Click="OnCancelClick" />
+            <TextBlock Text="{Binding StatusText}" VerticalAlignment="Center" Opacity="0.7" FontSize="12" />
+        </DockPanel>
+    </Grid>
+</Window>

@@ -26,7 +26,8 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
 {
     private readonly HotlineTabViewModel _parent;
     private readonly HotlineTransactionClient _client = new();
-    private readonly HotlineConnectOptions _options;
+    /// <summary>Not readonly: Apply in the header swaps in the new nickname/icon, so a reconnect logs back in as who you are now, not who you were at connect.</summary>
+    private HotlineConnectOptions _options;
 
     /// <summary>The Files tab for this server — created up front, but it doesn't ask the server anything until the tab is actually opened (see SelectedSectionIndex).</summary>
     public HotlineFilesViewModel Files { get; }
@@ -109,7 +110,76 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
     [ObservableProperty]
     public partial bool HasUnread { get; set; }
 
+    /// <summary>The header's Name box — what you'd like to be called. Nothing is sent until Apply.</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPendingIdentityChange))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyIdentityCommand))]
+    public partial string EditNickname { get; set; } = "";
+
+    /// <summary>The header's Icon box — a hlwiki.com icon number.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(HasPendingIdentityChange))]
+    [NotifyCanExecuteChangedFor(nameof(ApplyIdentityCommand))]
+    public partial int EditIconId { get; set; }
+
+    /// <summary>The icon for EditIconId, shown beside the name so you see what others will see before applying.</summary>
+    [ObservableProperty]
+    public partial Avalonia.Media.Imaging.Bitmap? EditIconPreview { get; set; }
+
+    /// <summary>Black or white, picked from the icon's brightness — the same rule the Users list uses.</summary>
+    [ObservableProperty]
+    public partial IBrush EditNameBrush { get; set; } = Brushes.Black;
+
+    public Avalonia.Thickness NameMargin { get; } = new(HotlineIconLoader.NameOffset, 0, 0, 0);
+
+    partial void OnEditIconIdChanged(int value) => _ = RefreshEditIconPreviewAsync(ClampIcon(value));
+
+    private async Task RefreshEditIconPreviewAsync(ushort iconId)
+    {
+        var bitmap = await HotlineIconLoader.GetAsync(iconId).ConfigureAwait(true);
+        // A slower fetch for an earlier number mustn't overwrite the one for what's typed now.
+        if (ClampIcon(EditIconId) == iconId)
+        {
+            EditIconPreview = bitmap;
+            EditNameBrush = HotlineIconLoader.NameBrushFor(iconId);
+        }
+    }
+
+    private static ushort ClampIcon(int value) => (ushort)Math.Clamp(value, 0, ushort.MaxValue);
+
+    public bool HasPendingIdentityChange =>
+        EditNickname.Trim() != _options.Nickname || ClampIcon(EditIconId) != _options.IconId;
+
+    private bool CanApplyIdentity() => IsConnected && EditNickname.Trim().Length > 0 && HasPendingIdentityChange;
+
+    /// <summary>
+    /// Sends the new nickname/icon to the server (SetClientUserInfo), remembers them for any
+    /// reconnect, and — for a session opened from a saved server — saves them to that profile too,
+    /// so the next connect starts as the same person.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanApplyIdentity))]
+    private async Task ApplyIdentityAsync()
+    {
+        var nickname = EditNickname.Trim();
+        var iconId = ClampIcon(EditIconId);
+        await _client.ChangeUserInfoAsync(nickname, iconId).ConfigureAwait(true);
+        _options = _options with { Nickname = nickname, IconId = iconId };
+        EditNickname = nickname;
+        OnPropertyChanged(nameof(HasPendingIdentityChange));
+        ApplyIdentityCommand.NotifyCanExecuteChanged();
+
+        if (_options.ProfileId is { } profileId && HotlineServerProfileStore.Find(profileId) is { } profile)
+        {
+            profile.Nickname = nickname;
+            profile.IconId = iconId;
+            HotlineServerProfileStore.Save();
+        }
+
+        AppendMessage($"* You are now \"{nickname}\" (icon {iconId}).");
+    }
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(ApplyIdentityCommand))]
     public partial bool IsConnected { get; set; }
 
     [ObservableProperty]
@@ -221,6 +291,8 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
         Host = options.Host;
         Port = options.Port;
         _hasExplicitDisplayName = !string.IsNullOrEmpty(options.DisplayName);
+        EditNickname = options.Nickname;
+        EditIconId = options.IconId;
         Title = options.DisplayName is { Length: > 0 } ? options.DisplayName : $"{options.Host}:{options.Port}";
         _client.AutoAcceptAgreement = options.AutoAcceptAgreement;
         _client.UseSecureLogin = options.UseSecureLogin;
@@ -619,8 +691,8 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
                     return true;
                 }
 
-                await _client.ChangeUserInfoAsync(rest).ConfigureAwait(true);
-                AppendMessage($"* Nickname changed to \"{rest}\".");
+                EditNickname = rest;
+                await ApplyIdentityAsync().ConfigureAwait(true);
                 return true;
 
             case "nowplaying":

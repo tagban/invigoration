@@ -37,12 +37,13 @@ public sealed partial class HotlineUserRowViewModel : ViewModelBase
     /// What the Users list row itself renders the name in — the highlight color if set, otherwise
     /// the same Admin/Default rank coloring the chat log already uses (see
     /// HotlineSessionViewModel.AppendColorizedLine) so an admin shows the same color in both
-    /// places; plain black for a non-admin (the panel's own light background assumes black as the
-    /// default, unlike the dark chat log's white default). Previously fell straight through to
-    /// black regardless of Admin status — a real bug, fixed per direct user report ("Usernames in
-    /// Hotline are red in chat for admins but not in the userlist and should be").
+    /// places. A plain name is black or white depending on how light the icon behind it is
+    /// (HotlineIconLoader.NameBrushFor) — black on the light panel, white over a dark banner.
+    /// Previously fell straight through to black regardless of Admin status — a real bug, fixed
+    /// per direct user report ("Usernames in Hotline are red in chat for admins but not in the
+    /// userlist and should be").
     /// </summary>
-    public IBrush DisplayBrush => HighlightBrush ?? (User.IsAdmin ? new SolidColorBrush(Color.Parse(_parent.Config.AdminColorHex)) : Brushes.Black);
+    public IBrush DisplayBrush => HighlightBrush ?? (User.IsAdmin ? new SolidColorBrush(Color.Parse(_parent.Config.AdminColorHex)) : HotlineIconLoader.NameBrushFor(User.IconId));
 
     /// <summary>Raised when this row's "Send Private Message" is picked, so the view can switch to the Whispers tab and focus the thread.</summary>
     public static event Action<WhisperThreadViewModel>? PrivateMessageRequested;
@@ -94,6 +95,10 @@ public sealed partial class HotlineUserRowViewModel : ViewModelBase
     private async Task LoadIconAsync()
     {
         var icon = await HotlineIconLoader.GetAsync(User.IconId).ConfigureAwait(true);
-        Dispatcher.UIThread.Post(() => Icon = icon);
+        Dispatcher.UIThread.Post(() =>
+        {
+            Icon = icon;
+            OnPropertyChanged(nameof(DisplayBrush));
+        });
     }
 }

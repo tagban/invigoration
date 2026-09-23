@@ -39,6 +39,20 @@ public partial class HotlineSessionView : UserControl
         };
     }
 
+    /// <summary>"Choose..." in the header — the picker window hands back an icon number, which only fills the Icon box; Apply is still what sends it.</summary>
+    private async void OnChooseIconClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is not HotlineSessionViewModel vm || TopLevel.GetTopLevel(this) is not Window owner)
+        {
+            return;
+        }
+
+        if (await new HotlineIconPickerWindow().ShowDialog<ushort?>(owner) is { } iconId)
+        {
+            vm.EditIconId = iconId;
+        }
+    }
+
     /// <summary>
     /// Downloads and uploads need the platform file pickers, which need a TopLevel — a view
     /// concern, so the Files view model asks through these callbacks rather than reaching for one
