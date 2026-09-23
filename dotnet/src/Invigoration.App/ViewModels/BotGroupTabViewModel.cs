@@ -61,4 +61,34 @@ public sealed partial class BotGroupTabViewModel : ViewModelBase
             };
         }
     }
+
+    public bool AnyCanConnect => Bots.Any(b => b.CanConnect);
+
+    public bool AnyCanDisconnect => Bots.Any(b => b.CanDisconnect);
+
+    /// <summary>Staggered two seconds apart for the same reason startup auto-connect is (MainWindowViewModel.AutoConnectStartupBotsAsync): a burst of logins to one server is what a flood limit catches.</summary>
+    public async Task ConnectAllAsync()
+    {
+        var first = true;
+        foreach (var bot in Bots.Where(b => b.CanConnect).ToList())
+        {
+            if (!first)
+            {
+                await Task.Delay(2000);
+            }
+
+            first = false;
+            await bot.ConnectCommand.ExecuteAsync(null);
+        }
+    }
+
+    public Task DisconnectAllAsync() =>
+        Task.WhenAll(Bots.Where(b => b.CanDisconnect).Select(b => b.DisconnectCommand.ExecuteAsync(null)));
+
+    public async Task ReconnectAllAsync()
+    {
+        await DisconnectAllAsync();
+        await ConnectAllAsync();
+    }
+
 }

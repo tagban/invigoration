@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Controls.Primitives;
 using Avalonia.Interactivity;
 using Avalonia.Threading;
@@ -224,6 +225,9 @@ public partial class MainWindow : Window
     }
 
     /// <summary>Keeps MainWindowViewModel.SelectedBot in sync with whichever tab is actually showing — TabControl.SelectedItem can't bind directly to it two-way any more since TopLevelTabs is a mixed BotTabViewModel/GlobalWhispersTabViewModel collection; selecting the Whispers tab leaves SelectedBot as whatever bot was last actually selected, which is a reasonable "last bot you were looking at" fallback for the Bot menu (which names that bot at the top so it's never a guess). Also feeds SetActiveTopLevelItem, which drives every bot's IsActive/HasUnread state (see RecomputeActiveBot).</summary>
+    private void OnTabHeaderContextRequested(object? sender, ContextRequestedEventArgs e) =>
+        TabHeaderContextMenu.OnContextRequested(sender, e);
+
     private void OnTopLevelTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (ViewModel is not { } vm)

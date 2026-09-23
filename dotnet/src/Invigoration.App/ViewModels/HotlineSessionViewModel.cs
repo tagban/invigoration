@@ -147,10 +147,16 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
 
     private static ushort ClampIcon(int value) => (ushort)Math.Clamp(value, 0, ushort.MaxValue);
 
-    public bool HasPendingIdentityChange =>
-        EditNickname.Trim() != _options.Nickname || ClampIcon(EditIconId) != _options.IconId;
+    /// <summary>
+    /// Trailing spaces only: leading ones are how people line a name up with the art on their
+    /// icon, so they're part of the name.
+    /// </summary>
+    private string PendingNickname => EditNickname.TrimEnd();
 
-    private bool CanApplyIdentity() => IsConnected && EditNickname.Trim().Length > 0 && HasPendingIdentityChange;
+    public bool HasPendingIdentityChange =>
+        PendingNickname != _options.Nickname || ClampIcon(EditIconId) != _options.IconId;
+
+    private bool CanApplyIdentity() => IsConnected && PendingNickname.Trim().Length > 0 && HasPendingIdentityChange;
 
     /// <summary>
     /// Sends the new nickname/icon to the server (SetClientUserInfo), remembers them for any
@@ -160,7 +166,7 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
     [RelayCommand(CanExecute = nameof(CanApplyIdentity))]
     private async Task ApplyIdentityAsync()
     {
-        var nickname = EditNickname.Trim();
+        var nickname = PendingNickname;
         var iconId = ClampIcon(EditIconId);
         await _client.ChangeUserInfoAsync(nickname, iconId).ConfigureAwait(true);
         _options = _options with { Nickname = nickname, IconId = iconId };
@@ -324,6 +330,13 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
             AppendWhisper(pm.SenderName, pm.SenderId, pm.SenderName, pm.Text, incoming: true));
         _client.Disconnected += ex => Dispatcher.UIThread.Post(() =>
         {
+            // The old connection ending while a Reconnect from the tab's menu is already bringing
+            // up the new one — nothing to report, and nothing for auto-reconnect to chase.
+            if (_connectingNow)
+            {
+                return;
+            }
+
             IsConnected = false;
             AppendMessage(ex is null ? "* Disconnected." : $"* Disconnected ({ex.GetType().Name}: {ex.Message}).");
             MaybeScheduleReconnect();
@@ -349,10 +362,75 @@ public sealed partial class HotlineSessionViewModel : ViewModelBase, IAsyncDispo
     [ObservableProperty]
     public partial bool IsReconnecting { get; set; }
 
+    /// <summary>Set by Disconnect on the tab's right-click menu: the tab stays, offline, until Connect — so auto-reconnect leaves it alone.</summary>
+    private bool _heldOffline;
+
+    /// <summary>A Connect or Reconnect from the tab's menu is in flight.</summary>
+    private bool _connectingNow;
+
+    /// <summary>Offline and not already connecting — what the tab's menu offers Connect for.</summary>
+    public bool CanConnectNow => !_closing && !IsConnected && !_connectingNow;
+
+    /// <summary>Online, or still retrying on its own — what the tab's menu offers Disconnect for.</summary>
+    public bool CanDisconnectNow => !_closing && (IsConnected || IsReconnecting);
+
+    /// <summary>Connects this tab's session again, skipping any auto-reconnect wait.</summary>
+    public async Task ConnectNowAsync()
+    {
+        if (!CanConnectNow)
+        {
+            return;
+        }
+
+        _heldOffline = false;
+        _reconnectCts?.Cancel();
+        _connectingNow = true;
+        try
+        {
+            await ConnectAsync(_options.Login, _options.Password, _options.Nickname, _options.IconId).ConfigureAwait(true);
+        }
+        finally
+        {
+            _connectingNow = false;
+        }
+    }
+
+    /// <summary>Drops the connection but keeps the tab and its log, so Connect can bring it back. Closing the tab is still the Disconnect button's job.</summary>
+    public void GoOffline()
+    {
+        if (!CanDisconnectNow)
+        {
+            return;
+        }
+
+        _heldOffline = true;
+        _reconnectCts?.Cancel();
+        _client.Close();
+    }
+
+    public async Task ReconnectNowAsync()
+    {
+        if (_closing || _connectingNow)
+        {
+            return;
+        }
+
+        if (IsConnected || IsReconnecting)
+        {
+            _heldOffline = true;
+            _reconnectCts?.Cancel();
+            _client.Close();
+            IsConnected = false;
+            AppendMessage("* Reconnecting...");
+        }
+
+        await ConnectNowAsync().ConfigureAwait(true);
+    }
+
     private void MaybeScheduleReconnect()
     {
         var config = _parent.Config;
-        if (_closing || _loginRefused || !config.AutoReconnect || IsReconnecting)
+        if (_closing || _heldOffline || _loginRefused || !config.AutoReconnect || IsReconnecting)
         {
             return;
         }

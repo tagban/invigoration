@@ -13,8 +13,10 @@
         <DockPanel Grid.Row="0" Margin="0,0,0,8">
             <Button DockPanel.Dock="Right" Content="{Binding DownloadAllLabel}" Command="{Binding ToggleDownloadAllCommand}"
                     Margin="8,0,0,0" ToolTip.Tip="Saves every icon locally (one zip when the site has it, otherwise a few at a time) so browsing is instant afterwards" />
+            <CheckBox DockPanel.Dock="Right" Content="Show NSFW" IsChecked="{Binding ShowNsfw}" Margin="8,0,0,0"
+                      ToolTip.Tip="Icons tagged nsfw (nudity and the like) are hidden unless this is ticked" />
             <Button DockPanel.Dock="Right" Content="Open ik0ns page" Command="{Binding OpenGalleryCommand}" Margin="8,0,0,0" />
-            <TextBox Text="{Binding FilterText}" PlaceholderText="Filter by number (e.g. 41 shows 41, 410-419, 4100...)" />
+            <TextBox Text="{Binding FilterText}" PlaceholderText="Search: a number (41 shows 41, 410-419...), or words like &quot;flag&quot;, &quot;eye&quot;, &quot;starcraft&quot;, &quot;red&quot;" />
         </DockPanel>
 
         <!-- Rows of cells, not one WrapPanel: only rows virtualize, and that's what keeps the
@@ -39,7 +41,8 @@
                                 <Button Width="244" Height="56" Padding="4" Margin="0,3"
                                         HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
                                         Command="{Binding $parent[Window].((vm:HotlineIconPickerViewModel)DataContext).PickCommand}"
-                                        CommandParameter="{Binding}">
+                                        CommandParameter="{Binding}"
+                                        ToolTip.Tip="{Binding Tooltip}">
                                     <StackPanel Spacing="2" HorizontalAlignment="Center">
                                         <Image Source="{Binding Image}" MaxWidth="232" MaxHeight="32" Stretch="None" HorizontalAlignment="Center" />
                                         <TextBlock Text="{Binding Id}" FontSize="10" Opacity="0.6" HorizontalAlignment="Center" />

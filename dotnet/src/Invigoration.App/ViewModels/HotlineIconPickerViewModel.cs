@@ -13,12 +13,18 @@ namespace Invigoration.App.ViewModels;
 /// with a virtualized list means "when its row scrolls into view", so opening the picker doesn't
 /// fire off 6,500 downloads.
 /// </summary>
-public sealed partial class HotlineIconCellViewModel(ushort id) : ObservableObject
+public sealed partial class HotlineIconCellViewModel(ushort id, HotlineIconInfo? info) : ObservableObject
 {
     private bool _requested;
     private Bitmap? _image;
 
     public ushort Id { get; } = id;
+
+    /// <summary>What the search index says this icon shows — null when the index isn't available.</summary>
+    public HotlineIconInfo? Info { get; } = info;
+
+    /// <summary>The icon's number, then its lettering, subjects and colors when the index has them.</summary>
+    public string Tooltip => Info is null ? $"Icon {Id}" : $"Icon {Id}\n{Info.Describe()}";
 
     public Bitmap? Image
     {
@@ -46,7 +52,7 @@ public sealed record HotlineIconRow(IReadOnlyList<HotlineIconCellViewModel> Cell
 
 /// <summary>
 /// The icon chooser behind the session header's "Choose..." button: every icon hlwiki.com has,
-/// filterable by number, with an optional "Download all" that fills the local cache so scrolling
+/// searchable by number or by what's on it (hlwiki.com's ik0ns.csv — see HotlineIconIndex), with an optional "Download all" that fills the local cache so scrolling
 /// is instant from then on.
 /// </summary>
 public sealed partial class HotlineIconPickerViewModel : ObservableObject
@@ -57,6 +63,7 @@ public sealed partial class HotlineIconPickerViewModel : ObservableObject
     private const int DownloadConcurrency = 4;
 
     private List<HotlineIconCellViewModel> _all = [];
+    private IReadOnlyDictionary<ushort, HotlineIconInfo> _index = new Dictionary<ushort, HotlineIconInfo>();
     private CancellationTokenSource? _downloadCts;
 
     public ObservableCollection<HotlineIconRow> Rows { get; } = [];
@@ -76,26 +83,46 @@ public sealed partial class HotlineIconPickerViewModel : ObservableObject
 
     public string DownloadAllLabel => IsDownloading ? "Stop Downloading" : "Download All";
 
+    /// <summary>Off each time the picker opens: icons the index tags "nsfw" stay out of the list unless asked for.</summary>
+    [ObservableProperty]
+    public partial bool ShowNsfw { get; set; }
+
     partial void OnFilterTextChanged(string value) => RebuildRows();
+
+    partial void OnShowNsfwChanged(bool value) => RebuildRows();
 
     public async Task LoadAsync()
     {
-        var ids = await HotlineIconLoader.GetCatalogAsync().ConfigureAwait(true);
-        _all = [.. ids.Select(id => new HotlineIconCellViewModel(id))];
+        var catalog = HotlineIconLoader.GetCatalogAsync();
+        var index = HotlineIconIndex.LoadAsync();
+        var ids = await catalog.ConfigureAwait(true);
+        _index = await index.ConfigureAwait(true);
+        _all = [.. ids.Select(id => new HotlineIconCellViewModel(id, _index.GetValueOrDefault(id)))];
         RebuildRows();
         StatusText = _all.Count == 0
             ? "Couldn't reach hlwiki.com for the icon list — type a number in the Icon box instead."
-            : $"{_all.Count:N0} icons. Scroll, or type a number to filter.";
+            : _index.Count == 0
+                ? $"{_all.Count:N0} icons. Scroll, or type a number to filter."
+                : $"{_all.Count:N0} icons. Scroll, or search by number, words on the icon, what's on it, or color.";
     }
 
     private void RebuildRows()
     {
         var filter = FilterText.Trim();
-        var matching = filter.Length == 0 ? _all : _all.Where(c => c.Id.ToString().StartsWith(filter, StringComparison.Ordinal)).ToList();
+        var words = HotlineIconInfo.Split(filter).ToList();
+        var allowed = ShowNsfw ? _all : _all.Where(c => c.Info is not { IsNsfw: true }).ToList();
+        var matching = filter.Length == 0 || (words.Count == 0 && !filter.All(char.IsAsciiDigit))
+            ? allowed
+            : allowed.Where(c => HotlineIconIndex.Matches(c.Id, c.Info, words, filter)).ToList();
         Rows.Clear();
         for (var i = 0; i < matching.Count; i += CellsPerRow)
         {
             Rows.Add(new HotlineIconRow(matching.Skip(i).Take(CellsPerRow).ToList()));
+        }
+
+        if (filter.Length > 0 && _all.Count > 0)
+        {
+            StatusText = $"{matching.Count:N0} of {_all.Count:N0} icons match.";
         }
     }
 
@@ -183,8 +210,10 @@ public sealed partial class HotlineIconPickerViewModel : ObservableObject
             }
 
             StatusText = $"Downloaded the icon pack — {count:N0} icons saved.";
-            // Fresh cells, so any that had already come up empty read the newly saved files.
-            _all = [.. _all.Select(c => new HotlineIconCellViewModel(c.Id))];
+            // Fresh cells, so any that had already come up empty read the newly saved files — from
+            // the catalog the pack just saved, so an icon taken off the site drops out of the list.
+            var ids = await HotlineIconLoader.GetCatalogAsync().ConfigureAwait(true);
+            _all = [.. ids.Select(id => new HotlineIconCellViewModel(id, _index.GetValueOrDefault(id)))];
             RebuildRows();
             return true;
         }

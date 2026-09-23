@@ -273,7 +273,7 @@
                 <TextBlock Grid.Row="0" Text="Users" FontWeight="Bold" Foreground="Black" Opacity="0.7" Margin="0,0,0,4" />
                 <!-- Real Hotline client convention, per the user's own spec: the icon is a
                      background layer for the whole row, not something the name lays out around —
-                     the name always sits at a fixed 30px left offset (HotlineIconLoader.NameOffset — past the small emblem most banners carry at their left) regardless of icon width, so
+                     the name always sits at a fixed 33px left offset (HotlineIconLoader.NameOffset — past the small emblem most banners carry at their left) regardless of icon width, so
                      a wider icon just extends further behind the text instead of pushing it over.
                      Rows are exactly 18px with zero padding/spacing so icons sit flush against
                      each other — ListBoxItem's own default theme padding/min-height would
@@ -334,7 +334,7 @@
                                     </ContextMenu>
                                 </Grid.ContextMenu>
                                 <Image Source="{Binding Icon}" Height="18" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
-                                <TextBlock Text="{Binding Name}" Foreground="{Binding DisplayBrush}" Margin="30,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontWeight="Bold" />
+                                <TextBlock Text="{Binding Name}" Foreground="{Binding DisplayBrush}" Margin="33,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontWeight="Bold" />
                             </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>

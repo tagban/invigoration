@@ -255,7 +255,7 @@
                          HasUnread by reflection against whichever type is actually bound, rather
                          than requiring one shared base type to declare all five. -->
                     <DataTemplate x:CompileBindings="False">
-                        <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
+                        <Border Classes="tabHighlight" Background="Transparent" ContextRequested="OnTabHeaderContextRequested" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
                             <StackPanel Orientation="Horizontal" Spacing="4">
                                 <!-- Tiny game/client icon — null on a group/Whispers tab with no single game of its own, in which case Image just renders nothing. -->
                                 <Image Source="{Binding TabIconImage}" MaxWidth="20" MaxHeight="20" Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Center" />

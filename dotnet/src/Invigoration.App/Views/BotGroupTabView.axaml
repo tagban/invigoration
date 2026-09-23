@@ -21,7 +21,7 @@
         </TabControl.Styles>
         <TabControl.ItemTemplate>
             <DataTemplate x:DataType="vm:BotTabViewModel">
-                <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
+                <Border Classes="tabHighlight" Background="Transparent" ContextRequested="OnTabHeaderContextRequested" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="2,2,2,4">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <Image Source="{Binding TabIconImage}" MaxWidth="20" MaxHeight="20" Stretch="Uniform" StretchDirection="DownOnly" VerticalAlignment="Center" />
                         <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />

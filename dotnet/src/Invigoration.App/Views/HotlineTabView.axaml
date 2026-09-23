@@ -21,7 +21,7 @@
         </TabControl.Styles>
         <TabControl.ItemTemplate>
             <DataTemplate x:CompileBindings="False">
-                <Border Classes="tabHighlight" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="6,2,6,4">
+                <Border Classes="tabHighlight" Background="Transparent" ContextRequested="OnTabHeaderContextRequested" BorderBrush="{Binding HighlightBrush}" BorderThickness="0" Padding="6,2,6,4">
                     <StackPanel Orientation="Horizontal" Spacing="4">
                         <TextBlock Text="{Binding Title}" FontSize="{Binding HeaderFontSize}" Foreground="{Binding HeaderForeground}" />
                         <Ellipse Width="6" Height="6" Fill="#2CACE8" VerticalAlignment="Center" IsVisible="{Binding HasUnread}" />

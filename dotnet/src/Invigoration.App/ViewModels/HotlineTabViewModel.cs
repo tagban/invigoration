@@ -98,6 +98,26 @@ public sealed partial class HotlineTabViewModel : ViewModelBase
         }
     }
 
+    private IEnumerable<HotlineSessionViewModel> Sessions => Items.OfType<HotlineSessionViewModel>();
+
+    public bool AnyCanConnect => Sessions.Any(s => s.CanConnectNow);
+
+    public bool AnyCanDisconnect => Sessions.Any(s => s.CanDisconnectNow);
+
+    public bool HasSessions => Sessions.Any();
+
+    public Task ConnectAllAsync() => Task.WhenAll(Sessions.ToList().Select(s => s.ConnectNowAsync()));
+
+    public void DisconnectAll()
+    {
+        foreach (var session in Sessions.ToList())
+        {
+            session.GoOffline();
+        }
+    }
+
+    public Task ReconnectAllAsync() => Task.WhenAll(Sessions.ToList().Select(s => s.ReconnectNowAsync()));
+
     public void RequestRemove() => RemoveRequested?.Invoke();
 
     public void NotifyConfigChanged()

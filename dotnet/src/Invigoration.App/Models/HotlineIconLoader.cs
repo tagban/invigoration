@@ -30,8 +30,10 @@ public static partial class HotlineIconLoader
     /// Where a name starts over its icon, in pixels. Measured across the ~4,200 standard 232x18
     /// banners on hlwiki.com: most carry a small emblem at the left that ends between x=26 and 30,
     /// with x=29 by far the most common hard edge, so 30 clears it. (20 cut through most emblems.)
+    /// Then 3 more, a bold lowercase "l" further, to line up with where the banner's own lettering
+    /// area starts — checked by eye against a live user list.
     /// </summary>
-    public const double NameOffset = 30;
+    public const double NameOffset = 33;
 
     /// <summary>The Users panel's own background — what a transparent part of an icon shows through to.</summary>
     public static readonly Color PanelBackground = Color.FromRgb(0xD8, 0xD8, 0xD8);
@@ -41,7 +43,7 @@ public static partial class HotlineIconLoader
 
     private static readonly Dictionary<ushort, bool> DarkBehindName = [];
 
-    private static string CacheDirectory => Path.Combine(ConfigStore.DefaultConfigDirectory(), "HotlineIconCache");
+    internal static string CacheDirectory => Path.Combine(ConfigStore.DefaultConfigDirectory(), "HotlineIconCache");
 
     public static async Task<Bitmap?> GetAsync(ushort iconId, CancellationToken ct = default)
     {
@@ -225,6 +227,7 @@ public static partial class HotlineIconLoader
             progress.Report("Unpacking icons...");
             Directory.CreateDirectory(CacheDirectory);
             var saved = 0;
+            var inPack = new HashSet<ushort>();
             using var zip = ZipFile.OpenRead(tempPath);
             foreach (var entry in zip.Entries)
             {
@@ -248,9 +251,11 @@ public static partial class HotlineIconLoader
                     }
                 }
 
+                inPack.Add(iconId);
                 saved++;
             }
 
+            ForgetIconsNotIn(inPack);
             return saved;
         }
         finally
@@ -263,6 +268,41 @@ public static partial class HotlineIconLoader
             {
                 // A leftover temp file is harmless.
             }
+        }
+    }
+
+    /// <summary>
+    /// The pack is the whole archive, so an icon it no longer has was taken off the site on
+    /// purpose (hlwiki.com's scripts/removed-ik0ns.txt) — delete the copy saved from an older pack
+    /// and drop it from the saved catalog, so it's gone here too. Skipped for a suspiciously small
+    /// pack, which is more likely a broken download than thousands of removals.
+    /// </summary>
+    private static void ForgetIconsNotIn(HashSet<ushort> inPack)
+    {
+        if (inPack.Count < 1000)
+        {
+            return;
+        }
+
+        try
+        {
+            foreach (var path in Directory.EnumerateFiles(CacheDirectory, "*.png"))
+            {
+                if (ushort.TryParse(Path.GetFileNameWithoutExtension(path), out var id) && !inPack.Contains(id))
+                {
+                    File.Delete(path);
+                    lock (SyncRoot)
+                    {
+                        MemoryCache.Remove(id);
+                    }
+                }
+            }
+
+            File.WriteAllLines(CatalogPath, inPack.Order().Select(id => id.ToString()));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // Best-effort, same as the rest of the cache.
         }
     }
 
