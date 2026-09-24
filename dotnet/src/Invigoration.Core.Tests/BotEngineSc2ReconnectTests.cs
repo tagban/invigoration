@@ -2,6 +2,7 @@ using System.Reflection;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
 using Invigoration.Core.Protocol;
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.Core.Tests;
@@ -18,7 +19,7 @@ public class BotEngineSc2ReconnectTests
     private const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
 
     /// <summary>A real client that's never connected — events are fed in by hand — standing where a connect would have put it.</summary>
-    private static (BotEngine Engine, StimpakClient Client) NewSc2Bot(bool autoReconnect = true)
+    private static (BotEngine Engine, ISc2ChatClient Client) NewSc2Bot(bool autoReconnect = true)
     {
         StimpakNativeResolver.Register();
         var config = new BotConfig
@@ -36,13 +37,13 @@ public class BotEngineSc2ReconnectTests
         return (engine, client);
     }
 
-    private static StimpakClient NewClient() =>
-        new(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin") });
+    private static ISc2ChatClient NewClient() =>
+        new StimpakSc2ChatClient(new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin") }));
 
-    private static Task Feed(BotEngine engine, StimpakClient client, SC2Event next, CancellationToken token = default) =>
+    private static Task Feed(BotEngine engine, ISc2ChatClient client, SC2Event next, CancellationToken token = default) =>
         (Task)typeof(BotEngine).GetMethod("HandleSc2EventAsync", Private)!.Invoke(engine, [client, next, token])!;
 
-    private static async Task GetIntoChat(BotEngine engine, StimpakClient client)
+    private static async Task GetIntoChat(BotEngine engine, ISc2ChatClient client)
     {
         await Feed(engine, client, new Joined(1, new PublicChannel(100, "General"), 1));
         await Feed(engine, client, new StageChanged(Stage.Connected));
@@ -169,7 +170,7 @@ public class BotEngineSc2ReconnectTests
     }
 
     /// <summary>Loses the session, then plays the reconnect getting back in: the same client, in chat again.</summary>
-    private static async Task LoseItAndGetBackIn(BotEngine engine, StimpakClient client)
+    private static async Task LoseItAndGetBackIn(BotEngine engine, ISc2ChatClient client)
     {
         await Feed(engine, client, new StageChanged(Stage.Disconnected));
         Assert.True(await Waited(() => engine.IsReconnecting));

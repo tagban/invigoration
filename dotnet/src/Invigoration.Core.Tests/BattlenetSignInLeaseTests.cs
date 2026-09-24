@@ -1,6 +1,7 @@
 using System.Reflection;
 using Invigoration.Core.Config;
 using Invigoration.Core.Protocol;
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.Core.Tests;
@@ -32,14 +33,14 @@ public class BattlenetSignInLeaseTests
         return (engine, log);
     }
 
-    private static StimpakClient NewClient() =>
-        new(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin") });
+    private static ISc2ChatClient NewClient() =>
+        new StimpakSc2ChatClient(new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin") }));
 
-    private static Task Feed(BotEngine engine, StimpakClient client, SC2Event next) =>
+    private static Task Feed(BotEngine engine, ISc2ChatClient client, SC2Event next) =>
         (Task)typeof(BotEngine).GetMethod("HandleSc2EventAsync", Private)!.Invoke(engine, [client, next, CancellationToken.None])!;
 
     /// <summary>An SC2 bot part-way through an attempt on <paramref name="profileId"/>, holding its sign-in as ConnectSc2Async leaves it.</summary>
-    private static (StimpakClient Client, BattlenetSignInLease Lease) Attempting(BotEngine engine, string profileId)
+    private static (ISc2ChatClient Client, BattlenetSignInLease Lease) Attempting(BotEngine engine, string profileId)
     {
         Assert.True(BattlenetSignInLease.TryAcquire(profileId, engine, engine.Config.DisplayName, out var lease, out _));
         var client = NewClient();

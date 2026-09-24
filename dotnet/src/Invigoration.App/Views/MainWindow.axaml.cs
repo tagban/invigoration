@@ -13,7 +13,7 @@ namespace Invigoration.App.Views;
 
 public partial class MainWindow : Window
 {
-    private const string BaseTitle = $"Invigoration v{AppVersion.Current}";
+    private static readonly string BaseTitle = $"Invigoration v{AppVersion.Current}{TestBuild.TitleSuffix}";
 
     private static readonly TimeSpan TitleUpdateInterval = TimeSpan.FromSeconds(15);
 

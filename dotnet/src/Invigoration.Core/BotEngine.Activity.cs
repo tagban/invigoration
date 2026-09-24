@@ -1,3 +1,4 @@
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.Core;
@@ -32,7 +33,7 @@ public sealed partial class BotEngine
     private int _bncsLogonAttempt;
 
     /// <summary>The Stimpak client whose session is still live — not the same as _sc2Client, which outlives a session that ended.</summary>
-    private StimpakClient? _sc2LiveClient;
+    private ISc2ChatClient? _sc2LiveClient;
 
     /// <summary>Cancelled by DisconnectAsync (and replaced), so a connect still waiting on its socket stops instead of coming up after the user said stop.</summary>
     private CancellationTokenSource _connectCts = new();
@@ -101,7 +102,7 @@ public sealed partial class BotEngine
     /// client winding down can't make a newer connection look idle. Lets go of the Battle.net sign-in
     /// with it: Stimpak is done with the credential file until the next connect.
     /// </summary>
-    private void EndSc2Activity(StimpakClient client)
+    private void EndSc2Activity(ISc2ChatClient client)
     {
         if (Interlocked.CompareExchange(ref _sc2LiveClient, null, client) == client)
         {

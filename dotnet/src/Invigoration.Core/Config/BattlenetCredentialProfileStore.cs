@@ -1,3 +1,4 @@
+using Stimpak;
 using System.Text.Json;
 
 namespace Invigoration.Core.Config;
@@ -100,6 +101,67 @@ public static class BattlenetCredentialProfileStore
     {
         var path = CredentialFilePath(profileId);
         return File.Exists(path) && new FileInfo(path).Length > 0;
+    }
+
+    /// <summary>
+    /// Where Invigoration's own native client keeps a profile's reusable Battle.net sign-in for one
+    /// game (its program code: "S2", "S1", "W3", "OSI", "Fen"). Battle.net issues one per game, so
+    /// one sign-in can cover every Battle.net 2.0 game. Separate from Stimpak's file on purpose:
+    /// each client only ever touches its own.
+    /// </summary>
+    public static string NativeCredentialFilePath(string profileId, string program) =>
+        Path.Combine(ConfigDirectory, "BattlenetCredentials", $"{profileId}.native-{program}.bin");
+
+    public static byte[]? LoadNativeCredential(string profileId, string program)
+    {
+        var path = NativeCredentialFilePath(profileId, program);
+        return File.Exists(path) && File.ReadAllBytes(path) is { Length: > 0 } bytes ? bytes : null;
+    }
+
+    /// <summary>
+    /// Replaces the saved sign-in with a newly issued one. Only ever called with a credential
+    /// Battle.net has just issued, and written to a temporary file first then moved into place,
+    /// so the previous one is never lost before its replacement exists. Nothing deletes it when
+    /// Battle.net turns it down either: the next successful sign-in simply replaces it.
+    /// </summary>
+    public static void SaveNativeCredential(string profileId, string program, byte[] credential)
+    {
+        if (credential.Length == 0)
+        {
+            return;
+        }
+
+        var path = NativeCredentialFilePath(profileId, program);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        var temporary = path + ".new";
+        File.WriteAllBytes(temporary, credential);
+        if (!OperatingSystem.IsWindows())
+        {
+            File.SetUnixFileMode(temporary, UnixFileMode.UserRead | UnixFileMode.UserWrite);
+        }
+
+        File.Move(temporary, path, overwrite: true);
+    }
+
+    /// <summary>The channels last open on this login for <paramref name="product"/>, or null if none were ever saved.</summary>
+    public static IReadOnlyList<ChannelTarget>? LastChannels(string profileId, string product) =>
+        Find(profileId)?.LastChannels.TryGetValue(product, out var channels) == true ? channels : null;
+
+    /// <summary>Remembers the channels open on this login for <paramref name="product"/>. Saves only when the list changed.</summary>
+    public static void SetLastChannels(string profileId, string product, IReadOnlyList<ChannelTarget> channels)
+    {
+        if (Find(profileId) is not { } profile)
+        {
+            return;
+        }
+
+        if (profile.LastChannels.TryGetValue(product, out var saved) && saved.SequenceEqual(channels))
+        {
+            return;
+        }
+
+        profile.LastChannels[product] = channels.ToList();
+        Save();
     }
 
     /// <summary>

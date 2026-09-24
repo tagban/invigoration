@@ -2,6 +2,7 @@ using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.Core;
@@ -30,7 +31,11 @@ namespace Invigoration.Core;
 /// </summary>
 public sealed partial class BotEngine
 {
-    /// <summary>Native/protocol hard cap on simultaneously joined SC2 channels (ncarrillo/superiority's MAX_JOINED_CHANNELS). Not exposed via Stimpak's FFI surface, so this has no compile-time tie to the native crate — keep in sync by hand if that constant ever changes.</summary>
+    /// <summary>
+    /// How many chat channels an SC2, SC:R or WC3:R bot can have open at once. Six, matching Stimpak's
+    /// limit (the protocol itself has seven slots, a 3-bit index). The games may stop at five; this
+    /// is to be confirmed against a live account before changing it.
+    /// </summary>
     public const int MaxJoinedSc2Channels = 6;
 
     /// <summary>
@@ -59,7 +64,7 @@ public sealed partial class BotEngine
 
     private sealed record Sc2ChannelSession(byte ChannelIndex, ChatChannel Channel);
 
-    private StimpakClient? _sc2Client;
+    private ISc2ChatClient? _sc2Client;
 
     /// <summary>Cancelled when the current client is retired, closing a login window it has open. Only the sign-in uses it; the client's events are read until it's disposed.</summary>
     private CancellationTokenSource? _sc2ReceiveCts;
@@ -71,7 +76,7 @@ public sealed partial class BotEngine
     private BattlenetSignInLease? _sc2Lease;
 
     /// <summary>Retired clients still finishing an attempt, each with what completes once Stimpak says it has stopped.</summary>
-    private readonly ConcurrentDictionary<StimpakClient, TaskCompletionSource> _sc2WindingDown = new();
+    private readonly ConcurrentDictionary<ISc2ChatClient, TaskCompletionSource> _sc2WindingDown = new();
 
     /// <summary>
     /// Longest a retired client gets to finish the attempt it was making before it's released
@@ -313,6 +318,12 @@ public sealed partial class BotEngine
             .OfType<ChannelTarget>()
             .ToList();
 
+        // On the Battle.net login, per game, so any bot signing in with it gets them back.
+        if (!string.IsNullOrEmpty(Config.BattlenetCredentialProfileId))
+        {
+            BattlenetCredentialProfileStore.SetLastChannels(Config.BattlenetCredentialProfileId, Config.Product, channels);
+        }
+
         if (channels.SequenceEqual(Config.Sc2LastChannels))
         {
             return;
@@ -321,6 +332,13 @@ public sealed partial class BotEngine
         Config.Sc2LastChannels = channels;
         ConfigPersistNeeded?.Invoke();
     }
+
+    /// <summary>
+    /// The channels to restore on connect: this login's for this game, or, for a login that hasn't
+    /// saved any yet, the bot's own last list from before channels were kept per login.
+    /// </summary>
+    private IReadOnlyList<ChannelTarget> LastSc2Channels(string profileId) =>
+        BattlenetCredentialProfileStore.LastChannels(profileId, Config.Product) ?? Config.Sc2LastChannels;
 
     /// <summary>Called by the UI when the operator switches sub-tabs, so a typed message goes to the right channel.</summary>
     public void SetActiveSc2Channel(byte channelIndex)
@@ -391,13 +409,7 @@ public sealed partial class BotEngine
         {
             try
             {
-                // ApplicationId is required but doesn't matter for us. CredentialPath overrides
-                // the per-user cache location it would otherwise derive, since credential storage
-                // is already fully owned by BattlenetCredentialProfileStore.
-                client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration")
-                {
-                    CredentialPath = BattlenetCredentialProfileStore.CredentialFilePath(profileId),
-                });
+                client = CreateSc2Client(profileId);
             }
             catch (Exception ex)
             {
@@ -438,7 +450,7 @@ public sealed partial class BotEngine
             client.Connect(new StimpakConnectOptions
             {
                 ForceInteractive = false,
-                Channels = Config.Sc2LastChannels,
+                Channels = LastSc2Channels(profileId),
             });
         }
         catch (StimpakException ex)
@@ -448,6 +460,27 @@ public sealed partial class BotEngine
             _sc2ClientEnded = true;
             EndSc2Activity(client);
         }
+    }
+
+    /// <summary>
+    /// Stimpak's client normally; Invigoration's own native one when <see cref="NativeSc2ChatClient.Enabled"/>
+    /// (the test build turns it on). Either way credentials live under the bot's Battle.net profile.
+    /// </summary>
+    private ISc2ChatClient CreateSc2Client(string profileId)
+    {
+        if (NativeSc2ChatClient.Enabled)
+        {
+            LogInfo("Using Invigoration's native StarCraft II connection (test build).");
+            return new NativeSc2ChatClient(profileId, LogDebug);
+        }
+
+        // ApplicationId is required but doesn't matter for us. CredentialPath overrides the
+        // per-user cache location it would otherwise derive, since credential storage is already
+        // fully owned by BattlenetCredentialProfileStore.
+        return new StimpakSc2ChatClient(new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration")
+        {
+            CredentialPath = BattlenetCredentialProfileStore.CredentialFilePath(profileId),
+        }));
     }
 
     /// <summary>
@@ -501,8 +534,10 @@ public sealed partial class BotEngine
     /// </summary>
     private void NoteSavedSignIn(string profileId)
     {
-        var path = BattlenetCredentialProfileStore.CredentialFilePath(profileId);
-        _sc2SavedSignInAge = BattlenetCredentialProfileStore.HasCachedCredential(profileId)
+        var path = NativeSc2ChatClient.Enabled
+            ? BattlenetCredentialProfileStore.NativeCredentialFilePath(profileId, NativeSc2ChatClient.Program)
+            : BattlenetCredentialProfileStore.CredentialFilePath(profileId);
+        _sc2SavedSignInAge = File.Exists(path) && new FileInfo(path).Length > 0
             ? DateTime.UtcNow - File.GetLastWriteTimeUtc(path)
             : null;
 
@@ -532,7 +567,7 @@ public sealed partial class BotEngine
     /// Reads until the client is disposed, which is after it's retired, so RetireSc2Client can see it
     /// stop. The token only reaches the sign-in: cancelling it closes a login window this client has open.
     /// </remarks>
-    private async Task SafeSc2ConsumeLoopAsync(StimpakClient client, CancellationToken signInCancellation)
+    private async Task SafeSc2ConsumeLoopAsync(ISc2ChatClient client, CancellationToken signInCancellation)
     {
         try
         {
@@ -563,7 +598,7 @@ public sealed partial class BotEngine
         }
     }
 
-    private async Task HandleSc2EventAsync(StimpakClient client, SC2Event next, CancellationToken cancellationToken = default)
+    private async Task HandleSc2EventAsync(ISc2ChatClient client, SC2Event next, CancellationToken cancellationToken = default)
     {
         client.People.Apply(next);
 
@@ -769,7 +804,7 @@ public sealed partial class BotEngine
     /// on. A sign-in that's closed or can't be shown also stops auto-reconnect: every attempt would
     /// only ask again (a new window each time), and it's the user's call now.
     /// </remarks>
-    private async Task HandleSc2AuthenticationRequiredAsync(StimpakClient client, AuthenticationRequired auth, CancellationToken cancellationToken)
+    private async Task HandleSc2AuthenticationRequiredAsync(ISc2ChatClient client, AuthenticationRequired auth, CancellationToken cancellationToken)
     {
         if (Sc2ChallengeHandler is null)
         {
@@ -802,7 +837,7 @@ public sealed partial class BotEngine
     /// isn't one) — it otherwise waits for an answer forever, and the bot looks busy connecting
     /// with no way to try again. Stimpak ends the attempt with a Disconnected stage (see above).
     /// </summary>
-    private void CancelSc2SignIn(StimpakClient client, AuthenticationRequired auth)
+    private void CancelSc2SignIn(ISc2ChatClient client, AuthenticationRequired auth)
     {
         // A login window left open across a Disconnect (or a removed bot) belongs to a client
         // that's already gone — disposed, maybe already replaced by a newer connect. There's no
@@ -997,7 +1032,7 @@ public sealed partial class BotEngine
     }
 
     /// <summary>A retired client said Disconnected, or its events ended: it has stopped.</summary>
-    private void StoppedSc2Client(StimpakClient client)
+    private void StoppedSc2Client(ISc2ChatClient client)
     {
         if (_sc2WindingDown.TryRemove(client, out var stopped))
         {
@@ -1005,7 +1040,7 @@ public sealed partial class BotEngine
         }
     }
 
-    private async Task ReleaseSc2ClientAsync(StimpakClient client, Task stopped, BattlenetSignInLease? lease)
+    private async Task ReleaseSc2ClientAsync(ISc2ChatClient client, Task stopped, BattlenetSignInLease? lease)
     {
         try
         {

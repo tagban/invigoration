@@ -1,3 +1,5 @@
+using Stimpak;
+
 namespace Invigoration.Core.Config;
 
 /// <summary>
@@ -22,6 +24,13 @@ public sealed class BattlenetCredentialProfile
     /// different real accounts apart — see DisplayLabel.
     /// </summary>
     public string? BattleTag { get; set; }
+
+    /// <summary>
+    /// The chat channels last open on this login, per game (keyed by the bot's product code:
+    /// "SC2", "SCR", "W3R"). Whichever bot signs in with this login restores that game's list on
+    /// connect, so the channels follow the Battle.net login rather than one bot's settings.
+    /// </summary>
+    public Dictionary<string, List<ChannelTarget>> LastChannels { get; set; } = new();
 
     /// <summary>What the UI should show to identify this profile — the real signed-in username once known (the whole point of a profile is to track which actual account it is), falling back to the free-text Name for a profile that's never signed in yet.</summary>
     public string DisplayLabel => string.IsNullOrEmpty(BattleTag) ? Name : BattleTag;

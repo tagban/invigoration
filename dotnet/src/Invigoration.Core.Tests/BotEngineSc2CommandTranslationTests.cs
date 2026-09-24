@@ -1,6 +1,7 @@
 using System.Reflection;
 using Invigoration.Core.Config;
 using Invigoration.Core.Protocol;
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.Core.Tests;
@@ -83,7 +84,7 @@ public class BotEngineSc2ChannelPersistenceTests
         var engine = new BotEngine(config);
 
         var credentialPath = Path.Combine(Path.GetTempPath(), $"stimpak-test-{Guid.NewGuid():N}.bin");
-        var client = new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = credentialPath });
+        var client = new StimpakSc2ChatClient(new StimpakClient(new StimpakClientOptions("cc.bnet.invigoration.tests") { CredentialPath = credentialPath }));
         typeof(BotEngine).GetField("_sc2Client", BindingFlags.NonPublic | BindingFlags.Instance)!.SetValue(engine, client);
 
         return engine;
@@ -91,7 +92,7 @@ public class BotEngineSc2ChannelPersistenceTests
 
     private static Task InvokeHandleSc2Event(BotEngine engine, SC2Event next)
     {
-        var client = (StimpakClient)typeof(BotEngine).GetField("_sc2Client", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(engine)!;
+        var client = (ISc2ChatClient)typeof(BotEngine).GetField("_sc2Client", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(engine)!;
         var method = typeof(BotEngine).GetMethod("HandleSc2EventAsync", BindingFlags.NonPublic | BindingFlags.Instance)!;
         return (Task)method.Invoke(engine, [client, next, CancellationToken.None])!;
     }
