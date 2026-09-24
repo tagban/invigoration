@@ -1,6 +1,8 @@
 using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
+using Invigoration.App.Models;
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.App.Converters;
@@ -65,6 +67,31 @@ public sealed class PersonDetailsTooltipConverter : IValueConverter
         }
 
         return string.Join(Environment.NewLine, lines);
+    }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>A StarCraft: Remastered member's game icon (see NativeMemberProducts), or null for anyone without one, such as SC2 users.</summary>
+public sealed class PersonProductIconConverter : IValueConverter
+{
+    public static readonly PersonProductIconConverter Instance = new();
+
+    public object? Convert(object? value, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (value is not Person person)
+        {
+            return null;
+        }
+
+        var name = PersonNameWithTrailingClanTagConverter.Instance.Convert(person, typeof(string), null, culture) as string ?? person.Name;
+        if (person.ClanTag is { Length: > 0 } tag && name.EndsWith($" <{tag}>", StringComparison.Ordinal))
+        {
+            name = name[..^(tag.Length + 3)];
+        }
+
+        return NativeMemberProducts.IconKeyFor(name) is { } key ? GameIconLoader.Get(key) : null;
     }
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>

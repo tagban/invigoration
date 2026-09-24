@@ -272,6 +272,9 @@
                                         <MenuItem Name="ClassicIconStyleMenuItem" Header="Classic Icon Style"
                                                   ToggleType="CheckBox" Click="OnToggleClassicIconStyleClick"
                                                   ToolTip.Tip="When on, a moderator/Blizzard Rep/etc.'s rank badge replaces their game icon (real classic Battle.net behavior) instead of showing both side by side." />
+                                        <MenuItem Name="LadderIconsMenuItem" Header="Ladder Icons"
+                                                  ToggleType="CheckBox" Click="OnToggleLadderIconsClick"
+                                                  ToolTip.Tip="When on, players show ladder badges (StarCraft stars, Warcraft II axes, Warcraft III tiers, Diablo dots). When off, everyone shows their plain game logo." />
                                         <!-- Filled when the menu opens (OnUserContextMenuOpened), same list as the Bot menu's. -->
                                         <MenuItem Name="UserIconSetMenu" Header="Icon Set" />
                                     </ContextMenu>
@@ -374,6 +377,9 @@
                         <DataTemplate x:DataType="stimpak:Person">
                             <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding ., Converter={x:Static conv:PersonDetailsTooltipConverter.Instance}}">
                                 <views:PresenceIcon State="{Binding Presence, Converter={x:Static conv:PresenceConverter.Instance}}" />
+                                <!-- SC:R members' classic game icon; nothing for SC2 users (see NativeMemberProducts). -->
+                                <Image Source="{Binding ., Converter={x:Static conv:PersonProductIconConverter.Instance}}"
+                                       MaxWidth="32" MaxHeight="32" Stretch="Uniform" VerticalAlignment="Center" />
                                 <!-- Person.Name is "&lt;TAG&gt; Username" (tag prefixed) per Stimpak's own
                                      formatting — reordered to a trailing tag instead, per request. -->
                                 <TextBlock Text="{Binding ., Converter={x:Static conv:PersonNameWithTrailingClanTagConverter.Instance}}"

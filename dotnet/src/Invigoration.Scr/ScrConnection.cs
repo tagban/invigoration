@@ -13,6 +13,12 @@ namespace Invigoration.Scr;
 /// Then it keeps both sockets answered and hands chat events to the caller. The sequence follows
 /// ncarrillo/sc1-research (MIT).
 /// </summary>
+/// <summary>Which character to play as and where to start. The character is looked up on the gateway.</summary>
+public sealed record ScrConnectOptions(uint Gateway = ScrGateways.UsEast, string? CharacterName = null, string HomeChannel = ScrConnectOptions.DefaultHomeChannel)
+{
+    public const string DefaultHomeChannel = "Open Tech Support";
+}
+
 public sealed class ScrConnection : IAsyncDisposable
 {
     private static readonly TimeSpan StepTimeout = TimeSpan.FromSeconds(20);
@@ -23,12 +29,14 @@ public sealed class ScrConnection : IAsyncDisposable
     private readonly Channel<ScrChatEvent> _events = Channel.CreateUnbounded<ScrChatEvent>();
     private readonly Dictionary<uint, TaskCompletionSource<ClassicRpc>> _pending = new();
     private readonly Dictionary<ulong, ScrChannel> _catalog = new();
+    private readonly List<ScrGateway> _gateways = new();
     private readonly CancellationTokenSource _stop = new();
     private TaskCompletionSource _catalogArrived = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private TaskCompletionSource<ScrChannel> _entered = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private ScrChatSession _chat = null!;
     private Task? _reading;
     private Action<byte[]>? _saveCredential;
+    private bool _chatOnline;
 
     private ScrConnection(Action<string> trace)
     {
@@ -58,10 +66,32 @@ public sealed class ScrConnection : IAsyncDisposable
         }
     }
 
-    /// <summary>Signs in and joins <paramref name="homeChannel"/> (a public channel's name). Throws if any step fails.</summary>
+    /// <summary>The characters Battle.net listed for this account.</summary>
+    public IReadOnlyList<ScrToon> Toons { get; private set; } = [];
+
+    /// <summary>The character this connection plays as, once chosen.</summary>
+    public ScrToon? Toon { get; private set; }
+
+    /// <summary>The gateways Battle.net announced at sign-in, in the order it sent them.</summary>
+    public IReadOnlyList<ScrGateway> Gateways
+    {
+        get
+        {
+            lock (_gateways)
+            {
+                return _gateways.ToList();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Signs in, picks the character on <see cref="ScrConnectOptions.Gateway"/>, and joins the home
+    /// channel. Throws if any step fails; <see cref="ScrCharacterException"/> when the account has no
+    /// character there.
+    /// </summary>
     public static async Task<ScrConnection> ConnectAsync(
         byte[]? savedCredential,
-        string homeChannel,
+        ScrConnectOptions options,
         Func<Uri, CancellationToken, Task<byte[]>> challenge,
         Action<string> trace,
         CancellationToken cancellationToken,
@@ -70,7 +100,8 @@ public sealed class ScrConnection : IAsyncDisposable
         var connection = new ScrConnection(trace) { _saveCredential = saveCredential };
         try
         {
-            await connection.RunSignInAsync(savedCredential, homeChannel, challenge, cancellationToken).ConfigureAwait(false);
+            await connection.SignInAsync(savedCredential, challenge, cancellationToken).ConfigureAwait(false);
+            await connection.StartGameAsync(options, cancellationToken).ConfigureAwait(false);
             return connection;
         }
         catch
@@ -80,7 +111,26 @@ public sealed class ScrConnection : IAsyncDisposable
         }
     }
 
-    private async Task RunSignInAsync(byte[]? savedCredential, string homeChannel, Func<Uri, CancellationToken, Task<byte[]>> challenge, CancellationToken cancellationToken)
+    /// <summary>
+    /// Signs in only as far as the character list, for choosing a character and gateway before
+    /// connecting, then closes. Uses (and renews) the saved sign-in like a real connect.
+    /// </summary>
+    public static async Task<ScrAccount> ListCharactersAsync(
+        byte[]? savedCredential,
+        Func<Uri, CancellationToken, Task<byte[]>> challenge,
+        Action<string> trace,
+        CancellationToken cancellationToken,
+        Action<byte[]>? saveCredential = null)
+    {
+        await using var connection = new ScrConnection(trace) { _saveCredential = saveCredential };
+        await connection.SignInAsync(savedCredential, challenge, cancellationToken).ConfigureAwait(false);
+        await connection.LoadToonsAsync(cancellationToken).ConfigureAwait(false);
+        var gateways = connection.Gateways;
+        return new ScrAccount(connection.BattleTag, connection.Toons, gateways.Count > 0 ? gateways : ScrGateways.Known);
+    }
+
+    /// <summary>Aurora logon, the classic server's address and ticket, the classic socket, and AuthSession.</summary>
+    private async Task SignInAsync(byte[]? savedCredential, Func<Uri, CancellationToken, Task<byte[]>> challenge, CancellationToken cancellationToken)
     {
         _trace($"Opening Aurora at {AuroraClient.UsEndpoint}");
         await _aurora.ConnectAsync(AuroraClient.UsEndpoint, cancellationToken).ConfigureAwait(false);
@@ -120,12 +170,34 @@ public sealed class ScrConnection : IAsyncDisposable
         }
 
         _trace($"AuthSession accepted ({proof}-byte server proof).");
-        await CallAsync(ScrProtocol.GameAccountService, ScrProtocol.GetToonsMethod, [], null, cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task LoadToonsAsync(CancellationToken cancellationToken)
+    {
+        var toons = await CallAsync(ScrProtocol.GameAccountService, ScrProtocol.GetToonsMethod, [], null, cancellationToken).ConfigureAwait(false);
+        Toons = ScrToons.Decode(toons.Body);
+        _trace(Toons.Count == 0 ? "The account has no characters." : $"Characters: {string.Join(", ", Toons)}.");
+    }
+
+    /// <summary>
+    /// The rest of the startup, which Battle.net wants within about six seconds of the socket
+    /// opening: the character list, the game version, Legacy.Connect with the chosen character,
+    /// then LegacyChat and the home channel.
+    /// </summary>
+    private async Task StartGameAsync(ScrConnectOptions options, CancellationToken cancellationToken)
+    {
+        await LoadToonsAsync(cancellationToken).ConfigureAwait(false);
+        Toon = ScrToons.Choose(Toons, options.Gateway, options.CharacterName);
+        _trace($"Playing as {Toon}.");
+
         var version = new ProtoWriter();
         version.WriteString(1, ScrProtocol.GameVersion);
         await CallAsync(ScrProtocol.GameVersionService, ScrProtocol.SetGameVersionMethod, version.ToArray(), null, cancellationToken).ConfigureAwait(false);
+
+        // Legacy.Connect's field 1 is the character ID from GetToons: the retail client's capture
+        // sent 3 for the character with ID 3, and the gateway follows from the character.
         var legacy = new ProtoWriter();
-        legacy.WriteUInt32(1, ScrProtocol.LegacyClient);
+        legacy.WriteUInt32(1, Toon.Id);
         await CallAsync(ScrProtocol.LegacyService, ScrProtocol.LegacyConnectMethod, legacy.ToArray(), null, cancellationToken).ConfigureAwait(false);
         _trace("Game session started.");
 
@@ -133,21 +205,41 @@ public sealed class ScrConnection : IAsyncDisposable
         var chatConnect = new ProtoWriter();
         chatConnect.WriteUInt32(1, 0);
         await CallAsync(LegacyChatService.Hash, ScrProtocol.LegacyChatConnectMethod, chatConnect.ToArray(), null, cancellationToken).ConfigureAwait(false);
+        _chatOnline = true;
         await _catalogArrived.Task.WaitAsync(StepTimeout, cancellationToken).ConfigureAwait(false);
         _trace($"Chat online: {Channels.Count} public channel(s).");
 
-        await JoinAsync(homeChannel, cancellationToken).ConfigureAwait(false);
+        await JoinAsync(options.HomeChannel, cancellationToken).ConfigureAwait(false);
     }
 
-    /// <summary>Joins a public channel by its name (case-insensitive) and waits for Battle.net to confirm it.</summary>
+    /// <summary>
+    /// Joins a channel by name (case-insensitive) and waits for Battle.net to confirm it: a listed
+    /// public channel by its ID, anything else with the chat command, which creates it if need be.
+    /// </summary>
     public async Task<ScrChannel> JoinAsync(string channelName, CancellationToken cancellationToken)
     {
         var target = Channels.FirstOrDefault(c => c.DisplayName.Equals(channelName, StringComparison.OrdinalIgnoreCase)
-                                                  || c.InternalName.Equals(channelName, StringComparison.OrdinalIgnoreCase))
-            ?? throw new InvalidOperationException($"Battle.net doesn't list a channel called \"{channelName}\".");
+                                                  || c.InternalName.Equals(channelName, StringComparison.OrdinalIgnoreCase));
         _entered = new TaskCompletionSource<ScrChannel>(TaskCreationOptions.RunContinuationsAsynchronously);
-        _trace($"-> join {target.DisplayName} (#{target.Id})");
-        await SendAsync(_chat.JoinListedChannel(target), cancellationToken).ConfigureAwait(false);
+        if (target is not null)
+        {
+            _trace($"-> join {target.DisplayName} (#{target.Id})");
+            await SendAsync(_chat.JoinListedChannel(target), cancellationToken).ConfigureAwait(false);
+        }
+        else
+        {
+            // The join command runs from a channel: outside one, Battle.net ignores it.
+            if (_chat.ChannelId == 0 && channelName != ScrConnectOptions.DefaultHomeChannel && Channels.Count > 0)
+            {
+                _trace($"Not in a channel yet; entering {ScrConnectOptions.DefaultHomeChannel} before joining {channelName}.");
+                await JoinAsync(ScrConnectOptions.DefaultHomeChannel, cancellationToken).ConfigureAwait(false);
+                _entered = new TaskCompletionSource<ScrChannel>(TaskCreationOptions.RunContinuationsAsynchronously);
+            }
+
+            _trace($"-> join {channelName} (by name)");
+            await SendAsync(_chat.JoinByName(channelName), cancellationToken).ConfigureAwait(false);
+        }
+
         var joined = await _entered.Task.WaitAsync(StepTimeout, cancellationToken).ConfigureAwait(false);
         _trace($"Joined {joined.DisplayName}.");
         return joined;
@@ -274,6 +366,17 @@ public sealed class ScrConnection : IAsyncDisposable
             case ScrChatEvent.ChannelEntered entered:
                 _entered.TrySetResult(entered.Channel);
                 break;
+            case ScrChatEvent.Unhandled { Service: ScrProtocol.GatewayService, Method: ScrProtocol.GatewayUpdateMethod } update:
+                if (ScrGateways.DecodeUpdate(update.Body) is { } gateway)
+                {
+                    lock (_gateways)
+                    {
+                        _gateways.RemoveAll(g => g.Id == gateway.Id);
+                        _gateways.Add(gateway);
+                    }
+                }
+
+                break;
         }
     }
 
@@ -325,6 +428,23 @@ public sealed class ScrConnection : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Say goodbye to LegacyChat first, in case that lets Battle.net end the session sooner:
+        // a new sign-in stalls while it still thinks the last one is live.
+        if (_chatOnline && _reading is { IsCompleted: false })
+        {
+            try
+            {
+                var (goodbye, _) = _chat.Call(LegacyChatService.Hash, ScrProtocol.LegacyChatDisconnectMethod, []);
+                using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                await _classic.SendAsync(goodbye, true, timeout.Token).ConfigureAwait(false);
+                await Task.Delay(200, CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException)
+            {
+                // Already gone.
+            }
+        }
+
         _stop.Cancel();
         await _classic.DisposeAsync().ConfigureAwait(false);
         if (_reading is not null)

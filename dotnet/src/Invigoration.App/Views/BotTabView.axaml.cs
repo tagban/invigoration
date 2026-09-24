@@ -281,6 +281,11 @@ public partial class BotTabView : UserControl
             classicIconStyleItem.IsChecked = vm.Config.ClassicUserIconStyle;
         }
 
+        if (menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "LadderIconsMenuItem") is { } ladderIconsItem)
+        {
+            ladderIconsItem.IsChecked = vm.Config.ShowLadderIcons;
+        }
+
         if (menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "UserIconSetMenu") is { } iconSetMenu
             && this.FindAncestorOfType<Window>()?.DataContext is MainWindowViewModel mainVm)
         {
@@ -300,6 +305,14 @@ public partial class BotTabView : UserControl
         if (DataContext is BotTabViewModel vm)
         {
             vm.ToggleClassicUserIconStyle();
+        }
+    }
+
+    private void OnToggleLadderIconsClick(object? sender, RoutedEventArgs e)
+    {
+        if (DataContext is BotTabViewModel vm)
+        {
+            vm.ToggleShowLadderIcons();
         }
     }
 

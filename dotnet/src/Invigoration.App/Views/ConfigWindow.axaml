@@ -4,6 +4,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:vm="using:Invigoration.App.ViewModels"
         xmlns:cfg="using:Invigoration.Core.Config"
+        xmlns:models="using:Invigoration.App.Models"
         mc:Ignorable="d" d:DesignWidth="680" d:DesignHeight="900"
         x:Class="Invigoration.App.Views.ConfigWindow"
         x:DataType="vm:ConfigViewModel"
@@ -103,6 +104,23 @@
                                Text="Reuse a profile to share one Battle.net login across bots, one of them connected at a time; pick + New Profile for a separate login. Signing in happens on Connect, or from File → Manage Battle.net Profiles." />
                 </StackPanel>
 
+                <!-- StarCraft: Remastered: the character, which also decides the gateway -->
+                <StackPanel IsVisible="{Binding IsNativeScr}" Spacing="8">
+                    <TextBlock Classes="label" Text="Character and gateway" />
+                    <Grid ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding ScrCharacters}" SelectedItem="{Binding SelectedScrCharacter}"
+                                  HorizontalAlignment="Stretch">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="models:ScrCharacterOption">
+                                    <TextBlock Text="{Binding Label}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <Button Grid.Column="1" Content="Sign In &amp; Load Characters" Command="{Binding LoadScrCharactersCommand}" />
+                    </Grid>
+                    <TextBlock Classes="hint" Text="{Binding ScrCharacterStatus}" />
+                </StackPanel>
+
                 <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">
                     <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto" ColumnSpacing="12" RowSpacing="3">
                         <TextBlock Grid.Row="0" Grid.Column="0" Classes="label" Text="Username" />
@@ -151,7 +169,7 @@
                 </StackPanel>
             </StackPanel>
             <TextBlock Classes="warning" IsVisible="{Binding IsStimpakBackedProduct}"
-                       Text="StarCraft II connects through Battle.net's modern login instead — no server address to set here." />
+                       Text="These games connect through Battle.net's modern login instead — no server address to set here." />
 
             <!-- Everything else -->
             <TextBlock Classes="step" Text="More settings" Margin="0,14,0,0" />

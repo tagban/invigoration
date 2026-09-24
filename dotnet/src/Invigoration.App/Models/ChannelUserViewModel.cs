@@ -67,6 +67,14 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
     public partial bool UseClassicIconStyle { get; set; }
 
+    /// <summary>Mirrors BotConfig.ShowLadderIcons, pushed in the same way as UseClassicIconStyle.</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ProductIconImage))]
+    [NotifyPropertyChangedFor(nameof(DisplayIconImage))]
+    [NotifyPropertyChangedFor(nameof(IsLargeIcon))]
+    [NotifyPropertyChangedFor(nameof(ShowLadderScore))]
+    public partial bool ShowLadderIcons { get; set; } = true;
+
     /// <summary>A Diablo II character's real Battle.net portrait — class, hardcore/dead/ladder markings and act progress, cut from D2DV.pcx/D2XP.pcx (see D2PortraitLoader) — or null for anything that isn't a D2 character (other games, or D2 on an Open character). Shown only in a character-dock theme's portrait strip (BotTabView's dock tile).</summary>
     public Bitmap? D2PortraitImage => D2PortraitLoader.Get(StatString);
 
@@ -103,7 +111,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     /// request, those "moving avatars" belong to the Diablo II character dock only, and a D2 user
     /// in the regular list falls back to the set's own Diablo II icon like it always did.
     /// </summary>
-    public Bitmap? ProductIconImage => GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags));
+    public Bitmap? ProductIconImage => GameIconLoader.Get(ChatIcon.GetProductIconKey(StatString, Flags, ShowLadderIcons));
 
     public Bitmap? StatusIconImage => GameIconLoader.Get(ChatIcon.GetStatusIconKey(Flags));
 
@@ -120,7 +128,7 @@ public partial class ChannelUserViewModel(string username) : ObservableObject
     public string LadderScoreText => ChatIcon.GetLadderScore(StatString)?.ToString() ?? "";
 
     /// <summary>Only when there's a score AND the product-icon slot is actually showing the win/rank plate it belongs on — StatusIconImage not null means GetProductIconKey already deferred to the flat generic logo instead (same status-icon-takes-priority rule it applies internally), so stamping a score on that would be wrong.</summary>
-    public bool ShowLadderScore => LadderScoreText != "" && StatusIconImage is null;
+    public bool ShowLadderScore => ShowLadderIcons && LadderScoreText != "" && StatusIconImage is null;
 
     /// <summary>The product-icon tooltip's text — StatStringParser's own human-readable rendering (e.g. "StarCraft: (5 wins)", "WarCraft III: Reign of Chaos (level 500)") when it recognizes the product, falling back to the raw wire value for anything it doesn't (still useful for spotting what a genuinely unrecognized/malformed statstring actually contains).</summary>
     public string StatStringDescription

@@ -18,7 +18,7 @@ public abstract record ScrChatEvent
     public sealed record Message(ScrMessage Value) : ScrChatEvent;
 
     /// <summary>A server call this layer doesn't interpret. It has still been answered.</summary>
-    public sealed record Unhandled(uint Service, uint Method) : ScrChatEvent;
+    public sealed record Unhandled(uint Service, uint Method, byte[] Body) : ScrChatEvent;
 
     /// <summary>The server took us out of a channel (LegacyChat.LeftChannel).</summary>
     public sealed record ChannelLeft(ulong ChannelId) : ScrChatEvent;
@@ -35,6 +35,9 @@ public sealed class ScrChatSession
 {
     private readonly uint _seed;
     private readonly Dictionary<uint, uint> _pendingMethods = new();
+
+    // Requests are built on whichever thread sends; responses are read on another.
+    private readonly Lock _gate = new();
     private uint _token;
     private ScrChannel? _joining;
 
@@ -55,7 +58,15 @@ public sealed class ScrChatSession
 
     public byte[] Whisper(string recipient, string text) => Request(LegacyChatRequests.Whisper(ChannelId, recipient, text));
 
-    public byte[] JoinByName(string channelName) => Request(LegacyChatRequests.JoinByName(ChannelId, channelName));
+    /// <summary>
+    /// Joins (or creates) a channel by name with the chat command. Battle.net confirms it with its
+    /// current-channel call, reported as <see cref="ScrChatEvent.ChannelEntered"/>.
+    /// </summary>
+    public byte[] JoinByName(string channelName)
+    {
+        _joining = new ScrChannel(0, channelName, channelName, []);
+        return Request(LegacyChatRequests.JoinByName(ChannelId, channelName));
+    }
 
     /// <summary>
     /// Joins a listed channel by ID. Battle.net confirms it with a channel-list update that includes
@@ -85,10 +96,15 @@ public sealed class ScrChatSession
     /// </summary>
     public (byte[] Message, uint Token) Call(uint service, uint method, byte[] body, byte[]? requestTrace = null)
     {
-        _token = unchecked(_token + 1);
-        _pendingMethods[_token] = method;
-        var header = new ClassicHeader(service, method, _token, ClassicHeader.RequestRouting, 0, ObjectId: 0, IsResponse: false, requestTrace);
-        return (ClassicEnvelope.Scramble(ClassicFrame.Encode(header, body), _seed), _token);
+        uint token;
+        lock (_gate)
+        {
+            token = _token = unchecked(_token + 1);
+            _pendingMethods[token] = method;
+        }
+
+        var header = new ClassicHeader(service, method, token, ClassicHeader.RequestRouting, 0, ObjectId: 0, IsResponse: false, requestTrace);
+        return (ClassicEnvelope.Scramble(ClassicFrame.Encode(header, body), _seed), token);
     }
 
     /// <summary>Unscrambles one received WebSocket message and handles every RPC in it.</summary>
@@ -108,7 +124,11 @@ public sealed class ScrChatSession
             {
                 // Replies carry no status to check: a refused request shows up as a chat error
                 // message or as a join that never gets confirmed.
-                _pendingMethods.Remove(rpc.Header.Token);
+                lock (_gate)
+                {
+                    _pendingMethods.Remove(rpc.Header.Token);
+                }
+
                 answered.Add(rpc);
                 continue;
             }
@@ -132,7 +152,7 @@ public sealed class ScrChatSession
 
         if (rpc.Header.Service != LegacyChatService.Hash)
         {
-            return new ScrChatEvent.Unhandled(rpc.Header.Service, rpc.Header.Method);
+            return new ScrChatEvent.Unhandled(rpc.Header.Service, rpc.Header.Method, rpc.Body);
         }
 
         switch (rpc.Header.Method)
@@ -144,6 +164,7 @@ public sealed class ScrChatSession
                 }
 
                 ChannelId = channel.Id;
+                _joining = null;
                 return new ScrChatEvent.ChannelEntered(channel);
 
             case LegacyChatService.LeftChannelCallback:
@@ -172,7 +193,7 @@ public sealed class ScrChatSession
                     return LegacyChatCallbacks.DecodeMessage(kind, rpc.Body) is { } message ? new ScrChatEvent.Message(message) : null;
                 }
 
-                return new ScrChatEvent.Unhandled(rpc.Header.Service, rpc.Header.Method);
+                return new ScrChatEvent.Unhandled(rpc.Header.Service, rpc.Header.Method, rpc.Body);
         }
     }
 

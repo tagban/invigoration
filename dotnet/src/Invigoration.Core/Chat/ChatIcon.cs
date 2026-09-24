@@ -31,7 +31,8 @@ public static class ChatIcon
     /// and the default leaves them with the same "always show the rank badge if one applies"
     /// behavior — there's no flags-driven badge to lose priority to there anyway.
     /// </summary>
-    public static string GetProductIconKey(string statString, uint flags = 0)
+    /// <remarks><paramref name="showLadder"/> false skips every ladder/win/progress badge for the plain game logo (BotConfig.ShowLadderIcons).</remarks>
+    public static string GetProductIconKey(string statString, uint flags = 0, bool showLadder = true)
     {
         // Not a wire-order product code at all: BotEngine.Sc2.cs stamps this literal
         // sentinel on every Stimpak-backed (SC2/SC:R/WC3:R) friend, since Stimpak's own
@@ -43,7 +44,8 @@ public static class ChatIcon
         }
 
         var product = statString.Length >= 4 ? statString[..4] : statString;
-        var noStatusIcon = GetStatusIconKey(flags) == "";
+        // A status badge takes the slot's priority over a ladder badge; so does turning ladder badges off.
+        var noStatusIcon = showLadder && GetStatusIconKey(flags) == "";
 
         if (product == "LTRD" && noStatusIcon && TryGetDiabloDots(statString) is { } dots)
         {

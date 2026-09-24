@@ -85,6 +85,13 @@ public sealed class BattlenetSignInLease : IDisposable
     }
 
     /// <summary>The file whose OS lock keeps other copies of the app out. Left in place afterwards, empty; removing it could race another copy opening it.</summary>
+    /// <summary>
+    /// The lease name for one game's native sign-in on a profile. The native connections keep a
+    /// saved sign-in per game, and Battle.net lets one account play several games at once, so an
+    /// SC2 bot and an SC:R bot can share a login; two bots of the same game still can't.
+    /// </summary>
+    public static string NativeKey(string profileId, string program) => $"{profileId}.native-{program}";
+
     public static string LockFilePath(string profileId) =>
         BattlenetCredentialProfileStore.CredentialFilePath(profileId) + ".lock";
 

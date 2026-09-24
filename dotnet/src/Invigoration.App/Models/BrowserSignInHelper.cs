@@ -35,7 +35,7 @@ internal sealed class BrowserSignInHelper : Window
             }
         };
 
-        _address = new TextBox { Watermark = "http://localhost:0/?ST=…", AcceptsReturn = false };
+        _address = new TextBox { PlaceholderText = "http://localhost:0/?ST=…", AcceptsReturn = false };
         _address.TextChanged += (_, _) => TryFinish(quiet: true);
         _problem = new TextBlock { Foreground = Brushes.IndianRed, TextWrapping = TextWrapping.Wrap, IsVisible = false };
         var finish = new Button { Content = "Continue", IsDefault = true, HorizontalAlignment = HorizontalAlignment.Right };

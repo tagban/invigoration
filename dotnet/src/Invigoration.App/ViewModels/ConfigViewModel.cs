@@ -9,6 +9,8 @@ using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
 using Invigoration.Core.Networking;
 using Invigoration.Core.Protocol;
+using Invigoration.Core.Sc2;
+using Invigoration.Scr;
 
 namespace Invigoration.App.ViewModels;
 
@@ -57,6 +59,7 @@ public partial class ConfigViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsChatTelnet))]
     [NotifyPropertyChangedFor(nameof(UsesBnls))]
     [NotifyPropertyChangedFor(nameof(IsDiabloII))]
+    [NotifyPropertyChangedFor(nameof(IsNativeScr))]
     public partial string Product { get; set; }
 
     public bool IsStimpakBackedProduct => BncsProduct.IsStimpakBacked(Product);
@@ -134,6 +137,120 @@ public partial class ConfigViewModel : ObservableObject
         NewProfileName = "";
         RefreshAvailableProfiles(profile.Id);
     }
+
+    // --- StarCraft: Remastered character: characters belong to a gateway, so picking one sets
+    // both. The list comes from signing in here (reusing the profile's saved sign-in when it
+    // can), so Connect later just uses the choice. Only the native connection (test build) uses
+    // it; Stimpak's SC:R is really SC2 and has no gateways. ---
+
+    /// <summary>Whether this is an SC:R bot on the native connection, which is where gateways and characters apply.</summary>
+    public bool IsNativeScr => Product == BncsProduct.ScRemastered && NativeSc2ChatClient.Enabled;
+
+    public ObservableCollection<ScrCharacterOption> ScrCharacters { get; } = [];
+
+    [ObservableProperty]
+    public partial ScrCharacterOption? SelectedScrCharacter { get; set; }
+
+    [ObservableProperty]
+    public partial string ScrCharacterStatus { get; set; } = "";
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(LoadScrCharactersCommand))]
+    public partial bool IsLoadingScrCharacters { get; set; }
+
+    partial void OnSelectedScrCharacterChanged(ScrCharacterOption? value)
+    {
+        if (value is null)
+        {
+            return;
+        }
+
+        Config.ScrGateway = value.Gateway;
+        Config.ScrCharacterName = value.Name;
+    }
+
+    private void LoadSavedScrCharacter()
+    {
+        ScrCharacters.Clear();
+        var saved = new ScrCharacterOption(Config.ScrGateway, Config.ScrCharacterName);
+        ScrCharacters.Add(saved);
+        SelectedScrCharacter = saved;
+        ScrCharacterStatus = "Sign in to list this account's characters.";
+    }
+
+    [RelayCommand(CanExecute = nameof(CanLoadScrCharacters))]
+    private async Task LoadScrCharactersAsync()
+    {
+        var profileId = Config.BattlenetCredentialProfileId;
+        if (string.IsNullOrEmpty(profileId))
+        {
+            ScrCharacterStatus = "Pick or create a Battle.net profile first.";
+            return;
+        }
+
+        if (!BattlenetSignInLease.TryAcquire(BattlenetSignInLease.NativeKey(profileId, NativeScrChatClient.Program), this, "the bot settings window", out var lease, out var holder))
+        {
+            ScrCharacterStatus = $"This Battle.net login is in use by {holder?.OwnerName ?? "another copy of Invigoration"}. Disconnect it first.";
+            return;
+        }
+
+        IsLoadingScrCharacters = true;
+        ScrCharacterStatus = "Signing in...";
+        try
+        {
+            using (lease)
+            {
+                var account = await Task.Run(() => ScrConnection.ListCharactersAsync(
+                    BattlenetCredentialProfileStore.LoadNativeCredential(profileId, NativeScrChatClient.Program),
+                    (url, token) => Sc2LoginChallenge.ShowAsync(url, "Battle.net Sign-In (StarCraft: Remastered)", token),
+                    _ => { },
+                    CancellationToken.None,
+                    fresh => BattlenetCredentialProfileStore.SaveNativeCredential(profileId, NativeScrChatClient.Program, fresh)));
+                if (account.BattleTag is { } tag)
+                {
+                    BattlenetCredentialProfileStore.UpdateBattleTag(profileId, tag);
+                }
+
+                ShowScrCharacters(account);
+            }
+        }
+        catch (Exception ex)
+        {
+            ScrCharacterStatus = $"Couldn't load characters: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingScrCharacters = false;
+        }
+    }
+
+    private bool CanLoadScrCharacters() => !IsLoadingScrCharacters;
+
+    private void ShowScrCharacters(ScrAccount account)
+    {
+        var options = account.Toons
+            .OrderBy(t => t.Gateway).ThenBy(t => t.Name, StringComparer.OrdinalIgnoreCase)
+            .Select(t => new ScrCharacterOption(t.Gateway, t.Name, GatewayName(account, t.Gateway)))
+            .ToList();
+        var current = options.FirstOrDefault(o => o.Gateway == Config.ScrGateway
+                                                  && (Config.ScrCharacterName.Length == 0 || o.Name.Equals(Config.ScrCharacterName, StringComparison.OrdinalIgnoreCase)))
+            ?? options.FirstOrDefault(o => o.Gateway == ScrGateways.UsEast)
+            ?? options.FirstOrDefault();
+        ScrCharacters.Clear();
+        foreach (var option in options)
+        {
+            ScrCharacters.Add(option);
+        }
+
+        SelectedScrCharacter = current;
+        var who = account.BattleTag is { } tag ? $"{tag}: " : "";
+        ScrCharacterStatus = options.Count == 0
+            ? $"{who}no characters yet. Create one once in StarCraft: Remastered on the gateway you want, then load again."
+            : $"{who}{options.Count} character(s). To play on another gateway, create a character there once in StarCraft: Remastered.";
+    }
+
+    private static string GatewayName(ScrAccount account, uint gateway) =>
+        account.Gateways.FirstOrDefault(g => g.Id == gateway)?.Name ?? ScrGateways.NameOf(gateway);
 
     private void RefreshAvailableProfiles(string? preferredId = null)
     {
@@ -324,6 +441,7 @@ public partial class ConfigViewModel : ObservableObject
         RefreshLibrarySchemes();
         RefreshAvailableIconSets();
         RefreshAvailableProfiles(config.BattlenetCredentialProfileId);
+        LoadSavedScrCharacter();
 
         // Everything above is just loading saved values into the editor; only edits the user
         // makes from here on should trigger the "picking a theme also switches the colors"

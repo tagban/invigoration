@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Invigoration.Sc2\Invigoration.Sc2.csproj" />
+    <ProjectReference Include="..\Invigoration.Scr\Invigoration.Scr.csproj" />
   </ItemGroup>
 
   <Import Project="..\StimpakPackage.props" />

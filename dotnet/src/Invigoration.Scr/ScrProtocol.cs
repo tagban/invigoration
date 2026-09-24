@@ -29,9 +29,9 @@ public static class ScrProtocol
     public const uint LegacyService = 0xD0C0F33D;
     public const uint LegacyConnectMethod = 0x607716CD;
     public const uint LegacyChatConnectMethod = 0x78D3F5A8;
-
-    /// <summary>Legacy.Connect's client value: 3 as observed for Brood War (sc1-research sends 1).</summary>
-    public const uint LegacyClient = 3;
+    public const uint LegacyChatDisconnectMethod = 0x6DEB8B04;
+    public const uint GatewayService = 0x2FD59FA3;
+    public const uint GatewayUpdateMethod = 0xF5570066;
 
     /// <summary>A request trace in the SDK's shape, "RT-XXXXXXXX-XXXX-XXXX-XXXX-XXXXXXXXXXXX", sent on the first classic call.</summary>
     public static byte[] NewRequestTrace()

@@ -951,6 +951,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             user = new ChannelUserViewModel(e.Username)
             {
                 UseClassicIconStyle = Config.ClassicUserIconStyle,
+                ShowLadderIcons = Config.ShowLadderIcons,
                 BotProduct = Config.Product,
                 Palette = Engine.Palette,
                 UseD2Layout = Theme.UsesCharacterDock,
@@ -999,6 +1000,16 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         foreach (var user in ChannelUsers)
         {
             user.UseClassicIconStyle = Config.ClassicUserIconStyle;
+        }
+    }
+
+    /// <summary>Flips Config.ShowLadderIcons and updates every row now; the right-click "Ladder Icons" item. Saved like ToggleClassicUserIconStyle.</summary>
+    public void ToggleShowLadderIcons()
+    {
+        Config.ShowLadderIcons = !Config.ShowLadderIcons;
+        foreach (var user in ChannelUsers)
+        {
+            user.ShowLadderIcons = Config.ShowLadderIcons;
         }
     }
 

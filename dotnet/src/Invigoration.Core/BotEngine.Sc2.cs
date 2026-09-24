@@ -468,6 +468,12 @@ public sealed partial class BotEngine
     /// </summary>
     private ISc2ChatClient CreateSc2Client(string profileId)
     {
+        if (NativeSc2ChatClient.Enabled && Config.Product == Protocol.BncsProduct.ScRemastered)
+        {
+            LogInfo("Using Invigoration's native StarCraft: Remastered connection (test build).");
+            return new NativeScrChatClient(profileId, Config.ScrGateway, Config.ScrCharacterName, LogDebug);
+        }
+
         if (NativeSc2ChatClient.Enabled)
         {
             LogInfo("Using Invigoration's native StarCraft II connection (test build).");
@@ -490,7 +496,9 @@ public sealed partial class BotEngine
     /// </summary>
     private async Task<BattlenetSignInLease?> AcquireSc2SignInAsync(string profileId, CancellationToken cancellationToken)
     {
-        if (BattlenetSignInLease.TryAcquire(profileId, this, Config.DisplayName, out var lease, out var holder))
+        // Native connections sign in per game (see BattlenetSignInLease.NativeKey); Stimpak's share one.
+        var leaseKey = NativeSc2ChatClient.Enabled ? BattlenetSignInLease.NativeKey(profileId, NativeProgram) : profileId;
+        if (BattlenetSignInLease.TryAcquire(leaseKey, this, Config.DisplayName, out var lease, out var holder))
         {
             return lease;
         }
@@ -510,7 +518,7 @@ public sealed partial class BotEngine
                 // Released by then regardless; see ReleaseSc2ClientAsync.
             }
 
-            if (BattlenetSignInLease.TryAcquire(profileId, this, Config.DisplayName, out lease, out holder))
+            if (BattlenetSignInLease.TryAcquire(leaseKey, this, Config.DisplayName, out lease, out holder))
             {
                 return lease;
             }
@@ -520,7 +528,7 @@ public sealed partial class BotEngine
         var who = holder?.OwnerName ?? "another copy of Invigoration";
         var fix = holder is null ? "quit the other copy" : $"disconnect {holder.OwnerName}";
         LogError(
-            $"The Battle.net login \"{login}\" is in use by {who}. One Battle.net login can only be connected once at a time: " +
+            $"The Battle.net login \"{login}\" is in use by {who}. One Battle.net login can only be connected {(NativeSc2ChatClient.Enabled ? "once per game" : "once")} at a time: " +
             $"{fix} first, or give this bot a Battle.net profile of its own (Edit Bot, then Battle.net Profile).");
         _logonRejection = $"its Battle.net login is in use by {who}.";
         return null;
@@ -535,7 +543,7 @@ public sealed partial class BotEngine
     private void NoteSavedSignIn(string profileId)
     {
         var path = NativeSc2ChatClient.Enabled
-            ? BattlenetCredentialProfileStore.NativeCredentialFilePath(profileId, NativeSc2ChatClient.Program)
+            ? BattlenetCredentialProfileStore.NativeCredentialFilePath(profileId, NativeProgram)
             : BattlenetCredentialProfileStore.CredentialFilePath(profileId);
         _sc2SavedSignInAge = File.Exists(path) && new FileInfo(path).Length > 0
             ? DateTime.UtcNow - File.GetLastWriteTimeUtc(path)
@@ -554,6 +562,9 @@ public sealed partial class BotEngine
             LogInfo(message);
         }
     }
+
+    /// <summary>The program code this bot's native client signs in as, which names its saved sign-in.</summary>
+    private string NativeProgram => Config.Product == Protocol.BncsProduct.ScRemastered ? NativeScrChatClient.Program : NativeSc2ChatClient.Program;
 
     public static string DescribeAge(TimeSpan age) => age switch
     {
@@ -764,6 +775,20 @@ public sealed partial class BotEngine
 
             case CommandFailed failed:
                 LogError($"StarCraft II command failed: {failed.Message}");
+                break;
+
+            case NativeChatEvent native:
+                await HandleChatEvent(native.Event).ConfigureAwait(false);
+                break;
+
+            case NativeFriendsEvent friends:
+                _sc2Friends.Clear();
+                foreach (var friend in friends.Friends)
+                {
+                    _sc2Friends[friend.Account] = friend;
+                }
+
+                FriendsListUpdated?.Invoke(_sc2Friends.Values.ToList());
                 break;
 
             case SessionFailed failed:

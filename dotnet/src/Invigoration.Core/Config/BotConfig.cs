@@ -68,6 +68,16 @@ public sealed class BotConfig
     public List<ChannelTarget> Sc2LastChannels { get; set; } = new();
 
     /// <summary>
+    /// StarCraft: Remastered's gateway: 10 U.S. West, 11 U.S. East, 20 Europe, 30 Korea, 45 Asia.
+    /// Characters belong to a gateway, so this and <see cref="ScrCharacterName"/> pick the character
+    /// together; the bot's settings window fills both from the account's character list.
+    /// </summary>
+    public uint ScrGateway { get; set; } = 11;
+
+    /// <summary>The SC:R character to play as on <see cref="ScrGateway"/>. Empty means the first one there.</summary>
+    public string ScrCharacterName { get; set; } = "";
+
+    /// <summary>
     /// Which named group this bot's top-level tab belongs to in MainWindow — "" means
     /// ungrouped, shown as its own individual tab like before. Purely a display grouping (e.g.
     /// several bots on the same server), set from the Config window; has no effect on
@@ -284,6 +294,13 @@ public sealed class BotConfig
     /// window, per explicit request — a quick display preference, not a connection setting.
     /// </summary>
     public bool ClassicUserIconStyle { get; set; }
+
+    /// <summary>
+    /// On (the default), the Users list shows ladder badges where a game has them: StarCraft stars,
+    /// Warcraft II axes, Warcraft III tiers, Diablo dots and ladder ratings. Off, everyone shows
+    /// their plain game logo. Toggled from the Users list's right-click menu.
+    /// </summary>
+    public bool ShowLadderIcons { get; set; } = true;
 
     /// <summary>
     /// Off by default ("Normal" layout: chat on the left, the Users/Friends/Clan panel docked
