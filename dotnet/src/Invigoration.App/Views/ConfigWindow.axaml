@@ -5,6 +5,7 @@
         xmlns:vm="using:Invigoration.App.ViewModels"
         xmlns:cfg="using:Invigoration.Core.Config"
         xmlns:models="using:Invigoration.App.Models"
+        xmlns:scr="using:Invigoration.Scr"
         mc:Ignorable="d" d:DesignWidth="680" d:DesignHeight="900"
         x:Class="Invigoration.App.Views.ConfigWindow"
         x:DataType="vm:ConfigViewModel"
@@ -119,6 +120,19 @@
                         <Button Grid.Column="1" Content="Sign In &amp; Load Characters" Command="{Binding LoadScrCharactersCommand}" />
                     </Grid>
                     <TextBlock Classes="hint" Text="{Binding ScrCharacterStatus}" />
+                    <TextBlock Classes="label" Text="New character" Margin="0,4,0,0" />
+                    <Grid ColumnDefinitions="Auto,*,Auto" ColumnSpacing="8">
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding ScrGatewayChoices}" SelectedItem="{Binding NewScrCharacterGateway}" MinWidth="120">
+                            <ComboBox.ItemTemplate>
+                                <DataTemplate x:DataType="scr:ScrGateway">
+                                    <TextBlock Text="{Binding Name}" />
+                                </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <TextBox Grid.Column="1" Text="{Binding NewScrCharacterName}" PlaceholderText="Character name" />
+                        <Button Grid.Column="2" Content="Create" Command="{Binding CreateScrCharacterCommand}"
+                                ToolTip.Tip="Creates a StarCraft: Remastered character on this gateway, as the game's character screen does, and selects it." />
+                    </Grid>
                 </StackPanel>
 
                 <StackPanel IsVisible="{Binding !IsStimpakBackedProduct}" Spacing="8">

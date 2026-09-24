@@ -156,6 +156,7 @@ public partial class ConfigViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(LoadScrCharactersCommand))]
+    [NotifyCanExecuteChangedFor(nameof(CreateScrCharacterCommand))]
     public partial bool IsLoadingScrCharacters { get; set; }
 
     partial void OnSelectedScrCharacterChanged(ScrCharacterOption? value)
@@ -226,6 +227,76 @@ public partial class ConfigViewModel : ObservableObject
     }
 
     private bool CanLoadScrCharacters() => !IsLoadingScrCharacters;
+
+    /// <summary>The gateways a new character can be created on.</summary>
+    public IReadOnlyList<ScrGateway> ScrGatewayChoices { get; } = ScrGateways.Known;
+
+    [ObservableProperty]
+    public partial ScrGateway? NewScrCharacterGateway { get; set; } = ScrGateways.Known.FirstOrDefault(g => g.Id == ScrGateways.UsEast);
+
+    [ObservableProperty]
+    [NotifyCanExecuteChangedFor(nameof(CreateScrCharacterCommand))]
+    public partial string NewScrCharacterName { get; set; } = "";
+
+    /// <summary>
+    /// Creates a StarCraft: Remastered character on the chosen gateway (GameAccount.CreateToon, as
+    /// the game's own character screen does), then shows the list with it selected.
+    /// </summary>
+    [RelayCommand(CanExecute = nameof(CanCreateScrCharacter))]
+    private async Task CreateScrCharacterAsync()
+    {
+        var profileId = Config.BattlenetCredentialProfileId;
+        var name = NewScrCharacterName.Trim();
+        if (string.IsNullOrEmpty(profileId) || NewScrCharacterGateway is not { } gateway)
+        {
+            ScrCharacterStatus = "Pick or create a Battle.net profile first.";
+            return;
+        }
+
+        if (!BattlenetSignInLease.TryAcquire(BattlenetSignInLease.NativeKey(profileId, NativeScrChatClient.Program), this, "the bot settings window", out var lease, out var holder))
+        {
+            ScrCharacterStatus = $"This Battle.net login is in use by {holder?.OwnerName ?? "another copy of Invigoration"}. Disconnect it first.";
+            return;
+        }
+
+        IsLoadingScrCharacters = true;
+        ScrCharacterStatus = $"Creating {name} on {gateway.Name}...";
+        try
+        {
+            using (lease)
+            {
+                var (created, account) = await Task.Run(() => ScrConnection.CreateToonAsync(
+                    BattlenetCredentialProfileStore.LoadNativeCredential(profileId, NativeScrChatClient.Program),
+                    name,
+                    gateway.Id,
+                    (url, token) => Sc2LoginChallenge.ShowAsync(url, "Battle.net Sign-In (StarCraft: Remastered)", token),
+                    _ => { },
+                    CancellationToken.None,
+                    fresh => BattlenetCredentialProfileStore.SaveNativeCredential(profileId, NativeScrChatClient.Program, fresh)));
+                if (created is not null)
+                {
+                    Config.ScrGateway = created.Gateway;
+                    Config.ScrCharacterName = created.Name;
+                    NewScrCharacterName = "";
+                }
+
+                ShowScrCharacters(account);
+                ScrCharacterStatus = created is not null
+                    ? $"Created {created.Name} on {ScrGateways.NameOf(created.Gateway)}."
+                    : $"Battle.net didn't create {name}. The name may be taken on {gateway.Name}, or not allowed.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ScrCharacterStatus = $"Couldn't create the character: {ex.Message}";
+        }
+        finally
+        {
+            IsLoadingScrCharacters = false;
+        }
+    }
+
+    private bool CanCreateScrCharacter() => !IsLoadingScrCharacters && NewScrCharacterName.Trim().Length >= 2;
 
     private void ShowScrCharacters(ScrAccount account)
     {

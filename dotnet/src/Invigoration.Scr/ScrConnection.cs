@@ -138,6 +138,36 @@ public sealed class ScrConnection : IAsyncDisposable
         return new ScrAccount(connection.BattleTag, connection.Toons, gateways.Count > 0 ? gateways : ScrGateways.Known);
     }
 
+    /// <summary>
+    /// Creates a character on <paramref name="gateway"/> with GameAccount.CreateToon, before any game
+    /// session starts (as the retail client's character screen does), then lists the characters
+    /// again. Returns the character Battle.net reports creating, or null, and the list afterwards.
+    /// </summary>
+    public static async Task<(ScrToon? Created, ScrAccount After)> CreateToonAsync(
+        byte[]? savedCredential,
+        string name,
+        uint gateway,
+        Func<Uri, CancellationToken, Task<byte[]>> challenge,
+        Action<string> trace,
+        CancellationToken cancellationToken,
+        Action<byte[]>? saveCredential = null)
+    {
+        await using var connection = new ScrConnection(trace) { _saveCredential = saveCredential };
+        await connection.SignInAsync(savedCredential, challenge, cancellationToken).ConfigureAwait(false);
+        await connection.LoadToonsAsync(cancellationToken).ConfigureAwait(false);
+
+        var request = new ProtoWriter();
+        request.WriteString(1, name);
+        request.WriteUInt64(2, gateway);
+        var reply = await connection.CallAsync(ScrProtocol.GameAccountService, ScrProtocol.CreateToonMethod, request.ToArray(), null, cancellationToken).ConfigureAwait(false);
+        trace($"CreateToon reply: header {reply.Header}, body {Convert.ToHexString(reply.Body)}");
+        var created = ScrToons.Decode(reply.Body).FirstOrDefault();
+
+        await connection.LoadToonsAsync(cancellationToken).ConfigureAwait(false);
+        var gateways = connection.Gateways;
+        return (created, new ScrAccount(connection.BattleTag, connection.Toons, gateways.Count > 0 ? gateways : ScrGateways.Known));
+    }
+
     /// <summary>Aurora logon, the classic server's address and ticket, the classic socket, and AuthSession.</summary>
     private async Task SignInAsync(byte[]? savedCredential, Func<Uri, CancellationToken, Task<byte[]>> challenge, CancellationToken cancellationToken)
     {

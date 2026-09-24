@@ -24,6 +24,12 @@ public static class ScrProtocol
     public const uint AuthSessionMethod = 0x95F59163;
     public const uint GameAccountService = 0x354252A4;
     public const uint GetToonsMethod = 0xBC18EDE5;
+
+    /// <summary>
+    /// GameAccount.CreateToon: {1 name, 2 uint64 gateway}, answered with {1 ToonInfo {1 id, 2 name, 3 gateway}}.
+    /// The id and both layouts were read from the retail client's own library (libClientSdk).
+    /// </summary>
+    public const uint CreateToonMethod = 0x6697AC0A;
     public const uint GameVersionService = 0x3D930F0E;
     public const uint SetGameVersionMethod = 0xD48DE460;
     public const uint LegacyService = 0xD0C0F33D;
