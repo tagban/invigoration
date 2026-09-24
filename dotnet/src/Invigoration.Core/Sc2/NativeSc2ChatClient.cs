@@ -16,9 +16,9 @@ namespace Invigoration.Core.Sc2;
 /// <summary>
 /// Invigoration's own StarCraft II connection: Front sign-in, the handoff to Sunken, then chat on
 /// Sunken's bit-packed records, with no Stimpak underneath. It reports in Stimpak's event types so
-/// BotEngine treats it exactly like Stimpak's client. Still experimental: only the test build turns
-/// it on (<see cref="Enabled"/>), and it keeps a protocol log of every record it reads, with hex
-/// for anything it can't decode, so a failed session says exactly where it stopped.
+/// BotEngine treats it exactly like Stimpak's client. The default since 2.3.0 (<see cref="Enabled"/>);
+/// it keeps a protocol log of every record it reads, with hex for anything it can't decode, so a
+/// failed session says exactly where it stopped.
 /// </summary>
 /// <remarks>
 /// Sign-in reuses the "keep me signed in" credential Battle.net issued last time (saved per game
@@ -30,8 +30,11 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
     /// <summary>The program code this client signs in as.</summary>
     public const string Program = "S2";
 
-    /// <summary>Set to 1 to use this client instead of Stimpak's. The test build sets it.</summary>
+    /// <summary>The old switch from when this client was test-only. Set to 0, it now falls back to Stimpak like <see cref="StimpakVariable"/>.</summary>
     public const string EnableVariable = "INVIGORATION_NATIVE_SC2";
+
+    /// <summary>Set to 1 to use Stimpak's client instead of Invigoration's own, as a fallback. Native is the default from 2.3.0.</summary>
+    public const string StimpakVariable = "INVIGORATION_STIMPAK";
 
     /// <summary>StarCraft II's public "General" channel.</summary>
     public const ushort GeneralChannelId = 1033;
@@ -43,7 +46,9 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         [1035] = "Help",
     };
 
-    public static bool Enabled => Environment.GetEnvironmentVariable(EnableVariable) == "1";
+    /// <summary>Whether SC2, SC:R and WC3:R bots use Invigoration's own connections (the default) rather than Stimpak's.</summary>
+    public static bool Enabled =>
+        Environment.GetEnvironmentVariable(StimpakVariable) != "1" && Environment.GetEnvironmentVariable(EnableVariable) != "0";
 
     private readonly string _profileId;
     private readonly Action<string> _log;

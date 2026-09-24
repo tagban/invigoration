@@ -463,20 +463,20 @@ public sealed partial class BotEngine
     }
 
     /// <summary>
-    /// Stimpak's client normally; Invigoration's own native one when <see cref="NativeSc2ChatClient.Enabled"/>
-    /// (the test build turns it on). Either way credentials live under the bot's Battle.net profile.
+    /// Invigoration's own native client (the default, <see cref="NativeSc2ChatClient.Enabled"/>), or
+    /// Stimpak's when INVIGORATION_STIMPAK=1 asks for the fallback. Either way credentials live under the bot's Battle.net profile.
     /// </summary>
     private ISc2ChatClient CreateSc2Client(string profileId)
     {
         if (NativeSc2ChatClient.Enabled && Config.Product == Protocol.BncsProduct.ScRemastered)
         {
-            LogInfo("Using Invigoration's native StarCraft: Remastered connection (test build).");
+            LogDebug("Using Invigoration's native StarCraft: Remastered connection.");
             return new NativeScrChatClient(profileId, Config.ScrGateway, Config.ScrCharacterName, LogDebug);
         }
 
         if (NativeSc2ChatClient.Enabled)
         {
-            LogInfo("Using Invigoration's native StarCraft II connection (test build).");
+            LogDebug("Using Invigoration's native StarCraft II connection.");
             return new NativeSc2ChatClient(profileId, LogDebug);
         }
 

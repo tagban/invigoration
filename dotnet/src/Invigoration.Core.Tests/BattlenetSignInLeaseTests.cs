@@ -82,7 +82,11 @@ public class BattlenetSignInLeaseTests
     public async Task ConnectingOnALoginAnotherBotHas_IsRefused_AndStopsAnyReconnect()
     {
         var profileId = NewProfileId();
-        Assert.True(BattlenetSignInLease.TryAcquire(profileId, new object(), "bot A", out var held, out _));
+        // The native connections lock a login per game (SC2 and SC:R can share one); Stimpak's per login.
+        var lockName = Invigoration.Core.Sc2.NativeSc2ChatClient.Enabled
+            ? BattlenetSignInLease.NativeKey(profileId, Invigoration.Core.Sc2.NativeSc2ChatClient.Program)
+            : profileId;
+        Assert.True(BattlenetSignInLease.TryAcquire(lockName, new object(), "bot A", out var held, out _));
         var (engine, log) = NewSc2Bot(profileId, "bot B");
         await using var disposeEngine = engine;
 
