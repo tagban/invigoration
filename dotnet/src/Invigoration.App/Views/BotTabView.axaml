@@ -60,7 +60,9 @@
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="Auto,*" IsVisible="{Binding SupportsMultiChannel}"
               Grid.ColumnSpan="{Binding Theme.ChatColumnSpan}" Margin="{Binding Theme.ChatMargin}"
               Background="{Binding BackgroundBrush}">
-            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,0">
+            <!-- Hidden for SC:R (IsSingleChannel): one channel, switched with /join as in classic chat,
+                 and the Users tab already names it. -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="4,4,4,0" IsVisible="{Binding !IsSingleChannel}">
                 <Button Content="+" Padding="8,2" FontSize="12" ToolTip.Tip="Join another channel">
                     <Button.Flyout>
                         <Flyout>
@@ -91,7 +93,20 @@
                 </Button>
             </StackPanel>
 
-            <TabControl Grid.Row="1" ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel}">
+            <Grid.ContextMenu>
+                <ContextMenu Opened="OnChatContextMenuOpened">
+                    <MenuItem Header="Pictures in Chat">
+                        <MenuItem Name="ChatPicturesOff" Header="Off" ToggleType="Radio" GroupName="ChatPictures" Click="OnChatPicturesClick" />
+                        <MenuItem Name="ChatPicturesCompact" Header="Compact" ToggleType="Radio" GroupName="ChatPictures" Click="OnChatPicturesClick"
+                                  ToolTip.Tip="A small picture before each speaker's name." />
+                        <MenuItem Name="ChatPicturesFull" Header="Full" ToggleType="Radio" GroupName="ChatPictures" Click="OnChatPicturesClick"
+                                  IsVisible="{Binding IsSc2}"
+                                  ToolTip.Tip="The speaker's portrait beside their name, with the message word-wrapped next to it." />
+                    </MenuItem>
+                </ContextMenu>
+            </Grid.ContextMenu>
+            <ContentControl Grid.Row="1" Content="{Binding SelectedChannel}" IsVisible="{Binding IsSingleChannel}" />
+            <TabControl Grid.Row="1" ItemsSource="{Binding Channels}" SelectedItem="{Binding SelectedChannel}" IsVisible="{Binding !IsSingleChannel}">
                 <TabControl.Styles>
                     <Style Selector="TabItem:selected Border.tabHighlight">
                         <Setter Property="BorderThickness" Value="0,0,0,3" />
@@ -367,6 +382,17 @@
                      doesn't carry per-user operator flags, ping, or a statstring. -->
                 <ListBox ItemsSource="{Binding SelectedChannel.Users}" Background="Transparent" BorderThickness="0" Padding="0,4"
                          IsVisible="{Binding SupportsMultiChannel}">
+                    <ListBox.ContextMenu>
+                        <ContextMenu Opened="OnSc2UserContextMenuOpened">
+                            <!-- Filled when the menu opens, same list as the Bot menu's. -->
+                            <!-- SC:R only: its members show classic game icons, which follow icon sets. SC2 shows portraits. -->
+                            <MenuItem Name="Sc2UserIconSetMenu" Header="Icon Set" IsVisible="{Binding !IsSc2}" />
+                            <MenuItem Name="UserListCompact" Header="Compact" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
+                                      IsVisible="{Binding IsSc2}" ToolTip.Tip="Small portraits, one line per person." />
+                            <MenuItem Name="UserListFull" Header="Full" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
+                                      IsVisible="{Binding IsSc2}" ToolTip.Tip="Larger portraits, with each person's BattleTag and status under their name." />
+                        </ContextMenu>
+                    </ListBox.ContextMenu>
                     <ListBox.Styles>
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="8,1" />
@@ -376,14 +402,47 @@
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="stimpak:Person">
                             <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding ., Converter={x:Static conv:PersonDetailsTooltipConverter.Instance}}">
-                                <views:PresenceIcon State="{Binding Presence, Converter={x:Static conv:PresenceConverter.Instance}}" />
-                                <!-- SC:R members' classic game icon; nothing for SC2 users (see NativeMemberProducts). -->
-                                <Image Source="{Binding ., Converter={x:Static conv:PersonProductIconConverter.Instance}}"
-                                       MaxWidth="32" MaxHeight="32" Stretch="Uniform" VerticalAlignment="Center" />
+                                <!-- The picture (an SC2 portrait, or an SC:R member's game icon) with the presence
+                                     dot on its bottom-right corner; SC:R has no presence, so no dot there. -->
+                                <Panel VerticalAlignment="Center">
+                                    <Image Stretch="Uniform"
+                                           Width="{Binding $parent[ListBox].((vm:BotTabViewModel)DataContext).PortraitSize}"
+                                           Height="{Binding $parent[ListBox].((vm:BotTabViewModel)DataContext).PortraitSize}">
+                                        <Image.Source>
+                                            <MultiBinding Converter="{x:Static conv:PersonProductIconConverter.Instance}">
+                                                <Binding Path="." />
+                                                <Binding Path="$parent[ListBox].((vm:BotTabViewModel)DataContext).IconVersion" />
+                                            </MultiBinding>
+                                        </Image.Source>
+                                    </Image>
+                                    <views:PresenceIcon HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,-2,-2"
+                                                        IsVisible="{Binding ., Converter={x:Static conv:PersonShowsPresenceConverter.Instance}}">
+                                        <views:PresenceIcon.State>
+                                            <MultiBinding Converter="{x:Static conv:PersonPresenceStateConverter.Instance}">
+                                                <Binding Path="." />
+                                                <Binding Path="$parent[ListBox].((vm:BotTabViewModel)DataContext).IconVersion" />
+                                            </MultiBinding>
+                                        </views:PresenceIcon.State>
+                                    </views:PresenceIcon>
+                                </Panel>
                                 <!-- Person.Name is "&lt;TAG&gt; Username" (tag prefixed) per Stimpak's own
-                                     formatting — reordered to a trailing tag instead, per request. -->
-                                <TextBlock Text="{Binding ., Converter={x:Static conv:PersonNameWithTrailingClanTagConverter.Instance}}"
-                                           Foreground="White" VerticalAlignment="Center" />
+                                     formatting — reordered to a trailing tag instead, per request. Under it, in
+                                     SC2's Full view, a light line with their BattleTag and status. -->
+                                <StackPanel VerticalAlignment="Center">
+                                    <TextBlock Foreground="White">
+                                        <Run Text="{Binding ., Converter={x:Static conv:NameCodeConverter.Instance}}" />
+                                        <Run Text="{Binding ., Converter={x:Static conv:NameCodeConverter.Instance}, ConverterParameter=code}" Foreground="#6A6A6A" />
+                                    </TextBlock>
+                                    <TextBlock Foreground="#A0A0A0" FontSize="10"
+                                               IsVisible="{Binding $parent[ListBox].((vm:BotTabViewModel)DataContext).ShowsMemberDetail}">
+                                        <TextBlock.Text>
+                                            <MultiBinding Converter="{x:Static conv:PersonDetailConverter.Instance}">
+                                                <Binding Path="." />
+                                                <Binding Path="$parent[ListBox].((vm:BotTabViewModel)DataContext).IconVersion" />
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                </StackPanel>
                             </StackPanel>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
@@ -399,13 +458,24 @@
                     </Border>
                 </TabItem.Header>
                 <DockPanel>
-                    <Button DockPanel.Dock="Top" Content="Refresh" Command="{Binding RefreshFriendsCommand}"
-                            HorizontalAlignment="Right" Margin="4" Padding="8,2" FontSize="11" />
+                    <DockPanel DockPanel.Dock="Top" Margin="4">
+                        <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshFriendsCommand}"
+                                Padding="8,2" FontSize="11" IsVisible="{Binding !SupportsMultiChannel}" />
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <CheckBox Content="Offline" IsChecked="{Binding ShowOfflineFriends}" FontSize="11"
+                                      ToolTip.Tip="Show friends who are offline too." />
+                            <CheckBox Content="Real names" IsChecked="{Binding ShowFriendRealNames}" FontSize="11"
+                                      IsVisible="{Binding SupportsMultiChannel}"
+                                      ToolTip.Tip="Show friends' real names after their BattleTags, when they share them." />
+                        </StackPanel>
+                    </DockPanel>
                     <ListBox ItemsSource="{Binding Friends}" Background="Transparent" BorderThickness="0" Padding="0,4">
                         <ListBox.Styles>
                             <Style Selector="ListBoxItem">
                                 <Setter Property="Padding" Value="8,2" />
                                 <Setter Property="MinHeight" Value="0" />
+                                <!-- Offline friends only with the Offline box ticked (FriendEntryViewModel.IsListed). -->
+                                <Setter Property="IsVisible" Value="{ReflectionBinding IsListed}" />
                             </Style>
                         </ListBox.Styles>
                         <ListBox.ItemTemplate>
@@ -449,8 +519,12 @@
                                            Stretch="Uniform"
                                            IsVisible="{Binding ProductIconImage, Converter={x:Static ObjectConverters.IsNotNull}}" />
                                     <views:PresenceIcon Grid.Row="0" Grid.RowSpan="2" Grid.Column="1" Margin="0,0,6,0"
-                                                         State="{Binding PresenceState}" />
-                                    <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding Account}" Foreground="White" />
+                                                         State="{Binding PresenceState}" IsVisible="{Binding ShowsPresenceDot}" />
+                                    <TextBlock Grid.Row="0" Grid.Column="2" Foreground="White" FontSize="{Binding NameFontSize}">
+                                        <Run Text="{Binding NamePart}" />
+                                        <Run Text="{Binding CodePart}" Foreground="#6A6A6A" />
+                                        <Run Text="{Binding RealNamePart}" />
+                                    </TextBlock>
                                     <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding StatusText}" Foreground="White" Opacity="0.6" FontSize="10" />
                                 </Grid>
                             </DataTemplate>

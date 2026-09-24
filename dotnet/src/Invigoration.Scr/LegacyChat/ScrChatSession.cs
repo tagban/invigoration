@@ -56,6 +56,8 @@ public sealed class ScrChatSession
 
     public byte[] SendMessage(string text) => Request(LegacyChatRequests.SendMessage(ChannelId, text));
 
+    public byte[] SlashCommand(string text) => Request(LegacyChatRequests.SlashCommand(ChannelId, text));
+
     public byte[] Whisper(string recipient, string text) => Request(LegacyChatRequests.Whisper(ChannelId, recipient, text));
 
     /// <summary>

@@ -19,6 +19,8 @@ public static class ChatCommands
     public const byte ChatSlot = 5;
     public const byte ToonSlot = 15;
     public const byte CacheSlot = 11;
+    public const byte ProfileSlot = 14;
+    public const byte ProfileReadCommand = 0;
     public const int ChannelIndexCount = 7;
 
     private const byte ChatJoinRequestCommand = 0;
@@ -30,6 +32,9 @@ public static class ChatCommands
     private const byte ChatChannelListRequestCommand = 21;
     private const byte ToonSelectCommand = 5;
     private const byte CacheGetStreamItemsCommand = 9;
+
+    private const byte FriendsSlot = 3;
+    private const byte FriendsToonsOfFriendsCommand = 6;
 
     private static BitWriter RecordWriter(byte command, byte serviceSlot)
     {
@@ -50,6 +55,56 @@ public static class ChatCommands
         writer.Write(FourCc.Encode(locale), 32);
         writer.Write(channelNameId, 16);
         writer.Write(token, 32);
+        writer.Align();
+        return writer.ToBytes();
+    }
+
+    /// <summary>
+    /// ToonsOfFriendsRequest (Friends slot 3, command 6): asks for an account friend's SC2
+    /// characters, answered by ToonsOfFriendsNotify on the same slot and command. An empty marker
+    /// struct, then m_accountId as 32 bits; ported from ncarrillo/superiority (MIT),
+    /// protocol.rs friend_toons.
+    /// </summary>
+    public static byte[] ToonsOfFriendsRequest(uint accountId)
+    {
+        var writer = RecordWriter(FriendsToonsOfFriendsCommand, FriendsSlot);
+        writer.Write(accountId, 32);
+        writer.Align();
+        return writer.ToBytes();
+    }
+
+    /// <summary>The profile path whose data holds the portrait (superiority's AVATAR_PATH).</summary>
+    public static ReadOnlySpan<byte> ProfileAvatarPath => [0x14];
+
+    /// <summary>
+    /// Profile ReadRequest (Profile slot 14, command 0) for the portrait of the profile at
+    /// <paramref name="address"/>, reading <see cref="ProfileAvatarPath"/>. Answered by one
+    /// or more <see cref="ProfileReadRecord"/>s carrying <paramref name="requestId"/>.
+    /// </summary>
+    public static byte[] ProfileReadRequest(uint requestId, PlayerTarget.ProfileRecordAddress address) =>
+        ProfileReadRequest(requestId, address, ProfileAvatarPath);
+
+    /// <summary>
+    /// Profile ReadRequest (Profile slot 14, command 0): a 32-bit client hash (0), the
+    /// request id, the record address (label 32 bits, id 64 bits), 5 zero bits (no
+    /// reserved flag, the "All" selection, no reader), an 8-bit path length, then the
+    /// byte-aligned path. Ported from ncarrillo/superiority (MIT), protocol.rs profile_read.
+    /// </summary>
+    public static byte[] ProfileReadRequest(uint requestId, PlayerTarget.ProfileRecordAddress address, ReadOnlySpan<byte> path)
+    {
+        if (path.Length > byte.MaxValue)
+        {
+            throw new ArgumentException("Profile read path is longer than 255 bytes.", nameof(path));
+        }
+
+        var writer = RecordWriter(ProfileReadCommand, ProfileSlot);
+        writer.Write(0, 32);
+        writer.Write(requestId, 32);
+        writer.Write(address.Label, 32);
+        writer.Write(address.RecordId, 64);
+        writer.Write(0, 5);
+        writer.Write((ulong)path.Length, 8);
+        writer.WriteBytes(path, aligned: true);
         writer.Align();
         return writer.ToBytes();
     }

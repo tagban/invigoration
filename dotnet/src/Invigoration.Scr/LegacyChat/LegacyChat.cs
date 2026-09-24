@@ -70,6 +70,17 @@ public static class LegacyChatRequests
         return Command(channelId, "channel", channelName);
     }
 
+    /// <summary>
+    /// A typed slash command ("/whois KTBPA", "/kick name reason"), as the game sends it: the command
+    /// word, then the first argument, then the rest of the line as one argument.
+    /// </summary>
+    public static (uint Method, byte[] Body) SlashCommand(ulong channelId, string text)
+    {
+        var parts = text.TrimStart('/').Split(' ', 3, StringSplitOptions.RemoveEmptyEntries);
+        RequireText(parts.Length > 0 ? parts[0] : "");
+        return Command(channelId, parts[0].ToLowerInvariant(), parts[1..]);
+    }
+
     public static (uint Method, byte[] Body) ListChannels()
     {
         var w = new ProtoWriter();

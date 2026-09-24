@@ -302,6 +302,21 @@ public sealed class BotConfig
     /// </summary>
     public bool ShowLadderIcons { get; set; } = true;
 
+    /// <summary>Whether the Battle.net 2.0 friends list (SC2/SC:R) shows friends by their real name, when they share it, instead of their BattleTag. Off by default.</summary>
+    public bool ShowFriendRealNames { get; set; }
+
+    /// <summary>Whether the Friends tab lists offline friends too. Off by default: only who's online.</summary>
+    public bool ShowOfflineFriends { get; set; }
+
+    /// <summary>
+    /// StarCraft II chat, with ShowUserIconsInChat on: a large portrait beside the speaker's name and
+    /// word-wrapped text, rather than a small icon before the line. Off (compact) by default.
+    /// </summary>
+    public bool FullChatPortraits { get; set; }
+
+    /// <summary>StarCraft II user list: larger portraits with a light detail line (BattleTag, status) under each name, rather than compact rows.</summary>
+    public bool FullUserListPortraits { get; set; }
+
     /// <summary>
     /// Off by default ("Normal" layout: chat on the left, the Users/Friends/Clan panel docked
     /// vertically on the right). On, switches that bot's tab to "D2 Style": the same panel moves

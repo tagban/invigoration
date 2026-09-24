@@ -300,6 +300,73 @@ public partial class BotTabView : UserControl
         }
     }
 
+    /// <summary>The SC2/SC:R user list's right-click menu: the icon set, filled like the classic list's.</summary>
+    private void OnSc2UserContextMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu
+            || DataContext is not BotTabViewModel vm
+            || menu.Items.OfType<MenuItem>().FirstOrDefault(m => m.Name == "Sc2UserIconSetMenu") is not { } iconSetMenu
+            || this.FindAncestorOfType<Window>()?.DataContext is not MainWindowViewModel mainVm)
+        {
+            return;
+        }
+
+        foreach (var choice in menu.Items.OfType<MenuItem>())
+        {
+            choice.IsChecked = choice.Name switch
+            {
+                "UserListCompact" => !vm.Config.FullUserListPortraits,
+                "UserListFull" => vm.Config.FullUserListPortraits,
+                _ => choice.IsChecked,
+            };
+        }
+
+        iconSetMenu.Items.Clear();
+        var current = MainWindowViewModel.IconSetNameFor(vm);
+        foreach (var name in mainVm.IconSetNames)
+        {
+            var item = new MenuItem { Header = name.Replace("_", "__"), ToggleType = MenuItemToggleType.Radio, GroupName = "Sc2UserIconSet", IsChecked = name == current };
+            item.Click += (_, _) => mainVm.UseIconSet(vm, name);
+            iconSetMenu.Items.Add(item);
+        }
+    }
+
+    private void OnUserListStyleClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Name: { } choice } && DataContext is BotTabViewModel vm)
+        {
+            vm.SetUserListFull(choice == "UserListFull");
+        }
+    }
+
+    /// <summary>The SC2/SC:R chat's right-click menu: ticks the current Pictures in Chat choice.</summary>
+    private void OnChatContextMenuOpened(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not ContextMenu menu || DataContext is not BotTabViewModel vm)
+        {
+            return;
+        }
+
+        foreach (var choice in menu.Items.OfType<MenuItem>().SelectMany(m => m.Items.OfType<MenuItem>()))
+        {
+            choice.IsChecked = choice.Name switch
+            {
+                "ChatPicturesOff" => !vm.Config.ShowUserIconsInChat,
+                "ChatPicturesCompact" => vm.Config.ShowUserIconsInChat && !(vm.IsSc2 && vm.Config.FullChatPortraits),
+                "ChatPicturesFull" => vm.Config.ShowUserIconsInChat && vm.IsSc2 && vm.Config.FullChatPortraits,
+                _ => choice.IsChecked,
+            };
+        }
+    }
+
+    private void OnChatPicturesClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is MenuItem { Name: { } choice } && DataContext is BotTabViewModel vm)
+        {
+            vm.SetChatPictures(show: choice != "ChatPicturesOff", full: choice == "ChatPicturesFull");
+        }
+    }
+
     private void OnToggleClassicIconStyleClick(object? sender, RoutedEventArgs e)
     {
         if (DataContext is BotTabViewModel vm)

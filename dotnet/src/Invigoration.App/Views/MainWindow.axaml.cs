@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         Title = BaseTitle;
+        BotTabViewModel.AskToDownloadSc2Portraits = AskSc2PortraitsAsync;
         Closing += (_, _) =>
         {
             ViewModel?.SaveAll();
@@ -534,6 +535,50 @@ public partial class MainWindow : Window
         dialog.Content = content;
 
         return await dialog.ShowDialog<bool?>(this);
+    }
+
+    /// <summary>The one-time offer to download StarCraft II portraits (see BotTabViewModel.OfferSc2PortraitsAsync).</summary>
+    private async Task<BotTabViewModel.Sc2PortraitsAnswer> AskSc2PortraitsAsync()
+    {
+        var dialog = new Window
+        {
+            Title = "StarCraft II Portraits",
+            Width = 460,
+            SizeToContent = SizeToContent.Height,
+            CanResize = false,
+            WindowStartupLocation = WindowStartupLocation.CenterOwner,
+        };
+
+        var download = new Button { Content = "Download", IsDefault = true };
+        var notNow = new Button { Content = "Not Now", IsCancel = true };
+        var never = new Button { Content = "Don't Ask Again" };
+        download.Click += (_, _) => dialog.Close(BotTabViewModel.Sc2PortraitsAnswer.Download);
+        notNow.Click += (_, _) => dialog.Close(BotTabViewModel.Sc2PortraitsAnswer.NotNow);
+        never.Click += (_, _) => dialog.Close(BotTabViewModel.Sc2PortraitsAnswer.Never);
+        dialog.Content = new StackPanel
+        {
+            Margin = new Avalonia.Thickness(20),
+            Spacing = 12,
+            Children =
+            {
+                new TextBlock { Text = "Show StarCraft II players' portraits?", FontWeight = Avalonia.Media.FontWeight.Bold, TextWrapping = Avalonia.Media.TextWrapping.Wrap },
+                new TextBlock
+                {
+                    Text = "Invigoration can show each StarCraft II player's profile portrait in the user list. The portraits are Blizzard's art, so they aren't included with Invigoration: this downloads them once (about 21 MB) from the open-source Superiority project on GitHub and keeps them in your settings folder.",
+                    TextWrapping = Avalonia.Media.TextWrapping.Wrap,
+                    Opacity = 0.8,
+                },
+                new StackPanel
+                {
+                    Orientation = Avalonia.Layout.Orientation.Horizontal,
+                    HorizontalAlignment = Avalonia.Layout.HorizontalAlignment.Right,
+                    Spacing = 8,
+                    Children = { never, notNow, download },
+                },
+            },
+        };
+
+        return await dialog.ShowDialog<BotTabViewModel.Sc2PortraitsAnswer?>(this) ?? BotTabViewModel.Sc2PortraitsAnswer.NotNow;
     }
 
     private async void OnRemoveBotClick(object? sender, RoutedEventArgs e) => await RemoveSelectedBot();

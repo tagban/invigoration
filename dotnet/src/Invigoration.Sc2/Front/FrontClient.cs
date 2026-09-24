@@ -19,7 +19,7 @@ namespace Invigoration.Sc2.Front;
 /// challenge) → GameUtilities.ProcessClientRequest → SunkenClient resume
 /// handshake all completed successfully in one continuous session.
 /// </summary>
-public sealed class FrontClient : IAsyncDisposable
+public sealed partial class FrontClient : IAsyncDisposable
 {
     /// <summary>Front WebSocket endpoint for the US region — the only region exercised so far. A real client picks this per-account from <see cref="LogonResult.AvailableRegions"/>/<see cref="LogonResult.ConnectedRegion"/>; not implemented yet.</summary>
     public const string DefaultUsUri = "wss://us.actual.battle.net:1119/";
@@ -37,7 +37,7 @@ public sealed class FrontClient : IAsyncDisposable
 
     /// <summary>ClientWebSocket allows one send at a time; Echo replies and requests can now overlap.</summary>
     private readonly SemaphoreSlim _sendLock = new(1, 1);
-    private uint _nextToken = 1;
+    private int _lastToken;
     private bool _connected;
 
     public async Task ConnectAsync(Uri uri, CancellationToken cancellationToken = default)
@@ -69,6 +69,7 @@ public sealed class FrontClient : IAsyncDisposable
         CancellationToken cancellationToken = default)
     {
         RequireConnected();
+        RequireNotListening("AuthenticateAsync");
         var logonToken = await RequestAsync(AuthenticationServiceHash, 1, LogonBuilder.BuildLogonRequest(cachedWebCredentials).Encode(), cancellationToken).ConfigureAwait(false);
 
         uint? verificationToken = null;
@@ -177,25 +178,23 @@ public sealed class FrontClient : IAsyncDisposable
     /// </summary>
     public async Task<byte[]> GenerateWebCredentialsAsync(string program, CancellationToken cancellationToken = default)
     {
-        RequireConnected();
-        var token = await RequestAsync(AuthenticationServiceHash, 8, new GenerateWebCredentialsRequest { Program = FourCc.Encode(program) }.Encode(), cancellationToken).ConfigureAwait(false);
-        var (_, body) = await AwaitResponseAsync(token, "AuthenticationService.GenerateWebCredentials", cancellationToken).ConfigureAwait(false);
+        var body = await CallAsync(AuthenticationServiceHash, 8, new GenerateWebCredentialsRequest { Program = FourCc.Encode(program) }.Encode(),
+            "AuthenticationService.GenerateWebCredentials", cancellationToken).ConfigureAwait(false);
         var response = GenerateWebCredentialsResponse.Decode(body);
         return response.WebCredentials ?? throw new InvalidOperationException("GenerateWebCredentials returned no credential.");
     }
 
     public async Task<SunkenHandoff> ProcessClientRequestAsync(EntityId gameAccountId, byte[] sessionKey, CancellationToken cancellationToken = default)
     {
-        RequireConnected();
         var request = GameUtilitiesSession.BuildProcessClientRequest(gameAccountId, sessionKey);
-        var token = await RequestAsync(GameUtilitiesServiceHash, 1, request.Encode(), cancellationToken).ConfigureAwait(false);
-        var (_, body) = await AwaitResponseAsync(token, "GameUtilities.ProcessClientRequest", cancellationToken).ConfigureAwait(false);
+        var body = await CallAsync(GameUtilitiesServiceHash, 1, request.Encode(), "GameUtilities.ProcessClientRequest", cancellationToken).ConfigureAwait(false);
         return GameUtilitiesSession.ParseHandoff(ClientResponse.Decode(body));
     }
 
     public async Task CloseAsync(CancellationToken cancellationToken = default)
     {
         _connected = false;
+        _closing = true;
         if (_socket.State == WebSocketState.Open)
         {
             await _socket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, cancellationToken).ConfigureAwait(false);
@@ -204,8 +203,7 @@ public sealed class FrontClient : IAsyncDisposable
 
     private async Task<uint> RequestAsync(uint serviceHash, uint method, byte[] body, CancellationToken cancellationToken)
     {
-        var token = _nextToken;
-        _nextToken = checked(_nextToken + 1);
+        var token = NextToken();
         await SendAsync(new Header { ServiceId = 0, MethodId = method, Token = token, ServiceHash = serviceHash }, body, cancellationToken).ConfigureAwait(false);
         return token;
     }
@@ -307,6 +305,7 @@ public sealed class FrontClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        _closing = true;
         if (_socket.State is WebSocketState.Open or WebSocketState.CloseReceived)
         {
             try
@@ -320,5 +319,16 @@ public sealed class FrontClient : IAsyncDisposable
         }
 
         _socket.Dispose();
+        if (_listenTask is not null)
+        {
+            try
+            {
+                await _listenTask.ConfigureAwait(false);
+            }
+            catch
+            {
+                // The listener reports its own end through ListeningStopped.
+            }
+        }
     }
 }

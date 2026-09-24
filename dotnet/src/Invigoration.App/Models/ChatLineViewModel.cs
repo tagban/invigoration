@@ -18,10 +18,22 @@ public sealed class ChatLineViewModel
     /// <summary>The speaker's game/client icon, shown before the text — see BotConfig.ShowUserIconsInChat. Null on every line that isn't a Talk/Emote from a real user, or when the toggle is off.</summary>
     public Bitmap? Icon { get; }
 
-    public ChatLineViewModel(IEnumerable<ChatLogSegment> segments, Bitmap? icon = null)
+    /// <summary>
+    /// Show <see cref="Icon"/> as a large portrait with the speaker's name above the word-wrapped
+    /// text, rather than a small inline icon (BotConfig.FullChatPortraits, SC2). The first segment
+    /// is then the name.
+    /// </summary>
+    public bool LargePicture { get; }
+
+    /// <summary>How many leading segments are the speaker's name (with its dimmed code and ": "), shown as the Full layout's heading.</summary>
+    public int NameSegments { get; }
+
+    public ChatLineViewModel(IEnumerable<ChatLogSegment> segments, Bitmap? icon = null, bool largePicture = false, int nameSegments = 1)
     {
         Segments = segments.Select(s => new ChatSegmentViewModel(s.Text, s.Color)).ToList();
         Icon = icon;
+        NameSegments = Math.Clamp(nameSegments, 1, Math.Max(1, Segments.Count - 1));
+        LargePicture = largePicture && icon is not null && Segments.Count > NameSegments;
     }
 
     public ChatLineViewModel(string text, RgbColor color, Bitmap? icon = null)

@@ -22,4 +22,23 @@ public static class FourCc
 
         return result;
     }
+
+    /// <summary>Inverse of <see cref="Encode"/>: 0x5332 → "S2", 0x42534170 → "BSAp". Leading zero bytes are dropped.</summary>
+    public static string Decode(uint value)
+    {
+        Span<byte> bytes = stackalloc byte[4];
+        var count = 0;
+        for (var shift = 24; shift >= 0; shift -= 8)
+        {
+            var b = (byte)(value >> shift);
+            if (b == 0 && count == 0)
+            {
+                continue;
+            }
+
+            bytes[count++] = b;
+        }
+
+        return Encoding.ASCII.GetString(bytes[..count]);
+    }
 }

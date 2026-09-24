@@ -186,7 +186,8 @@ public class SessionRecordTests
             w.Write(0, 8);
         });
 
-        AssertDecodesThenMarker<NativeChatRecord.Sc2Consumed>(record);
+        var update = AssertDecodesThenMarker<NativeChatRecord.PresenceUpdate>(record);
+        Assert.Equal("status", System.Text.Encoding.UTF8.GetString(update.Value.FieldData));
     }
 
     [Fact]

@@ -1,6 +1,10 @@
 using System.Text;
 using System.Threading.Channels;
+using Invigoration.Core.Chat;
+using FriendEntry = Invigoration.Core.Chat.FriendEntry;
 using Invigoration.Core.Config;
+using Sc2Friend = Invigoration.Sc2.Native.FriendEntry;
+using Sc2FriendIdentity = Invigoration.Sc2.Native.FriendIdentity;
 using WhisperTarget = Invigoration.Sc2.Chat.WhisperTarget;
 using Invigoration.Sc2.Front;
 using Invigoration.Sc2.Native;
@@ -57,6 +61,14 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
     private uint _nextJoinToken;
     private StreamWriter? _protocolLog;
     private bool _disposed;
+    private byte[]? _presented;
+    private readonly Dictionary<Sc2FriendIdentity, Sc2Friend> _friends = new();
+    private PresenceTracker _presence = new();
+    private readonly HashSet<uint> _askedFriendToons = new();
+    private PortraitResolver _portraits = new();
+    private int _presenceUpdatesLogged;
+    private List<FriendEntry> _shownFriends = [];
+    private IDisposable? _signInTurn;
 
     private sealed class ChannelState(ChatChannel channel, uint localHandle)
     {
@@ -70,6 +82,15 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
     {
         _profileId = profileId;
         _log = log;
+        BattlenetFriendDirectory.Changed += OnFriendDirectoryChanged;
+    }
+
+    private void OnFriendDirectoryChanged(string profileId)
+    {
+        if (profileId == _profileId && _stream is not null)
+        {
+            EmitFriendsIfChanged();
+        }
     }
 
     public PeopleRegistry People { get; } = new();
@@ -176,6 +197,8 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
             _runCts?.Cancel();
         }
 
+        BattlenetFriendDirectory.Changed -= OnFriendDirectoryChanged;
+
         _ = Task.Run(async () =>
         {
             if (_run is { } run)
@@ -193,7 +216,19 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         OpenProtocolLog();
         try
         {
-            await SignInAndChatAsync(channels, cancellationToken).ConfigureAwait(false);
+            while (true)
+            {
+                try
+                {
+                    await SignInAndChatAsync(channels, cancellationToken).ConfigureAwait(false);
+                    break;
+                }
+                catch (SavedSignInArrivedException arrived)
+                {
+                    // Not a failure: another game on the profile signed in for us meanwhile.
+                    Trace(arrived.Message);
+                }
+            }
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -211,6 +246,7 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         }
         finally
         {
+            EndSignInTurn();
             _stream?.Dispose();
             _stream = null;
             lock (_sync)
@@ -233,6 +269,16 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
 
     private async Task SignInAndChatAsync(IReadOnlyList<ChannelTarget> channels, CancellationToken cancellationToken)
     {
+        lock (_sync)
+        {
+            _friends.Clear();
+            _presence = new PresenceTracker();
+            _portraits = new PortraitResolver();
+            _presenceUpdatesLogged = 0;
+            _shownFriends = [];
+            _askedFriendToons.Clear();
+        }
+
         Emit(new StageChanged(Stage.WebAuthentication));
         var front = new FrontClient();
         var frontOpen = true;
@@ -242,7 +288,7 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
             await front.ConnectAsync(new Uri(FrontClient.DefaultUsUri), cancellationToken).ConfigureAwait(false);
             await front.EstablishAsync(cancellationToken).ConfigureAwait(false);
 
-            var saved = BattlenetCredentialProfileStore.LoadNativeCredential(_profileId, Program);
+            var saved = _presented = BattlenetCredentialProfileStore.LoadNativeCredential(_profileId, Program);
             Trace(saved is null ? "No saved sign-in; Battle.net will ask for one." : "Presenting the saved sign-in.");
             var logon = await front.AuthenticateAsync(saved, ChallengeAsync, cancellationToken).ConfigureAwait(false);
             if (logon.ErrorCode != 0)
@@ -257,6 +303,13 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
             var fresh = await front.GenerateWebCredentialsAsync(Program, cancellationToken).ConfigureAwait(false);
             BattlenetCredentialProfileStore.SaveNativeCredential(_profileId, Program, fresh);
             Trace("Saved the new sign-in.");
+            await NativeSignIns.IssueMissingAsync(
+                _profileId,
+                Program,
+                async (program, token) => await front.GenerateWebCredentialsAsync(program, token).ConfigureAwait(false),
+                Trace,
+                cancellationToken).ConfigureAwait(false);
+            EndSignInTurn();
 
             Emit(new StageChanged(Stage.GameUtilities));
             var gameAccount = logon.GameAccountIds.FirstOrDefault()
@@ -266,6 +319,9 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
             Trace($"Handoff to Sunken at {handoff.Address}.");
 
             Emit(new StageChanged(Stage.NativeAuthentication));
+            // Front closes once Sunken is reached. Keeping it for the account friends list was tried
+            // (FrontClient.StartSocialAsync): Battle.net refuses FriendsService.Subscribe from a game
+            // client with 3025 (ERROR_RPC_METHOD_DISABLED) and drops Front.
             var session = await SunkenClient.ConnectAsync(
                 handoff,
                 onStage: Trace,
@@ -299,6 +355,8 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         Emit(new StageChanged(Stage.ChatBootstrap));
         using var pinger = new PeriodicTimer(ConnectionCommands.PingInterval);
         var pinging = PingLoopAsync(pinger, cancellationToken);
+        using var portraitsStop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        var portraits = PumpPortraitsAsync(portraitsStop.Token);
         try
         {
             await ReadLoopAsync(channels, cancellationToken).ConfigureAwait(false);
@@ -307,6 +365,8 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         {
             pinger.Dispose();
             await pinging.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+            await portraitsStop.CancelAsync().ConfigureAwait(false);
+            await portraits.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
     }
 
@@ -402,16 +462,166 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
 
                 case NativeChatRecord.Membership membership:
                     HandleMembership(membership.Value);
+                    UpdatePortraits();
                     break;
 
                 case NativeChatRecord.Message message:
                     HandleMessage(message.Value);
                     break;
 
+                case NativeChatRecord.FriendsList friends:
+                    HandleFriends(friends.Value);
+                    break;
+
+                case NativeChatRecord.ToonsOfFriends toons:
+                    HandleFriendToons(toons.Value);
+                    break;
+
+                case NativeChatRecord.PresenceFields fields:
+                    _presence.Announce(fields.Value);
+                    _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    presence fields: "
+                        + string.Join(", ", fields.Value.Fields.Select(f => $"{f.Handle:X}:t{f.TypeId}{(f.FixedSize is { } size ? $"/{size}" : "")}")));
+                    break;
+
+                case NativeChatRecord.PresenceUpdate update:
+                    // Every value, for the first few hundred updates: to find whether SC2's presence
+                    // says which game (not just SC2) a friend is in.
+                    if (_presenceUpdatesLogged++ < 300)
+                    {
+                        var u = update.Value;
+                        _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    presence {u.MasterPresenceId}/{u.LocalPresenceId} online={u.Online} "
+                            + $"fields [{string.Join(",", u.Handles.Select(h => h.ToString("X")))}] cleared [{string.Join(",", u.ClearedHandles.Select(h => h.ToString("X")))}] "
+                            + $"sizes [{string.Join(",", u.VariableSizes)}] data {Convert.ToHexString(u.FieldData.AsSpan(0, Math.Min(u.FieldData.Length, 96)))}");
+                    }
+
+                    bool applied;
+                    lock (_sync)
+                    {
+                        applied = _presence.Apply(update.Value);
+                    }
+
+                    if (applied)
+                    {
+                        EmitFriendsIfChanged();
+                        UpdatePortraits();
+                    }
+
+                    break;
+
+                case NativeChatRecord.ProfileRead profile:
+                    bool resolved;
+                    lock (_sync)
+                    {
+                        resolved = _portraits.Complete(profile.Value);
+                    }
+
+                    if (resolved)
+                    {
+                        UpdatePortraits();
+                    }
+
+                    break;
+
                 case NativeChatRecord.Whisper whisper:
                     Emit(new WhisperReceived(whisper.Value.PeerName, whisper.Value.Body, false));
                     break;
             }
+        }
+    }
+
+    /// <summary>
+    /// Channel members' profile portraits, as superiority (MIT) finds them: straight from presence
+    /// when it carries one, otherwise by reading each member's profile, rate-limited by
+    /// PortraitResolver (see PumpPortraitsAsync). Found ones go to NativeMemberPortraits for the user list.
+    /// </summary>
+    private void UpdatePortraits()
+    {
+        lock (_sync)
+        {
+            foreach (var user in _channels.Values.SelectMany(c => c.Members.Values))
+            {
+                if (user.PresenceId is not { } presenceId)
+                {
+                    continue;
+                }
+
+                if (_portraits.For(_presence, presenceId) is { } portrait)
+                {
+                    NativeMemberPortraits.Set(user.Name, portrait.Table, portrait.Offset);
+                }
+                else
+                {
+                    _portraits.EnqueueMember(_presence, presenceId);
+                }
+
+                NativeMemberPortraits.SetDetail(user.Name, MemberDetail(presenceId));
+                if (_presence.State(presenceId) is { } state)
+                {
+                    NativeMemberPortraits.SetState(user.Name, state switch
+                    {
+                        FriendPresence.Away => Presence.Away,
+                        FriendPresence.Busy => Presence.Busy,
+                        FriendPresence.InGame => Presence.InGame,
+                        FriendPresence.Offline => Presence.Offline,
+                        _ => Presence.Available,
+                    });
+                }
+            }
+        }
+    }
+
+    /// <summary>What presence says about a member, for the user list's Full view: BattleTag, and in a game, away or busy.</summary>
+    private string MemberDetail(uint presenceId)
+    {
+        var parts = new List<string>();
+        if (_presence.BattleTagFor(presenceId) is { Length: > 0 } tag)
+        {
+            parts.Add(tag);
+        }
+
+        switch (_presence.State(presenceId))
+        {
+            case FriendPresence.InGame:
+                parts.Add("in a game");
+                break;
+            case FriendPresence.Away:
+                parts.Add("away");
+                break;
+            case FriendPresence.Busy:
+                parts.Add("busy");
+                break;
+        }
+
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>Sends the profile reads PortraitResolver allows (16 at once, 40 a second), four times a second.</summary>
+    private async Task PumpPortraitsAsync(CancellationToken cancellationToken)
+    {
+        using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(250));
+        try
+        {
+            while (await timer.WaitForNextTickAsync(cancellationToken).ConfigureAwait(false))
+            {
+                List<(uint RequestId, PlayerTarget.ProfileRecordAddress Address)> requests;
+                lock (_sync)
+                {
+                    requests = _portraits.NextRequests(DateTimeOffset.UtcNow).ToList();
+                }
+
+                foreach (var (requestId, address) in requests)
+                {
+                    await SendAsync(ChatCommands.ProfileReadRequest(requestId, address), cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+        {
+            // Session over.
+        }
+        catch (Exception ex)
+        {
+            Trace($"Portrait requests stopped: {ex.Message}");
         }
     }
 
@@ -442,6 +652,154 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
 
         Emit(new Joined(index, channel, join.MemberHandle ?? 0));
         return true;
+    }
+
+    /// <summary>
+    /// FriendsListNotify5 (Friends slot, command 30): Battle.net pushes the list at startup in pages
+    /// and sends changes later. Each friend is shown by BattleTag (or SC2 character); the real name
+    /// the record also carries is never shown.
+    /// </summary>
+    private void HandleFriends(FriendsListRecord page)
+    {
+        lock (_sync)
+        {
+            foreach (var update in page.Updates)
+            {
+                var id = update.Entry.Identity;
+                switch (update.Operation)
+                {
+                    case SocialOperation.Remove:
+                        _friends.Remove(id);
+                        break;
+                    case SocialOperation.Modify when _friends.TryGetValue(id, out var known):
+                        _friends[id] = known with
+                        {
+                            DisplayName = update.Entry.DisplayName ?? known.DisplayName,
+                            ToonName = update.Entry.ToonName ?? known.ToonName,
+                            Profile = update.Entry.Profile ?? known.Profile,
+                        };
+                        break;
+                    default:
+                        _friends[id] = update.Entry;
+                        break;
+                }
+            }
+        }
+
+        EmitFriendsIfChanged(page.Complete == false ? ", more to come" : "");
+
+        // Friends sent without a name: ask for their SC2 characters, as the game (and Stimpak) do.
+        List<uint> ask;
+        lock (_sync)
+        {
+            ask = _friends.Values
+                .Where(f => f.DisplayName is not { Length: > 0 } && f.ToonName is null)
+                .Select(f => f.Identity).OfType<Sc2FriendIdentity.Account>().Select(a => a.AccountId)
+                .Where(_askedFriendToons.Add)
+                .ToList();
+        }
+
+        foreach (var accountId in ask)
+        {
+            Send(ChatCommands.ToonsOfFriendsRequest(accountId), "ask for a friend's characters");
+        }
+    }
+
+    /// <summary>ToonsOfFriendsNotify: a friend's SC2 characters, which is the name they're shown by.</summary>
+    private void HandleFriendToons(ToonsOfFriendsRecord record)
+    {
+        lock (_sync)
+        {
+            foreach (var toon in record.Entries)
+            {
+                var id = new Sc2FriendIdentity.Account(toon.AccountId);
+                if (_friends.TryGetValue(id, out var friend) && friend.ToonName is null)
+                {
+                    _friends[id] = friend with { ToonName = toon.ToonName, Profile = friend.Profile ?? toon.Profile };
+                }
+            }
+        }
+
+        EmitFriendsIfChanged();
+    }
+
+    /// <summary>Reports the friends list when it or anyone's status has changed; presence updates arrive often.</summary>
+    private void EmitFriendsIfChanged(string note = "")
+    {
+        List<FriendEntry> list;
+        lock (_sync)
+        {
+            list = _friends.Values.Select(ToFriendEntry)
+                .OrderBy(f => f.Location == FriendLocation.Offline).ThenBy(f => f.Account, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (list.SequenceEqual(_shownFriends))
+            {
+                return;
+            }
+
+            _shownFriends = list;
+        }
+
+        int fromDirectory;
+        lock (_sync)
+        {
+            fromDirectory = _friends.Keys.OfType<Sc2FriendIdentity.Account>().Count(a => BattlenetFriendDirectory.Find(_profileId, a.AccountId) is not null);
+        }
+
+        Trace($"Friends list: {list.Count} ({list.Count(f => f.Location != FriendLocation.Offline)} online){note}; {fromDirectory} named from the Battle.net friends list.");
+        Emit(new NativeFriendsEvent(list));
+    }
+
+    /// <summary>
+    /// A friend as the Battle.net app shows them. SC2 doesn't send BattleTags for account friends,
+    /// so those come from the profile's Battle.net friends list as SC:R received it
+    /// (BattlenetFriendDirectory), and so does what they're doing while an SC:R bot is connected.
+    /// Otherwise: their SC2 character, else their real name, else their ID, and SC2's own presence.
+    /// </summary>
+    private FriendEntry ToFriendEntry(Sc2Friend friend)
+    {
+        var accountId = (friend.Identity as Sc2FriendIdentity.Account)?.AccountId;
+        var known = accountId is { } id ? BattlenetFriendDirectory.Find(_profileId, id) : null;
+        var realName = known?.RealName is { Length: > 0 } shared ? shared : friend.FullName ?? "";
+        var name = known?.BattleTag
+            ?? _presence.BattleTagFor(friend)
+            ?? (friend.DisplayName is { Length: > 0 } tag ? tag
+                : friend.ToonName is { } toon ? toon.Name
+                : realName.Length > 0 ? realName
+                : accountId is { } number ? $"#{number}" : "?");
+        if (name == realName)
+        {
+            realName = "";
+        }
+
+        if (accountId is { } liveId && BattlenetFriendDirectory.ActivityOf(_profileId, liveId) is { } activity)
+        {
+            if (!activity.Online)
+            {
+                return new FriendEntry(name, FriendStatus.None, FriendLocation.Offline, "", "", realName);
+            }
+
+            var (icon, game) = BattlenetPrograms.Describe(activity.Program);
+            return new FriendEntry(name, FriendStatus.None, FriendLocation.NotInChat, icon,
+                activity.Detail.Length > 0 ? $"{game}: {activity.Detail}" : game, realName);
+        }
+
+        // SC2's presence names the game account a friend is on (field 0x10018), as SC:R's list does.
+        var state = _presence.For(friend);
+        if (state is null or FriendPresence.Offline)
+        {
+            return new FriendEntry(name, FriendStatus.None, FriendLocation.Offline, "", "", realName);
+        }
+
+        var (gameIcon, gameName) = BattlenetPrograms.Describe(_presence.ProgramFor(friend) ?? "");
+        var (status, doing) = state switch
+        {
+            FriendPresence.Away => (FriendStatus.Away, $"{gameName} (away)"),
+            FriendPresence.Busy => (FriendStatus.DoNotDisturb, $"{gameName} (busy)"),
+            FriendPresence.InGame => (FriendStatus.None, $"{gameName}: in a game"),
+            _ => (FriendStatus.None, gameName),
+        };
+        return new FriendEntry(name, status, FriendLocation.NotInChat, gameIcon, doing, realName);
     }
 
     private void HandleMembership(MembershipChangeNotifyRecord record)
@@ -559,8 +917,13 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         }
     }
 
+    private void EndSignInTurn() => Interlocked.Exchange(ref _signInTurn, null)?.Dispose();
+
     private async Task<byte[]> ChallengeAsync(Uri url, CancellationToken cancellationToken)
     {
+        // One sign-in window per profile at a time; kept until the other games' sign-ins are saved.
+        _signInTurn ??= await NativeSignIns.BeginWebSignInAsync(_profileId, Program, _presented, cancellationToken).ConfigureAwait(false);
+
         TaskCompletionSource<string> answer;
         ulong authId;
         lock (_sync)

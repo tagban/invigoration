@@ -104,6 +104,12 @@ public partial class ChannelTabView : UserControl
             inlines.Add(new LineBreak());
         }
 
+        if (line.LargePicture && line.Icon is not null)
+        {
+            inlines.Add(new InlineUIContainer(LargePictureLine(chatText, line)));
+            return;
+        }
+
         if (line.Icon is not null)
         {
             // Same Viewbox-wrapping fix as BotTabView.axaml.cs's AppendLine — a plain Image's own
@@ -123,5 +129,69 @@ public partial class ChannelTabView : UserControl
         {
             inlines.Add(new Run(segment.Text) { Foreground = segment.Brush });
         }
+    }
+
+    /// <summary>
+    /// A talk line with the speaker's portrait on the left and their name above the word-wrapped
+    /// text (BotConfig.FullChatPortraits). Sized to the log's width, and resized with it.
+    /// </summary>
+    private static Control LargePictureLine(SelectableTextBlock chatText, ChatLineViewModel line)
+    {
+        var text = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = chatText.FontSize };
+        foreach (var segment in line.Segments.Skip(line.NameSegments))
+        {
+            text.Inlines!.Add(new Run(segment.Text) { Foreground = segment.Brush });
+        }
+
+        // The name (and its dimmed code) as a bold heading, without the ": ".
+        var heading = new TextBlock { FontWeight = Avalonia.Media.FontWeight.Bold };
+        foreach (var segment in line.Segments.Take(line.NameSegments))
+        {
+            var part = segment.Text.TrimEnd(' ', ':');
+            if (part.Length > 0)
+            {
+                heading.Inlines!.Add(new Run(part) { Foreground = segment.Brush });
+            }
+        }
+
+        var block = new Grid
+        {
+            ColumnDefinitions = new ColumnDefinitions("Auto,*"),
+            Margin = new Thickness(0, 3, 0, 3),
+        };
+        block.Children.Add(new Image { Source = line.Icon, Width = 40, Height = 40, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 0, 8, 0) });
+        var column = new StackPanel { Spacing = 1 };
+        column.Children.Add(heading);
+        column.Children.Add(text);
+        Grid.SetColumn(column, 1);
+        block.Children.Add(column);
+
+        // Follows the log's width while on screen. A log that's being swapped out reports 0: ignored,
+        // or every line would shrink to its minimum and stay there.
+        void Fit()
+        {
+            if (chatText.Bounds.Width > 0)
+            {
+                block.Width = Math.Max(120, chatText.Bounds.Width - 4);
+            }
+        }
+
+        void OnResized(object? sender, AvaloniaPropertyChangedEventArgs e)
+        {
+            if (e.Property == Visual.BoundsProperty)
+            {
+                Fit();
+            }
+        }
+
+        Fit();
+        block.AttachedToVisualTree += (_, _) =>
+        {
+            chatText.PropertyChanged -= OnResized;
+            chatText.PropertyChanged += OnResized;
+            Fit();
+        };
+        block.DetachedFromVisualTree += (_, _) => chatText.PropertyChanged -= OnResized;
+        return block;
     }
 }

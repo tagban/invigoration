@@ -65,7 +65,7 @@ public class ScrAccountTests
 public class ScrFriendsTests
 {
     [Fact]
-    public void FriendUpdated_KeepsTagProgramAndStateButNotTheRealName()
+    public void FriendUpdated_KeepsTagRealNameProgramAndState()
     {
         var friend = new ProtoWriter();
         friend.WriteUInt64(1, 374291212);
@@ -81,8 +81,27 @@ public class ScrFriendsTests
 
         var (decoded, removed) = ScrFriends.DecodeUpdate(body.ToArray())!.Value;
 
-        Assert.Equal(new ScrFriend(374291212, "islanti#11308", "S1", true, false, true), decoded);
+        Assert.Equal(new ScrFriend(374291212, "islanti#11308", "S1", true, false, true, "Real Name"), decoded);
         Assert.False(removed);
-        Assert.DoesNotContain("Real Name", decoded.ToString());
+    }
+}
+
+public class ScrSlashCommandTests
+{
+    [Fact]
+    public void SlashCommand_SplitsTheCommandFirstArgumentAndRest()
+    {
+        var (method, body) = Invigoration.Scr.LegacyChat.LegacyChatRequests.SlashCommand(9, "/kick Raynor spamming the channel");
+
+        Assert.Equal(Invigoration.Scr.LegacyChat.LegacyChatService.CommandMethod, method);
+        var r = new ProtoReader(body);
+        var fields = new List<string>();
+        while (r.HasMore)
+        {
+            var (_, type) = r.ReadTag();
+            fields.Add(type == WireType.Varint ? r.ReadVarint().ToString() : r.ReadString());
+        }
+
+        Assert.Equal(["9", "kick", "Raynor", "spamming the channel"], fields);
     }
 }

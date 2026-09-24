@@ -53,7 +53,10 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
     /// so BotTabViewModel.OnChatMessage never routes one here at all; see
     /// BotTabViewModel.WhisperThreads for where whispers actually go.
     /// </summary>
-    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null, bool showIcons = true)
+    /// <summary>The dim gray a name's "#1234" code is shown in.</summary>
+    private static readonly RgbColor NameCodeColor = new(0x6A, 0x6A, 0x6A);
+
+    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null, bool showIcons = true, bool largePictures = false)
     {
         switch (e.Type)
         {
@@ -71,9 +74,19 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
                 break;
 
             case ChatEventType.Talk:
-                var segments = new List<ChatLogSegment> { new(palette.GetUserNameColor(e.Flags), $"{e.Username}: ") };
+                // "Name#1234": the code dimmed, so it's there but reads like a chat.
+                var nameColor = palette.GetUserNameColor(e.Flags);
+                var (name, code) = NameParts.Split(e.Username);
+                var segments = new List<ChatLogSegment> { new(nameColor, name) };
+                if (code.Length > 0)
+                {
+                    segments.Add(new(NameCodeColor, code));
+                }
+
+                segments.Add(new(nameColor, ": "));
+                var nameSegments = segments.Count;
                 segments.AddRange(ChatColorFormatter.Parse(e.Text, palette.GetChatColor(e.Flags), palette));
-                ChatLines.Add(new ChatLineViewModel(segments, userIcon));
+                ChatLines.Add(new ChatLineViewModel(segments, userIcon, largePictures, nameSegments));
                 break;
 
             case ChatEventType.Emote:

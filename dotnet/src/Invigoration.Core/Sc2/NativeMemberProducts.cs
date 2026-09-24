@@ -21,6 +21,9 @@ public static class NativeMemberProducts
         }
     }
 
+    /// <summary>Whether this name is a StarCraft: Remastered chat member, which has no presence to show.</summary>
+    public static bool IsKnown(string name) => ByName.ContainsKey(name);
+
     /// <summary>The icon key for a member's game, or null when none is known (every SC2 user).</summary>
     public static string? IconKeyFor(string name) =>
         ByName.TryGetValue(name, out var program)

@@ -49,6 +49,9 @@ public sealed class NativeScrChatClient : ISc2ChatClient
     private readonly Dictionary<ulong, ScrFriend> _friends = new();
     private Timer? _friendsTimer;
     private bool _everJoined;
+    private readonly HashSet<string> _describedMembers = new(StringComparer.OrdinalIgnoreCase);
+    private byte[]? _presented;
+    private IDisposable? _signInTurn;
     private bool _rosterLoaded;
     private bool _disposed;
 
@@ -120,6 +123,14 @@ public sealed class NativeScrChatClient : ISc2ChatClient
     /// <summary>Sends to the channel, and shows it: Battle.net doesn't echo a sender's own lines.</summary>
     public void SendMessage(byte channelIndex, string body)
     {
+        // Slash commands (/whois, /kick, /ban, /designate...) go to the server as commands; its
+        // answer comes back as an info or error line.
+        if (body.StartsWith('/') && body.Length > 1)
+        {
+            Send(c => c.Chat.SlashCommand(body), "send " + body.Split(' ')[0]);
+            return;
+        }
+
         Send(c => c.Chat.SendMessage(body), "send message");
         Emit(new MessageReceived(ChannelIndex, UserFor(_connection?.Toon?.Name ?? ""), body));
     }
@@ -187,6 +198,11 @@ public sealed class NativeScrChatClient : ISc2ChatClient
             Trace($"Gateway {ScrGateways.NameOf(_gateway)}, character {(_characterName.Length > 0 ? _characterName : "(first there)")}, home channel {homeChannel}.");
             _connection = await ConnectWithRetryAsync(homeChannel, cancellationToken).ConfigureAwait(false);
 
+            // After startup, which Battle.net wants done within seconds: other games' sign-ins, then
+            // let any other game on this profile waiting to sign in have its turn.
+            await NativeSignIns.IssueMissingAsync(_profileId, Program, _connection.GenerateWebCredentialsAsync, Trace, cancellationToken).ConfigureAwait(false);
+            EndSignInTurn();
+
             Emit(new AccountConnected(new AccountSummary(null, _connection.BattleTag ?? "", null, [])));
             Emit(new PublicChannelsReceived(_connection.Channels
                 .Where(c => c.Id <= ushort.MaxValue)
@@ -213,6 +229,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient
         }
         finally
         {
+            EndSignInTurn();
             await session.CancelAsync().ConfigureAwait(false);
             if (sending is not null)
             {
@@ -238,6 +255,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient
                 _friends.Clear();
                 _friendsTimer?.Dispose();
                 _friendsTimer = null;
+                BattlenetFriendDirectory.ForgetActivity(_profileId);
             }
 
             Emit(new StageChanged(Stage.Disconnected));
@@ -260,7 +278,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient
             try
             {
                 // Reloaded each time: the attempt before may have saved a newer one.
-                var saved = BattlenetCredentialProfileStore.LoadNativeCredential(_profileId, Program);
+                var saved = _presented = BattlenetCredentialProfileStore.LoadNativeCredential(_profileId, Program);
                 return await ScrConnection.ConnectAsync(
                     saved,
                     new ScrConnectOptions(_gateway, _characterName, homeChannel),
@@ -268,6 +286,12 @@ public sealed class NativeScrChatClient : ISc2ChatClient
                     Trace,
                     cancellationToken,
                     fresh => BattlenetCredentialProfileStore.SaveNativeCredential(_profileId, Program, fresh)).ConfigureAwait(false);
+            }
+            catch (SavedSignInArrivedException arrived)
+            {
+                // Not a failure: another game on the profile signed in for us meanwhile.
+                Trace(arrived.Message);
+                attempt--;
             }
             catch (Exception ex) when (attempt < waits.Length && IsStartupDrop(ex) && !cancellationToken.IsCancellationRequested)
             {
@@ -315,6 +339,11 @@ public sealed class NativeScrChatClient : ISc2ChatClient
             case ScrChatEvent.Unhandled { Service: ScrFriends.Service, Method: ScrFriends.FriendUpdatedMethod } friendUpdate:
                 if (ScrFriends.DecodeUpdate(friendUpdate.Body) is var (friend, removed))
                 {
+                    if (friend.Online)
+                    {
+                        _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    friend {friend.BattleTag}: program {friend.Program}, detail \"{friend.Detail}\", flags {friend.Away}/{friend.Busy}");
+                    }
+
                     lock (_sync)
                     {
                         if (removed)
@@ -345,41 +374,30 @@ public sealed class NativeScrChatClient : ISc2ChatClient
         List<FriendEntry> friends;
         lock (_sync)
         {
+            BattlenetFriendDirectory.Update(_profileId, _friends.Values.Select(f =>
+                ((uint)f.AccountId, f.BattleTag, f.RealName, new BattlenetFriendDirectory.Activity(f.Online, f.Program, f.Detail))));
             friends = _friends.Values
                 .OrderByDescending(f => f.Online).ThenBy(f => f.BattleTag, StringComparer.OrdinalIgnoreCase)
                 .Select(ToFriendEntry)
                 .ToList();
         }
 
+        Trace($"Friends list: {friends.Count} ({friends.Count(f => f.Location != FriendLocation.Offline)} online).");
         Emit(new NativeFriendsEvent(friends));
     }
 
-    /// <summary>
-    /// A Battle.net friend in the Friends tab's classic terms: the game they're in as its classic
-    /// product code where one exists (so it gets that game's icon), and its name as the location.
-    /// </summary>
+    /// <summary>A Battle.net friend as the Battle.net app shows them: BattleTag, real name if shared, and the game they're in.</summary>
     private static FriendEntry ToFriendEntry(ScrFriend friend)
     {
         var status = friend.Busy ? FriendStatus.DoNotDisturb : friend.Away ? FriendStatus.Away : FriendStatus.None;
         if (!friend.Online)
         {
-            return new FriendEntry(friend.BattleTag, status, FriendLocation.Offline, "", "");
+            return new FriendEntry(friend.BattleTag, status, FriendLocation.Offline, "", "", friend.RealName);
         }
 
-        var (product, game) = friend.Program switch
-        {
-            "S1" => ("PXES", "StarCraft: Remastered"),
-            "S2" => ("sc2", "StarCraft II"),
-            "W3" => ("3RAW", "Warcraft III: Reforged"),
-            "OSI" => ("PX2D", "Diablo II: Resurrected"),
-            "Fen" => ("", "Diablo IV"),
-            "BSAp" or "App" => ("", "Battle.net app"),
-            "WoW" => ("", "World of Warcraft"),
-            "Pro" => ("", "Overwatch"),
-            "WTCG" => ("", "Hearthstone"),
-            var other => ("", other),
-        };
-        return new FriendEntry(friend.BattleTag, status, FriendLocation.NotInChat, product, game);
+        var (icon, game) = BattlenetPrograms.Describe(friend.Program);
+        var doing = friend.Detail.Length > 0 ? $"{game}: {friend.Detail}" : game;
+        return new FriendEntry(friend.BattleTag, status, FriendLocation.NotInChat, icon, doing, friend.RealName);
     }
 
     private void Enter(ScrChannel channel)
@@ -400,10 +418,29 @@ public sealed class NativeScrChatClient : ISc2ChatClient
         var name = channel.DisplayName.Length > 0 ? channel.DisplayName : channel.InternalName;
         Emit(new Joined(ChannelIndex, new PrivateChannel(name), 0));
 
-        // Usually empty: the member list follows about a second later in a channel-list update.
+        // Usually empty: the member list follows in a channel-list update, often a second later but
+        // sometimes not for 20 seconds or more. If it hasn't come in two, ask for the channel list
+        // again, which may bring it sooner.
         if (channel.Members.Count > 0)
         {
             UpdateMembers(channel.Members);
+        }
+        else
+        {
+            _ = Task.Delay(TimeSpan.FromSeconds(2)).ContinueWith(_ =>
+            {
+                bool waiting;
+                lock (_sync)
+                {
+                    waiting = ReferenceEquals(_channel, channel) && !_rosterLoaded;
+                }
+
+                if (waiting && _connection is not null)
+                {
+                    Trace($"No member list for {name} yet; asking for the channel list again.");
+                    Send(c => c.Chat.ListChannels(), "ask for the channel list");
+                }
+            }, TaskScheduler.Default);
         }
         if (first)
         {
@@ -420,9 +457,16 @@ public sealed class NativeScrChatClient : ISc2ChatClient
     {
         foreach (var member in members)
         {
-            if (member.Attributes.TryGetValue("program_id", out var program))
+            // SC:R chat only meets Warcraft II, StarCraft, Diablo (in some channels) and Diablo II,
+            // and every one but Diablo II comes with its code; so no code means Diablo II. Whether
+            // it's Lord of Destruction isn't said, so it's the plain Diablo II icon.
+            NativeMemberProducts.Set(member.Name, member.Attributes.TryGetValue("program_id", out var program) ? program : "D2DV");
+
+            // What each member carries, once per name, to learn what other games send (icons).
+            if (_describedMembers.Add(member.Name))
             {
-                NativeMemberProducts.Set(member.Name, program);
+                _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    member {member.Name}: flags {member.Flags}; "
+                    + string.Join(", ", member.Attributes.Where(a => a.Key != "battle_tag").Select(a => $"{a.Key}={a.Value}")));
             }
         }
 
@@ -546,8 +590,13 @@ public sealed class NativeScrChatClient : ISc2ChatClient
         }
     }
 
+    private void EndSignInTurn() => Interlocked.Exchange(ref _signInTurn, null)?.Dispose();
+
     private async Task<byte[]> ChallengeAsync(Uri url, CancellationToken cancellationToken)
     {
+        // One sign-in window per profile at a time; kept until the other games' sign-ins are saved.
+        _signInTurn ??= await NativeSignIns.BeginWebSignInAsync(_profileId, Program, _presented, cancellationToken).ConfigureAwait(false);
+
         TaskCompletionSource<string> answer;
         ulong authId;
         lock (_sync)

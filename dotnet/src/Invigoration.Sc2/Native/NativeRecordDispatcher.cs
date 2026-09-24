@@ -97,6 +97,15 @@ public abstract record NativeChatRecord
     /// <summary>Chat 22: the public channel list Battle.net sends back for Chat 21. Numbers only, no names.</summary>
     public sealed record PublicChannelList(IReadOnlyList<(byte A, ushort B, uint C)> Entries) : NativeChatRecord;
 
+    /// <summary>Presence 1 (FieldSpecAnnounce): presence field definitions. Pass to <see cref="PresenceTracker.Announce"/>.</summary>
+    public sealed record PresenceFields(PresenceFieldsRecord Value) : NativeChatRecord;
+
+    /// <summary>Presence 0 (PresenceUpdateNotify): new field values for one presence. Pass to <see cref="PresenceTracker.Apply"/>.</summary>
+    public sealed record PresenceUpdate(PresenceUpdateRecord Value) : NativeChatRecord;
+
+    /// <summary>Profile 0: one answer to a <see cref="ChatCommands.ProfileReadRequest(uint, PlayerTarget.ProfileRecordAddress)"/>. Pass to <see cref="PortraitResolver.Complete"/>.</summary>
+    public sealed record ProfileRead(ProfileReadRecord Value) : NativeChatRecord;
+
     /// <summary>Presence 10: the result of a temporary presence request.</summary>
     public sealed record TemporaryPresenceResult(ushort Result) : NativeChatRecord;
 
@@ -170,8 +179,8 @@ public static class NativeRecordDispatcher
             (FriendsSlot, 31) => Consumed(reader, StartupRecordDecoder.SkipAccountBlocks, serviceSlot, commandId),
             (FriendsSlot, FriendsToonBlockCommand) => new NativeChatRecord.ToonBlocks(FriendsRecordDecoder.DecodeToonBlockNotify(reader)),
 
-            (PresenceSlot, 0) => Consumed(reader, StartupRecordDecoder.SkipPresenceUpdate, serviceSlot, commandId),
-            (PresenceSlot, 1) => Consumed(reader, StartupRecordDecoder.SkipFieldSpecAnnounce, serviceSlot, commandId),
+            (PresenceSlot, 0) => new NativeChatRecord.PresenceUpdate(PresenceRecordDecoder.DecodePresenceUpdate(reader)),
+            (PresenceSlot, 1) => new NativeChatRecord.PresenceFields(PresenceRecordDecoder.DecodeFieldSpecAnnounce(reader)),
             (PresenceSlot, 2) => Consumed(reader, r => r.Read(1), serviceSlot, commandId),
             (PresenceSlot, 3) => Consumed(reader, StartupRecordDecoder.SkipPresenceStatistics, serviceSlot, commandId),
             (PresenceSlot, 4) => Consumed(reader, StartupRecordDecoder.SkipTemporaryPresenceRequest, serviceSlot, commandId),
@@ -189,6 +198,7 @@ public static class NativeRecordDispatcher
             (PartySlot, 0) => Consumed(reader, r => r.SkipToRecordByte(recordStart, 18), serviceSlot, commandId),
             (S2MapsSlot, 50) => Consumed(reader, r => r.SkipToRecordByte(recordStart, 38), serviceSlot, commandId),
             (S2MapsSlot, 57) => Consumed(reader, StartupRecordDecoder.SkipClubSettings, serviceSlot, commandId),
+            (ProfileSlot, ChatCommands.ProfileReadCommand) => new NativeChatRecord.ProfileRead(ProfileRecordDecoder.DecodeProfileRead(reader)),
             (ProfileSlot, 4) => Consumed(reader, StartupRecordDecoder.SkipProfileSettings, serviceSlot, commandId),
 
             _ => throw new UnknownNativeRecordException(serviceSlot, commandId),
@@ -205,7 +215,7 @@ public static class NativeRecordDispatcher
     private const byte S2MasterSlot = 10;
     private const byte PartySlot = 12;
     private const byte S2MapsSlot = 13;
-    private const byte ProfileSlot = 14;
+    private const byte ProfileSlot = ChatCommands.ProfileSlot;
 
     /// <summary>Battlenet::Friends' RPC service slot. core/src/native/protocol.rs: FRIENDS_SLOT.</summary>
     private const byte FriendsSlot = 3;

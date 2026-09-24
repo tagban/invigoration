@@ -120,11 +120,20 @@ public sealed class ScrConnection : IAsyncDisposable
         Func<Uri, CancellationToken, Task<byte[]>> challenge,
         Action<string> trace,
         CancellationToken cancellationToken,
-        Action<byte[]>? saveCredential = null)
+        Action<byte[]>? saveCredential = null,
+        Func<Func<string, CancellationToken, Task<byte[]?>>, Task>? whileSignedIn = null)
     {
         await using var connection = new ScrConnection(trace) { _saveCredential = saveCredential };
         await connection.SignInAsync(savedCredential, challenge, cancellationToken).ConfigureAwait(false);
+
         await connection.LoadToonsAsync(cancellationToken).ConfigureAwait(false);
+
+        // After the character list: Battle.net wants that within seconds of the classic socket opening.
+        if (whileSignedIn is not null)
+        {
+            await whileSignedIn(connection.GenerateWebCredentialsAsync).ConfigureAwait(false);
+        }
+
         var gateways = connection.Gateways;
         return new ScrAccount(connection.BattleTag, connection.Toons, gateways.Count > 0 ? gateways : ScrGateways.Known);
     }
@@ -212,31 +221,40 @@ public sealed class ScrConnection : IAsyncDisposable
         await JoinAsync(options.HomeChannel, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <summary>The channel Battle.net last confirmed we're in, if any.</summary>
+    public ScrChannel? CurrentChannel { get; private set; }
+
     /// <summary>
-    /// Joins a channel by name (case-insensitive) and waits for Battle.net to confirm it: a listed
-    /// public channel by its ID, anything else with the chat command, which creates it if need be.
+    /// Joins a channel by name (case-insensitive) and waits for Battle.net to confirm it. Outside
+    /// any channel (right after sign-in) a listed channel is joined by its ID, as the game does;
+    /// from inside one, Battle.net ignores that, so it's the chat command ("/channel name"), which
+    /// works for any channel and creates one that doesn't exist.
     /// </summary>
     public async Task<ScrChannel> JoinAsync(string channelName, CancellationToken cancellationToken)
     {
-        var target = Channels.FirstOrDefault(c => c.DisplayName.Equals(channelName, StringComparison.OrdinalIgnoreCase)
-                                                  || c.InternalName.Equals(channelName, StringComparison.OrdinalIgnoreCase));
-        _entered = new TaskCompletionSource<ScrChannel>(TaskCreationOptions.RunContinuationsAsynchronously);
-        if (target is not null)
+        if (CurrentChannel is { } current && IsNamed(current, channelName))
         {
-            _trace($"-> join {target.DisplayName} (#{target.Id})");
-            await SendAsync(_chat.JoinListedChannel(target), cancellationToken).ConfigureAwait(false);
+            _trace($"Already in {current.DisplayName}.");
+            return current;
+        }
+
+        var listed = Channels.FirstOrDefault(c => IsNamed(c, channelName));
+        if (CurrentChannel is null && listed is null && channelName != ScrConnectOptions.DefaultHomeChannel && Channels.Count > 0)
+        {
+            // The command runs from a channel: outside one, Battle.net ignores it.
+            _trace($"Not in a channel yet; entering {ScrConnectOptions.DefaultHomeChannel} before joining {channelName}.");
+            await JoinAsync(ScrConnectOptions.DefaultHomeChannel, cancellationToken).ConfigureAwait(false);
+        }
+
+        _entered = new TaskCompletionSource<ScrChannel>(TaskCreationOptions.RunContinuationsAsynchronously);
+        if (CurrentChannel is null && listed is not null)
+        {
+            _trace($"-> join {listed.DisplayName} (#{listed.Id})");
+            await SendAsync(_chat.JoinListedChannel(listed), cancellationToken).ConfigureAwait(false);
         }
         else
         {
-            // The join command runs from a channel: outside one, Battle.net ignores it.
-            if (_chat.ChannelId == 0 && channelName != ScrConnectOptions.DefaultHomeChannel && Channels.Count > 0)
-            {
-                _trace($"Not in a channel yet; entering {ScrConnectOptions.DefaultHomeChannel} before joining {channelName}.");
-                await JoinAsync(ScrConnectOptions.DefaultHomeChannel, cancellationToken).ConfigureAwait(false);
-                _entered = new TaskCompletionSource<ScrChannel>(TaskCreationOptions.RunContinuationsAsynchronously);
-            }
-
-            _trace($"-> join {channelName} (by name)");
+            _trace($"-> join {channelName} (channel command)");
             await SendAsync(_chat.JoinByName(channelName), cancellationToken).ConfigureAwait(false);
         }
 
@@ -244,6 +262,14 @@ public sealed class ScrConnection : IAsyncDisposable
         _trace($"Joined {joined.DisplayName}.");
         return joined;
     }
+
+    private static bool IsNamed(ScrChannel channel, string name) =>
+        channel.DisplayName.Equals(name, StringComparison.OrdinalIgnoreCase)
+        || channel.InternalName.Equals(name, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>A "keep me signed in" credential for <paramref name="program"/>, from this signed-in session. Null if Battle.net issues none.</summary>
+    public Task<byte[]?> GenerateWebCredentialsAsync(string program, CancellationToken cancellationToken) =>
+        _aurora.GenerateWebCredentialsAsync(program, cancellationToken);
 
     /// <summary>Sends a message built by <see cref="Chat"/> (a chat line, a whisper, a join).</summary>
     public Task SendAsync(byte[] message, CancellationToken cancellationToken) => _classic.SendAsync(message, true, cancellationToken);
@@ -364,7 +390,11 @@ public sealed class ScrConnection : IAsyncDisposable
                 _catalogArrived.TrySetResult();
                 break;
             case ScrChatEvent.ChannelEntered entered:
+                CurrentChannel = entered.Channel;
                 _entered.TrySetResult(entered.Channel);
+                break;
+            case ScrChatEvent.ChannelLeft left when CurrentChannel is { } current && (left.ChannelId == current.Id || left.ChannelId == 0):
+                CurrentChannel = null;
                 break;
             case ScrChatEvent.Unhandled { Service: ScrProtocol.GatewayService, Method: ScrProtocol.GatewayUpdateMethod } update:
                 if (ScrGateways.DecodeUpdate(update.Body) is { } gateway)

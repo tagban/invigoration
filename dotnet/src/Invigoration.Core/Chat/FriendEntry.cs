@@ -22,7 +22,8 @@ public enum FriendLocation : byte
 }
 
 /// <summary>One entry in the classic BNCS friends list. <see cref="ProductCode"/> is the same wire-form 4-character product code used throughout this codebase (e.g. "VD2D"), suitable for <see cref="ChatIcon.GetProductIconKey"/>.</summary>
-public sealed record FriendEntry(string Account, FriendStatus Status, FriendLocation Location, string ProductCode, string LocationName);
+/// <remarks>For Battle.net 2.0 friends, <see cref="ProductCode"/> may be an icon key itself ("d4", "bnet2"), <see cref="LocationName"/> is what they're in, and <see cref="RealName"/> is shown after their BattleTag when they share it.</remarks>
+public sealed record FriendEntry(string Account, FriendStatus Status, FriendLocation Location, string ProductCode, string LocationName, string RealName = "");
 
 /// <summary>The fields SID_FRIENDSUPDATE carries — everything about a <see cref="FriendEntry"/> except the account name, which that packet identifies by list position instead.</summary>
 public sealed record FriendStatusUpdate(FriendStatus Status, FriendLocation Location, string ProductCode, string LocationName);

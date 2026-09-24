@@ -186,6 +186,28 @@ public static class IconSets
         ("war3-tier1", "GameIconsHD", "war3-tier1"), ("war3-tier2-human", "GameIconsHD", "war3-tier2-human"), ("war3-tier3-human", "GameIconsHD", "war3-tier3-human"), ("war3-tier4-human", "GameIconsHD", "war3-tier4-human"), ("war3-tier5-human", "GameIconsHD", "war3-tier5-human"), ("war3-tier6-human", "GameIconsHD", "war3-tier6-human"), ("war3-tier2-orc", "GameIconsHD", "war3-tier2-orc"), ("war3-tier3-orc", "GameIconsHD", "war3-tier3-orc"), ("war3-tier4-orc", "GameIconsHD", "war3-tier4-orc"), ("war3-tier5-orc", "GameIconsHD", "war3-tier5-orc"), ("war3-tier6-orc", "GameIconsHD", "war3-tier6-orc"), ("war3-tier2-nightelf", "GameIconsHD", "war3-tier2-nightelf"), ("war3-tier3-nightelf", "GameIconsHD", "war3-tier3-nightelf"), ("war3-tier4-nightelf", "GameIconsHD", "war3-tier4-nightelf"), ("war3-tier5-nightelf", "GameIconsHD", "war3-tier5-nightelf"), ("war3-tier6-nightelf", "GameIconsHD", "war3-tier6-nightelf"), ("war3-tier2-undead", "GameIconsHD", "war3-tier2-undead"), ("war3-tier3-undead", "GameIconsHD", "war3-tier3-undead"), ("war3-tier4-undead", "GameIconsHD", "war3-tier4-undead"), ("war3-tier5-undead", "GameIconsHD", "war3-tier5-undead"), ("war3-tier6-undead", "GameIconsHD", "war3-tier6-undead"), ("war3-tier2-random", "GameIconsHD", "war3-tier2-random"), ("war3-tier3-random", "GameIconsHD", "war3-tier3-random"), ("war3-tier4-random", "GameIconsHD", "war3-tier4-random"), ("war3-tier5-random", "GameIconsHD", "war3-tier5-random"), ("war3-tier6-random", "GameIconsHD", "war3-tier6-random"), ("war3-tier2-tourney", "GameIconsHD", "war3-tier2-tourney"), ("war3-tier3-tourney", "GameIconsHD", "war3-tier3-tourney"), ("war3-tier4-tourney", "GameIconsHD", "war3-tier4-tourney"), ("war3-tier5-tourney", "GameIconsHD", "war3-tier5-tourney"), ("war3-tier6-tourney", "GameIconsHD", "war3-tier6-tourney"),
     ];
 
+    private static readonly Dictionary<string, Avalonia.Media.Imaging.Bitmap?> Bnet2Cache = [];
+
+    /// <summary>
+    /// A key's icon from the Battle.net 2.0 set whatever set is showing, for the Battle.net 2.0
+    /// friends list. Keys that set doesn't cover (d4, bnet2, offline...) come as usual.
+    /// </summary>
+    public static Avalonia.Media.Imaging.Bitmap? GetBnet2(string key)
+    {
+        if (Bnet2Set.FirstOrDefault(entry => entry.Key == key) is not { Folder: not null } entry)
+        {
+            return GameIconLoader.Get(key);
+        }
+
+        if (!Bnet2Cache.TryGetValue(key, out var bitmap))
+        {
+            using var stream = AssetLoader.Open(new Uri($"avares://Invigoration.App/Assets/{entry.Folder}/{entry.SourceKey}.png"));
+            Bnet2Cache[key] = bitmap = new Avalonia.Media.Imaging.Bitmap(stream);
+        }
+
+        return bitmap;
+    }
+
     /// <summary>The bundled sets, then every saved one whose name doesn't clash with them.</summary>
     public static IReadOnlyList<string> All() =>
         BundledNames.Concat(IconSetStore.ListSets().Where(name => !IsBundled(name))).ToList();

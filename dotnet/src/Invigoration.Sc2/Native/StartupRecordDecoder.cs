@@ -65,38 +65,8 @@ public static class StartupRecordDecoder
         reader.Read(8);
     }
 
-    /// <summary>PresenceUpdateNotify (Presence 0).</summary>
-    public static void SkipPresenceUpdate(BitReader reader)
-    {
-        reader.Skip(19);
-        reader.Read(1);
-        reader.Skip(64);
-        reader.ReadBlob(11);
-        reader.Skip(11);
-        foreach (var width in (int[])[32, 32, 16])
-        {
-            reader.Skip((int)reader.Read(4) * width);
-        }
-
-        reader.SkipOptional(r => r.Skip(1 + 32));
-        reader.Read(8);
-    }
-
-    /// <summary>FieldSpecAnnounce (Presence 1).</summary>
-    public static void SkipFieldSpecAnnounce(BitReader reader)
-    {
-        var count = (int)reader.Read(7);
-        for (var i = 0; i < count; i++)
-        {
-            reader.Skip(3);
-            if (reader.Read(1) == 0)
-            {
-                reader.Read(16);
-            }
-
-            reader.Skip(1 + 8 + 32);
-        }
-    }
+    // PresenceUpdateNotify (Presence 0) and FieldSpecAnnounce (Presence 1) are
+    // decoded, not skipped: see PresenceRecordDecoder.
 
     /// <summary>PresenceStatisticsUpdate (Presence 3): up to 63 pairs of a 32-bit key and 64-bit value.</summary>
     public static void SkipPresenceStatistics(BitReader reader) =>

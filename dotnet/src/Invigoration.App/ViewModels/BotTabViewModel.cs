@@ -10,6 +10,7 @@ using Invigoration.App.Models;
 using Invigoration.Core;
 using Invigoration.Core.Chat;
 using Invigoration.Core.Config;
+using Invigoration.Core.Sc2;
 using Invigoration.Core.Discord;
 using Invigoration.Core.Protocol;
 using Stimpak;
@@ -121,6 +122,107 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
 
     /// <summary>Whether this bot can be joined to several channels at once (SC2/SC:R/WC3:R) — gates the sub-tab UI. Classic BNCS/Chat-Telnet stay on the single flat ChatLines/ChannelUsers above.</summary>
     public bool SupportsMultiChannel => BncsProduct.IsStimpakBacked(Config.Product);
+
+    /// <summary>
+    /// StarCraft: Remastered on the native connection: one channel at a time, like classic
+    /// Battle.net, so its channel shows without tabs and joining another switches to it. Stimpak's
+    /// SC:R is really SC2 and keeps the tabs.
+    /// </summary>
+    /// <summary>The user's answer to the one-time StarCraft II portraits offer.</summary>
+    public enum Sc2PortraitsAnswer
+    {
+        Download,
+        NotNow,
+        Never,
+    }
+
+    /// <summary>Asks the user whether to download the StarCraft II portraits; set by the main window.</summary>
+    public static Func<Task<Sc2PortraitsAnswer>>? AskToDownloadSc2Portraits { get; set; }
+
+    private static bool _sc2PortraitsOffered;
+
+    private int _portraitRedrawQueued;
+
+    /// <summary>Portraits arrive a few at a time; redraw once per burst, a quarter second after the first.</summary>
+    private void OnPortraitsChanged()
+    {
+        if (!SupportsMultiChannel || Interlocked.Exchange(ref _portraitRedrawQueued, 1) == 1)
+        {
+            return;
+        }
+
+        DispatcherTimer.RunOnce(() =>
+        {
+            Interlocked.Exchange(ref _portraitRedrawQueued, 0);
+            IconVersion++;
+        }, TimeSpan.FromMilliseconds(250));
+    }
+
+    /// <summary>
+    /// The first time a StarCraft II bot connects (natively) without the portraits, offers to
+    /// download them, once per run. They're Blizzard's art, so they aren't shipped with the app.
+    /// </summary>
+    private async Task OfferSc2PortraitsAsync()
+    {
+        if (Config.Product != BncsProduct.Sc2 || !Invigoration.Core.Sc2.NativeSc2ChatClient.Enabled
+            || _sc2PortraitsOffered || Sc2PortraitStore.Declined || Sc2PortraitStore.IsDownloaded
+            || AskToDownloadSc2Portraits is not { } ask)
+        {
+            return;
+        }
+
+        _sc2PortraitsOffered = true;
+        switch (await ask())
+        {
+            case Sc2PortraitsAnswer.Never:
+                Sc2PortraitStore.Decline();
+                return;
+            case Sc2PortraitsAnswer.NotNow:
+                return;
+        }
+
+        void Say(string text) => (SelectedChannel?.ChatLines ?? ChatLines).Add(new ChatLineViewModel(text, Engine.Palette.Info));
+        Say("Downloading StarCraft II portraits (about 21 MB)...");
+        try
+        {
+            await Sc2PortraitStore.DownloadAsync(null, CancellationToken.None);
+            Say("StarCraft II portraits downloaded.");
+        }
+        catch (Exception ex) when (ex is HttpRequestException or IOException or TaskCanceledException or UnauthorizedAccessException)
+        {
+            Say($"Couldn't download the StarCraft II portraits: {ex.Message} You'll be asked again next time.");
+            _sc2PortraitsOffered = false;
+        }
+    }
+
+    /// <summary>The SC2/SC:R user list's picture size: compact by default; larger in SC2's Full view (BotConfig.FullUserListPortraits).</summary>
+    public double PortraitSize => ShowsMemberDetail ? 36 : 20;
+
+    /// <summary>SC2's Full user list: a light detail line (BattleTag, status) under each name.</summary>
+    public bool ShowsMemberDetail => IsSc2 && Config.FullUserListPortraits;
+
+    public void SetUserListFull(bool full)
+    {
+        Config.FullUserListPortraits = full;
+        OnPropertyChanged(nameof(PortraitSize));
+        OnPropertyChanged(nameof(ShowsMemberDetail));
+    }
+
+    /// <summary>Whether this bot shows SC2 portraits (as opposed to SC:R's classic game icons, which follow icon sets).</summary>
+    public bool IsSc2 => Config.Product == BncsProduct.Sc2;
+
+    /// <summary>The "Pictures in Chat" choice: off, compact (a small icon before the line) or full (SC2: a portrait beside name and text).</summary>
+    public void SetChatPictures(bool show, bool full)
+    {
+        Config.ShowUserIconsInChat = show;
+        Config.FullChatPortraits = full;
+    }
+
+    /// <summary>Bumped when icons change, so the SC2/SC:R user rows (Stimpak's Person, which can't be told) redraw theirs.</summary>
+    [ObservableProperty]
+    public partial int IconVersion { get; set; }
+
+    public bool IsSingleChannel => Config.Product == BncsProduct.ScRemastered && Invigoration.Core.Sc2.NativeSc2ChatClient.Enabled;
 
     /// <summary>One sub-tab per joined SC2/SC:R/WC3:R channel — see SupportsMultiChannel.</summary>
     public ObservableCollection<ChannelTabViewModel> Channels { get; } = [];
@@ -270,6 +372,10 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         OnPropertyChanged(nameof(BackgroundBrush));
         OnPropertyChanged(nameof(SupportsFriends));
         OnPropertyChanged(nameof(SupportsClan));
+        OnPropertyChanged(nameof(IsSingleChannel));
+        OnPropertyChanged(nameof(IsSc2));
+        OnPropertyChanged(nameof(PortraitSize));
+        OnPropertyChanged(nameof(ShowsMemberDetail));
         RefreshTheme();
     }
 
@@ -287,7 +393,10 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         {
             IsConnected = true;
             RefreshConnectionState();
+            _ = OfferSc2PortraitsAsync();
         });
+        Sc2PortraitStore.Downloaded += () => Dispatcher.UIThread.Post(() => IconVersion++);
+        NativeMemberPortraits.Changed += OnPortraitsChanged;
         Engine.ActivityChanged += () => Dispatcher.UIThread.Post(RefreshConnectionState);
         Engine.DebugModeChanged += () => Dispatcher.UIThread.Post(() => OnPropertyChanged(nameof(DebugMode)));
         Engine.BncsDisconnected += _ => Dispatcher.UIThread.Post(() =>
@@ -344,6 +453,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     /// </summary>
     private void OnIconOverrideChanged(string key) => Dispatcher.UIThread.Post(() =>
     {
+        IconVersion++;
         foreach (var user in ChannelUsers)
         {
             user.RefreshIcons();
@@ -503,7 +613,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     {
         if (SupportsMultiChannel)
         {
-            SelectedChannel?.ChatLines.Add(new ChatLineViewModel(segments, ResolveSc2UserIcon()));
+            SelectedChannel?.ChatLines.Add(new ChatLineViewModel(segments, ResolveSc2UserIcon("")));
         }
         else
         {
@@ -596,7 +706,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
         {
             var channel = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
-            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon(), Config.ShowUserIconsInChat);
+            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon(e.Username), Config.ShowUserIconsInChat, IsSc2 && Config.FullChatPortraits);
             if (IsUnreadWorthy(e.Type))
             {
                 if (channel is not null && channel != SelectedChannel)
@@ -830,6 +940,10 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             friend.Location = entry.Location;
             friend.ProductCode = entry.ProductCode;
             friend.LocationName = entry.LocationName;
+            friend.RealName = entry.RealName;
+            friend.ModernStyle = SupportsMultiChannel;
+            friend.ShowRealName = Config.ShowFriendRealNames;
+            friend.ShowOffline = Config.ShowOfflineFriends;
         }
 
         // Online-first, otherwise stable (OrderByDescending doesn't reorder two friends that
@@ -1003,6 +1117,48 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         }
     }
 
+    /// <summary>The Friends tab's "Real names" checkbox (Battle.net 2.0 friends only). Saved with the bot's config.</summary>
+    public bool ShowFriendRealNames
+    {
+        get => Config.ShowFriendRealNames;
+        set
+        {
+            if (Config.ShowFriendRealNames == value)
+            {
+                return;
+            }
+
+            Config.ShowFriendRealNames = value;
+            foreach (var friend in Friends)
+            {
+                friend.ShowRealName = value;
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>The Friends tab's "Offline" checkbox. Saved with the bot's config.</summary>
+    public bool ShowOfflineFriends
+    {
+        get => Config.ShowOfflineFriends;
+        set
+        {
+            if (Config.ShowOfflineFriends == value)
+            {
+                return;
+            }
+
+            Config.ShowOfflineFriends = value;
+            foreach (var friend in Friends)
+            {
+                friend.ShowOffline = value;
+            }
+
+            OnPropertyChanged();
+        }
+    }
+
     /// <summary>Flips Config.ShowLadderIcons and updates every row now; the right-click "Ladder Icons" item. Saved like ToggleClassicUserIconStyle.</summary>
     public void ToggleShowLadderIcons()
     {
@@ -1038,9 +1194,29 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         return string.IsNullOrEmpty(key) ? null : GameIconLoader.Get(key);
     }
 
-    /// <summary>Stimpak-backed (SC2/SC:R/WC3:R) speaker icon — every speaker gets this bot's own product icon, since Stimpak's roster carries no per-user product field to tell them apart by (see BotConfig.ShowUserIconsInChat's remarks).</summary>
-    private Bitmap? ResolveSc2UserIcon() =>
-        Config.ShowUserIconsInChat ? GameIconLoader.Get(BncsProduct.GetIconKey(Config.Product)) : null;
+    /// <summary>
+    /// SC2/SC:R speaker icon (BotConfig.ShowUserIconsInChat): an SC:R speaker's classic game icon, an
+    /// SC2 speaker's portrait once known, otherwise this bot's own game icon.
+    /// </summary>
+    private Bitmap? ResolveSc2UserIcon(string username)
+    {
+        if (!Config.ShowUserIconsInChat)
+        {
+            return null;
+        }
+
+        if (NativeMemberProducts.IconKeyFor(username) is { } key)
+        {
+            return GameIconLoader.Get(key);
+        }
+
+        if (NativeMemberPortraits.For(username) is { } portrait && Sc2PortraitImages.Get(portrait.Sheet, portrait.Cell) is { } image)
+        {
+            return image;
+        }
+
+        return GameIconLoader.Get(BncsProduct.GetIconKey(Config.Product));
+    }
 
     public ValueTask DisposeAsync()
     {

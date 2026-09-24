@@ -205,7 +205,8 @@ public partial class ConfigViewModel : ObservableObject
                     (url, token) => Sc2LoginChallenge.ShowAsync(url, "Battle.net Sign-In (StarCraft: Remastered)", token),
                     _ => { },
                     CancellationToken.None,
-                    fresh => BattlenetCredentialProfileStore.SaveNativeCredential(profileId, NativeScrChatClient.Program, fresh)));
+                    fresh => BattlenetCredentialProfileStore.SaveNativeCredential(profileId, NativeScrChatClient.Program, fresh),
+                    generate => NativeSignIns.IssueMissingAsync(profileId, NativeScrChatClient.Program, generate, _ => { }, CancellationToken.None)));
                 if (account.BattleTag is { } tag)
                 {
                     BattlenetCredentialProfileStore.UpdateBattleTag(profileId, tag);
