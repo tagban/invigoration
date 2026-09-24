@@ -21,7 +21,7 @@ public class ScrChatTests
     public void SendMessage_BuildsThePublishedPlainFrame()
     {
         var (method, body) = LegacyChatRequests.SendMessage(9, "hello");
-        var header = new ClassicHeader(LegacyChatService.Hash, method, 1, ClassicHeader.RequestRouting, 0, 0, false);
+        var header = new ClassicHeader(LegacyChatService.Hash, method, 1, ClassicHeader.RequestRouting, 0, ObjectId: 0, IsResponse: false);
 
         Assert.Equal(ExamplePlain, Hex(ClassicFrame.Encode(header, body)));
     }
@@ -137,17 +137,30 @@ public class ScrChatTests
     }
 
     [Fact]
-    public void Session_ReportsAFailedRequestByItsMethod()
+    public void Replies_EchoTheCallsObjectIdAndRouting_AndResponsesNeedNoAnswer()
     {
         var session = new ScrChatSession(ExampleSeed, token: 0, channelId: 9);
-        session.SendMessage("hi");
-        var failure = ClassicFrame.Encode(
-            new ClassicHeader(LegacyChatService.Hash, LegacyChatService.SendMessageMethod, 1, ClassicHeader.RequestRouting, 0, 13, true), []);
+        var call = ClassicFrame.Encode(new ClassicHeader(LegacyChatService.Hash, 0x850B6EE3, 40, 77, 0, ObjectId: 5, IsResponse: false), [0x08, 0x01]);
+        var response = ClassicFrame.Encode(new ClassicHeader(LegacyChatService.Hash, LegacyChatService.SendMessageMethod, 1, ClassicHeader.RequestRouting, 0, ObjectId: 0, IsResponse: true), []);
 
-        var (events, replies) = session.Receive(ClassicEnvelope.Scramble(failure, ExampleSeed));
+        var (_, replies) = session.Receive(ClassicEnvelope.Scramble([.. call, .. response], ExampleSeed));
 
-        Assert.Empty(replies);
-        Assert.Equal(new ScrChatEvent.RequestFailed(LegacyChatService.SendMessageMethod, 1, 13), Assert.Single(events));
+        var reply = Assert.Single(ClassicFrame.DecodeAll(ClassicEnvelope.Unscramble(Assert.Single(replies), ExampleSeed))).Header;
+        Assert.Equal((40u, 77u, 5ul, true), (reply.Token, reply.Routing!.Value, reply.ObjectId!.Value, reply.IsResponse));
+    }
+
+    [Theory]
+    [InlineData("RNam504UhTYmXuZv34oqHA==", 0xBAB6E072u)] // sc1-research's captured connection
+    public void Seed_IsFoldedFromTheWebSocketKey(string key, uint seed) =>
+        Assert.Equal(seed, ClassicEnvelope.SeedFromWebSocketKey(key));
+
+    [Fact]
+    public void Seed_ReproducesTheBlockTheRetailClientSent()
+    {
+        // sc1-research's capture: the AuthSession frame's first four plaintext bytes, and the wire.
+        var seed = ClassicEnvelope.SeedFromWebSocketKey("RNam504UhTYmXuZv34oqHA==");
+
+        Assert.Equal("e5c5bf2c", Hex(ClassicEnvelope.Scramble([0x00, 0x44, 0x08, 0x87], seed)));
     }
 
     [Fact]

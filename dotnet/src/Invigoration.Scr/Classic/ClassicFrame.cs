@@ -4,10 +4,13 @@ using Invigoration.Sc2.Protobuf;
 namespace Invigoration.Scr.Classic;
 
 /// <summary>
-/// The RPC header on SC:R's classic connection. Unlike Front's, every field is
-/// a varint, the service hash included, and requests carry a routing value.
+/// The RPC header on SC:R's classic connection. Unlike Front's, every number is a varint, the
+/// service hash included, and requests carry a routing value. Field 6 is an object ID (echoed back
+/// in replies), not a status; field 12 is an optional request trace ("RT-…") the client puts on
+/// its first call. Field numbers as in ncarrillo/sc1-research (MIT), which confirmed them against
+/// real traffic.
 /// </summary>
-public sealed record ClassicHeader(uint Service, uint Method, uint Token, uint? Routing, uint Size, uint Status, bool IsResponse)
+public sealed record ClassicHeader(uint Service, uint Method, uint Token, uint? Routing, uint Size, ulong? ObjectId, bool IsResponse, byte[]? RequestTrace = null)
 {
     /// <summary>The routing value every client request carries.</summary>
     public const uint RequestRouting = 2525111537; // 0x968224F1
@@ -20,15 +23,18 @@ public sealed record ClassicHeader(uint Service, uint Method, uint Token, uint? 
         w.WriteUInt32(3, Token);
         w.WriteUInt32(4, Routing);
         w.WriteUInt32(5, Size);
-        w.WriteUInt32(6, Status);
+        w.WriteUInt64(6, ObjectId);
         w.WriteUInt32(9, IsResponse ? 1u : 0u);
+        w.WriteBytesField(12, RequestTrace);
         return w.ToArray();
     }
 
     public static ClassicHeader Decode(byte[] data)
     {
-        uint service = 0, method = 0, token = 0, size = 0, status = 0;
+        uint service = 0, method = 0, token = 0, size = 0;
         uint? routing = null;
+        ulong? objectId = null;
+        byte[]? trace = null;
         var isResponse = false;
         var r = new ProtoReader(data);
         while (r.HasMore)
@@ -36,18 +42,19 @@ public sealed record ClassicHeader(uint Service, uint Method, uint Token, uint? 
             var (field, type) = r.ReadTag();
             switch (field)
             {
-                case 1: service = (uint)r.ReadVarint(); break;
-                case 2: method = (uint)r.ReadVarint(); break;
-                case 3: token = (uint)r.ReadVarint(); break;
-                case 4: routing = (uint)r.ReadVarint(); break;
-                case 5: size = (uint)r.ReadVarint(); break;
-                case 6: status = (uint)r.ReadVarint(); break;
-                case 9: isResponse = r.ReadVarint() != 0; break;
+                case 1 when type == WireType.Varint: service = (uint)r.ReadVarint(); break;
+                case 2 when type == WireType.Varint: method = (uint)r.ReadVarint(); break;
+                case 3 when type == WireType.Varint: token = (uint)r.ReadVarint(); break;
+                case 4 when type == WireType.Varint: routing = (uint)r.ReadVarint(); break;
+                case 5 when type == WireType.Varint: size = (uint)r.ReadVarint(); break;
+                case 6 when type == WireType.Varint: objectId = r.ReadVarint(); break;
+                case 9 when type == WireType.Varint: isResponse = r.ReadVarint() != 0; break;
+                case 12 when type == WireType.LengthDelimited: trace = r.ReadLengthDelimited(); break;
                 default: r.Skip(type); break;
             }
         }
 
-        return new ClassicHeader(service, method, token, routing, size, status, isResponse);
+        return new ClassicHeader(service, method, token, routing, size, objectId, isResponse, trace);
     }
 }
 

@@ -17,11 +17,11 @@ public abstract record ScrChatEvent
 
     public sealed record Message(ScrMessage Value) : ScrChatEvent;
 
-    /// <summary>A reply to one of our requests reported an error.</summary>
-    public sealed record RequestFailed(uint Method, uint Token, uint Status) : ScrChatEvent;
-
     /// <summary>A server call this layer doesn't interpret. It has still been answered.</summary>
     public sealed record Unhandled(uint Service, uint Method) : ScrChatEvent;
+
+    /// <summary>The server took us out of a channel (LegacyChat.LeftChannel).</summary>
+    public sealed record ChannelLeft(ulong ChannelId) : ScrChatEvent;
 }
 
 /// <summary>
@@ -36,6 +36,7 @@ public sealed class ScrChatSession
     private readonly uint _seed;
     private readonly Dictionary<uint, uint> _pendingMethods = new();
     private uint _token;
+    private ScrChannel? _joining;
 
     /// <param name="seed">The classic connection's scrambling seed from sign-in.</param>
     /// <param name="token">The connection's request counter as sign-in left it. Each request increments it first.</param>
@@ -56,27 +57,59 @@ public sealed class ScrChatSession
 
     public byte[] JoinByName(string channelName) => Request(LegacyChatRequests.JoinByName(ChannelId, channelName));
 
-    public byte[] JoinListedChannel(ulong targetChannelId) => Request(LegacyChatRequests.JoinListedChannel(targetChannelId));
+    /// <summary>
+    /// Joins a listed channel by ID. Battle.net confirms it with a channel-list update that includes
+    /// the channel, which is reported as <see cref="ScrChatEvent.ChannelEntered"/>.
+    /// </summary>
+    public byte[] JoinListedChannel(ulong targetChannelId) =>
+        JoinListedChannel(new ScrChannel(targetChannelId, "", "", []));
+
+    /// <summary>
+    /// Joins a listed channel. Battle.net confirms it with a channel-list update carrying the
+    /// channel, sometimes as a new instance with its own ID, so a match on the name (with members)
+    /// counts too. Reported as <see cref="ScrChatEvent.ChannelEntered"/>.
+    /// </summary>
+    public byte[] JoinListedChannel(ScrChannel target)
+    {
+        _joining = target;
+        return Request(LegacyChatRequests.JoinListedChannel(target.Id));
+    }
 
     public byte[] ListChannels() => Request(LegacyChatRequests.ListChannels());
 
     public byte[] LeaveChannel() => Request(LegacyChatRequests.LeaveChannel(ChannelId));
 
+    /// <summary>
+    /// Any request on the classic connection, from any service: the sign-in and startup calls use
+    /// this too. Returns the scrambled message and the token its response will carry.
+    /// </summary>
+    public (byte[] Message, uint Token) Call(uint service, uint method, byte[] body, byte[]? requestTrace = null)
+    {
+        _token = unchecked(_token + 1);
+        _pendingMethods[_token] = method;
+        var header = new ClassicHeader(service, method, _token, ClassicHeader.RequestRouting, 0, ObjectId: 0, IsResponse: false, requestTrace);
+        return (ClassicEnvelope.Scramble(ClassicFrame.Encode(header, body), _seed), _token);
+    }
+
     /// <summary>Unscrambles one received WebSocket message and handles every RPC in it.</summary>
-    public (IReadOnlyList<ScrChatEvent> Events, IReadOnlyList<byte[]> Replies) Receive(ReadOnlySpan<byte> wireMessage)
+    public (IReadOnlyList<ScrChatEvent> Events, IReadOnlyList<byte[]> Replies) Receive(ReadOnlySpan<byte> wireMessage) =>
+        Receive(wireMessage, out _);
+
+    /// <summary>As <see cref="Receive(ReadOnlySpan{byte})"/>, also handing back the responses to our own requests.</summary>
+    public (IReadOnlyList<ScrChatEvent> Events, IReadOnlyList<byte[]> Replies) Receive(ReadOnlySpan<byte> wireMessage, out IReadOnlyList<ClassicRpc> responses)
     {
         var events = new List<ScrChatEvent>();
         var replies = new List<byte[]>();
+        var answered = new List<ClassicRpc>();
+        responses = answered;
         foreach (var rpc in ClassicFrame.DecodeAll(ClassicEnvelope.Unscramble(wireMessage, _seed)))
         {
             if (rpc.Header.IsResponse)
             {
-                var method = _pendingMethods.Remove(rpc.Header.Token, out var sent) ? sent : rpc.Header.Method;
-                if (rpc.Header.Status != 0)
-                {
-                    events.Add(new ScrChatEvent.RequestFailed(method, rpc.Header.Token, rpc.Header.Status));
-                }
-
+                // Replies carry no status to check: a refused request shows up as a chat error
+                // message or as a join that never gets confirmed.
+                _pendingMethods.Remove(rpc.Header.Token);
+                answered.Add(rpc);
                 continue;
             }
 
@@ -113,8 +146,25 @@ public sealed class ScrChatSession
                 ChannelId = channel.Id;
                 return new ScrChatEvent.ChannelEntered(channel);
 
+            case LegacyChatService.LeftChannelCallback:
+                var left = LegacyChatCallbacks.DecodeChannelId(rpc.Body);
+                if (left == ChannelId)
+                {
+                    ChannelId = 0;
+                }
+
+                return new ScrChatEvent.ChannelLeft(left);
+
             case LegacyChatService.ChannelListChangedCallback:
-                return new ScrChatEvent.ChannelListChanged(LegacyChatCallbacks.DecodeChannelListChanges(rpc.Body));
+                var changes = LegacyChatCallbacks.DecodeChannelListChanges(rpc.Body);
+                if (_joining is { } target && changes.FirstOrDefault(c => !c.IsRemoval && IsJoinOf(target, c.Channel)) is { } joined)
+                {
+                    _joining = null;
+                    ChannelId = joined.Channel.Id;
+                    return new ScrChatEvent.ChannelEntered(joined.Channel);
+                }
+
+                return new ScrChatEvent.ChannelListChanged(changes);
 
             default:
                 if (LegacyChatCallbacks.TryGetMessageKind(rpc.Header.Method, out var kind))
@@ -126,11 +176,11 @@ public sealed class ScrChatSession
         }
     }
 
-    private byte[] Request((uint Method, byte[] Body) request)
-    {
-        _token = unchecked(_token + 1);
-        _pendingMethods[_token] = request.Method;
-        var header = new ClassicHeader(LegacyChatService.Hash, request.Method, _token, ClassicHeader.RequestRouting, 0, 0, false);
-        return ClassicEnvelope.Scramble(ClassicFrame.Encode(header, request.Body), _seed);
-    }
+    private static bool IsJoinOf(ScrChannel target, ScrChannel channel) =>
+        channel.Id == target.Id
+        || (channel.Members.Count > 0 && target.DisplayName.Length > 0
+            && (channel.DisplayName.Equals(target.DisplayName, StringComparison.OrdinalIgnoreCase)
+                || channel.InternalName.Equals(target.InternalName, StringComparison.OrdinalIgnoreCase)));
+
+    private byte[] Request((uint Method, byte[] Body) request) => Call(LegacyChatService.Hash, request.Method, request.Body).Message;
 }

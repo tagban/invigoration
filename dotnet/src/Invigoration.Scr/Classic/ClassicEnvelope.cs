@@ -12,6 +12,36 @@ namespace Invigoration.Scr.Classic;
 /// </summary>
 public static class ClassicEnvelope
 {
+    /// <summary>StarCraft: Remastered's program code, "S1".</summary>
+    public const uint ScrProgram = 0x5331;
+
+    /// <summary>WarCraft III: Reforged's program code, "W3".</summary>
+    public const uint Wc3Program = 0x5733;
+
+    /// <summary>
+    /// The seed for a connection, folded from the 16 bytes behind its Sec-WebSocket-Key. It starts
+    /// from (program &lt;&lt; 7) ^ 0x10831105; each byte is sign-extended and shifted into lane
+    /// (index mod 4), OR'd in for the first four bytes and XOR'd after. As in
+    /// ncarrillo/sc1-research (MIT), which matched it against the retail client.
+    /// </summary>
+    public static uint SeedFromWebSocketKey(string webSocketKey, uint program = ScrProgram)
+    {
+        var nonce = Convert.FromBase64String(webSocketKey);
+        if (nonce.Length != 16)
+        {
+            throw new ArgumentException($"A Sec-WebSocket-Key is 16 bytes; this one is {nonce.Length}.", nameof(webSocketKey));
+        }
+
+        var value = (program << 7) ^ 0x10831105u;
+        for (var index = 0; index < nonce.Length; index++)
+        {
+            var shifted = unchecked((uint)(sbyte)nonce[index]) << ((index & 3) * 8);
+            value = index < 4 ? value | shifted : value ^ shifted;
+        }
+
+        return value;
+    }
+
     /// <summary>Scrambles an outgoing message.</summary>
     public static byte[] Scramble(ReadOnlySpan<byte> plain, uint seed) => Apply(plain, seed, encoding: true);
 

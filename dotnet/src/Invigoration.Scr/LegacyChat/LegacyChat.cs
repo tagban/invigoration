@@ -22,7 +22,14 @@ public static class LegacyChatService
     public const uint LeaveChannelMethod = 0x84F6DDA8;
 
     public const uint ChannelListChangedCallback = 0xC04DAC29;
+
+    /// <summary>ForceJoinChannel: the server putting us in a channel, which confirms a join.</summary>
     public const uint CurrentChannelCallback = 0xC583300A;
+
+    /// <summary>LeftChannel: the server taking us out of a channel. Body field 1 is its ID.</summary>
+    public const uint LeftChannelCallback = 0xB07FD98A;
+
+    public const uint SetOnlineMethod = 0xD5EBA117;
 }
 
 /// <summary>Which kind of text a LegacyChat callback carries.</summary>
@@ -138,14 +145,33 @@ public static class LegacyChatCallbacks
 
     /// <summary>
     /// The reply every server call on the classic connection needs: same service,
-    /// method, token and routing, marked as a response. The body is empty, except
+    /// method, token, routing and object ID, marked as a response. The body is empty, except
     /// for ConnectionService's echo, which gets its own body back.
     /// </summary>
     public static byte[] Reply(ClassicRpc call)
     {
         var echo = call.Header.Service == LegacyChatService.ConnectionHash && call.Header.Method == LegacyChatService.ConnectionEchoMethod;
-        var header = call.Header with { Status = 0, IsResponse = true };
+        // Same service, method, token, routing and object ID; marked as a response; no trace.
+        var header = call.Header with { Routing = call.Header.Routing ?? ClassicHeader.RequestRouting, IsResponse = true, RequestTrace = null };
         return ClassicFrame.Encode(header, echo ? call.Body : []);
+    }
+
+    /// <summary>Field 1 of a body that carries just a channel ID, such as LeftChannel.</summary>
+    public static ulong DecodeChannelId(byte[] body)
+    {
+        var r = new ProtoReader(body);
+        while (r.HasMore)
+        {
+            var (field, type) = r.ReadTag();
+            if (field == 1 && type == WireType.Varint)
+            {
+                return r.ReadVarint();
+            }
+
+            r.Skip(type);
+        }
+
+        return 0;
     }
 
     /// <summary>Channel list changes (<see cref="LegacyChatService.ChannelListChangedCallback"/>).</summary>
@@ -202,11 +228,15 @@ public static class LegacyChatCallbacks
     {
         var texts = new List<string>();
         CollectTexts(body, depth: 0, texts);
+
+        // Server notices carry the recipient, us, where a talk or whisper carries its sender, so
+        // they get no sender at all.
+        var hasSender = kind is ScrMessageKind.Channel or ScrMessageKind.Whisper or ScrMessageKind.Emote;
         return texts.Count switch
         {
             0 => null,
             1 => new ScrMessage(kind, null, texts[0]),
-            _ => new ScrMessage(kind, texts[0], texts[^1]),
+            _ => new ScrMessage(kind, hasSender ? texts[0] : null, texts[^1]),
         };
     }
 
@@ -306,7 +336,8 @@ public static class LegacyChatCallbacks
             }
         }
 
-        return new ScrChannel(id, internalName, displayName, members);
+        // The channel list often carries only the internal name; it doubles as the display name then.
+        return new ScrChannel(id, internalName, displayName.Length > 0 ? displayName : internalName, members);
     }
 
     private static ScrMember DecodeMember(byte[] data)
