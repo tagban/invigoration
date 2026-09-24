@@ -2,7 +2,11 @@
 # Builds, signs, and (optionally) notarizes a macOS .app bundle for Invigoration.
 #
 # Usage:
-#   ./build-macos.sh [--rid osx-arm64|osx-x64] [--notarize-profile PROFILE_NAME] [--no-sign]
+#   ./build-macos.sh [--rid osx-arm64|osx-x64] [--notarize-profile PROFILE_NAME] [--no-sign] [--test]
+#
+# --test builds "Invigoration Test.app" instead: its own bundle ID, its own settings folder
+# (~/Library/Application Support/Invigoration Test) and Invigoration's native StarCraft II
+# connection in place of Stimpak's. It can sit beside the everyday copy without touching it.
 #
 # First-time notarization setup (run once, stores credentials in Keychain):
 #   xcrun notarytool store-credentials "invigoration-notary" \
@@ -16,12 +20,14 @@ set -euo pipefail
 RID="osx-arm64"
 NOTARIZE_PROFILE=""
 SIGN=true
+TEST_BUILD=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --rid) RID="$2"; shift 2 ;;
     --notarize-profile) NOTARIZE_PROFILE="$2"; shift 2 ;;
     --no-sign) SIGN=false; shift ;;
+    --test) TEST_BUILD=true; shift ;;
     *) echo "Unknown argument: $1"; exit 1 ;;
   esac
 done
@@ -34,6 +40,10 @@ NUMERIC_VERSION=$(echo "$VERSION" | grep -o '^[0-9]*\.[0-9]*\.[0-9]*')
 
 DIST_DIR="$SCRIPT_DIR/dist/macos-$RID"
 APP_BUNDLE="$DIST_DIR/Invigoration.app"
+if [ "$TEST_BUILD" = true ]; then
+  DIST_DIR="$SCRIPT_DIR/dist/macos-$RID-test"
+  APP_BUNDLE="$DIST_DIR/Invigoration Test.app"
+fi
 PUBLISH_DIR="$SCRIPT_DIR/src/Invigoration.App/bin/Release/net10.0/$RID/publish"
 
 echo "==> Publishing self-contained $RID build (version $VERSION)"
@@ -48,7 +58,25 @@ mkdir -p "$APP_BUNDLE/Contents/MacOS" "$APP_BUNDLE/Contents/Resources"
 cp -R "$PUBLISH_DIR"/* "$APP_BUNDLE/Contents/MacOS/"
 cp "$SCRIPT_DIR/packaging/AppIcon.icns" "$APP_BUNDLE/Contents/Resources/AppIcon.icns"
 sed "s/__VERSION__/$NUMERIC_VERSION/g" "$SCRIPT_DIR/packaging/Info.plist.template" > "$APP_BUNDLE/Contents/Info.plist"
+if [ "$TEST_BUILD" = true ]; then
+  PLIST="$APP_BUNDLE/Contents/Info.plist"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleName Invigoration Test" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName Invigoration Test" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier com.tagban.invigoration.test" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :LSEnvironment dict" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :LSEnvironment:INVIGORATION_SETTINGS_FOLDER string Invigoration Test" "$PLIST"
+  /usr/libexec/PlistBuddy -c "Add :LSEnvironment:INVIGORATION_NATIVE_SC2 string 1" "$PLIST"
+fi
 chmod +x "$APP_BUNDLE/Contents/MacOS/Invigoration.App"
+
+echo "==> Building the Battle.net sign-in helper"
+case "$RID" in
+  osx-x64) SWIFT_TARGET="x86_64-apple-macos11" ;;
+  *) SWIFT_TARGET="arm64-apple-macos11" ;;
+esac
+swiftc -O -target "$SWIFT_TARGET" -framework AppKit -framework WebKit \
+  -o "$APP_BUNDLE/Contents/MacOS/invigoration-signin" \
+  "$SCRIPT_DIR/packaging/signin-helper/SignInHelper.swift"
 
 case "$RID" in
   osx-arm64) LIPO_ARCH="arm64" ;;

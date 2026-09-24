@@ -37,7 +37,40 @@ public static class Sc2LoginChallenge
     {
         cancellationToken.ThrowIfCancellationRequested();
 
+        // On macOS, Invigoration's own sign-in app, which catches the final redirect Avalonia's
+        // web view never reports. Everywhere else (and in a development run without it), the
+        // built-in window below, with the browser-and-paste route beside it.
+        if (MacSignInHelper.Find() is { } signInApp)
+        {
+            return await MacSignInHelper.RunAsync(signInApp, challengeUrl, title, cancellationToken);
+        }
+
         NativeWebDialog? dialog = null;
+        BrowserSignInHelper? helper = null;
+        var helperClosed = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Battle.net finishes by redirecting to http://localhost:0/?ST=…, which the broker is meant to
+        // catch. On macOS that redirect arrives as a server-side redirect of the login form's submit,
+        // and the web view never reports it as a navigation, so the broker waits forever while the
+        // page spins. So the window's address is also watched directly (see SignInTrace), and the
+        // credential taken from whichever sees it first.
+        var redirected = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        void Observe(Uri address)
+        {
+            if (TryReadCredential(address) is { } credential)
+            {
+                Finish(credential);
+            }
+        }
+
+        void Finish(string credential)
+        {
+            if (redirected.TrySetResult(credential))
+            {
+                Dispatcher.UIThread.Post(CloseDialog);
+            }
+        }
+
         var options = new WebAuthenticatorOptions(challengeUrl, new Uri("http://localhost:0/"))
         {
             Mode = WebAuthenticatorMode.NativeWebDialog,
@@ -54,6 +87,20 @@ public static class Sc2LoginChallenge
             {
                 dialog = new NativeWebDialog { Title = title, CanUserResize = true };
                 dialog.Resize(600, 700);
+                SignInTrace.Attach(dialog, Observe);
+
+                // Beside it, the way round it: the same sign-in in the user's own browser.
+                helper = new BrowserSignInHelper(challengeUrl, title, Finish);
+                helper.Closed += (_, _) => helperClosed.TrySetResult();
+                if (findOwner() is Window owner)
+                {
+                    helper.Show(owner);
+                }
+                else
+                {
+                    helper.Show();
+                }
+
                 return dialog;
             },
         };
@@ -64,6 +111,8 @@ public static class Sc2LoginChallenge
         {
             var open = dialog;
             dialog = null;
+            var openHelper = helper;
+            helper = null;
             try
             {
                 open?.Close();
@@ -72,6 +121,8 @@ public static class Sc2LoginChallenge
             {
                 // Already closing, or disposed (ObjectDisposedException).
             }
+
+            openHelper?.Close();
         }
 
         using var closeOnCancel = cancellationToken.Register(() => Dispatcher.UIThread.Post(CloseDialog));
@@ -96,7 +147,16 @@ public static class Sc2LoginChallenge
         {
             // WaitAsync as well as closing the window: a cancel landing before the window exists
             // can't close it, and the caller shouldn't be held up either way.
-            result = await authenticating.WaitAsync(cancellationToken);
+            var finished = await Task.WhenAny(authenticating, redirected.Task).WaitAsync(cancellationToken);
+            if (finished == redirected.Task)
+            {
+                // Closing the window ends the broker too; nothing is waiting on how.
+                _ = authenticating.ContinueWith(t => _ = t.Exception, TaskScheduler.Default);
+                return Encoding.UTF8.GetBytes(await redirected.Task);
+            }
+
+            result = await authenticating;
+            Dispatcher.UIThread.Post(CloseDialog);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
@@ -109,7 +169,17 @@ public static class Sc2LoginChallenge
         }
         catch (OperationCanceledException)
         {
-            // The broker reports the user closing its window as a cancellation of its own.
+            // The broker reports the user closing its window as a cancellation of its own. Closing a
+            // spinning window is how someone moves on to the browser route, so while that's still
+            // open, wait for it rather than giving up.
+            if (!helperClosed.Task.IsCompleted
+                && await Task.WhenAny(redirected.Task, helperClosed.Task).WaitAsync(cancellationToken) == redirected.Task)
+            {
+                Dispatcher.UIThread.Post(CloseDialog);
+                return Encoding.UTF8.GetBytes(await redirected.Task);
+            }
+
+            Dispatcher.UIThread.Post(CloseDialog);
             throw new InvalidOperationException("The Battle.net login window was closed before finishing.");
         }
 
@@ -119,5 +189,17 @@ public static class Sc2LoginChallenge
         }
 
         throw new InvalidOperationException(result.Error ?? "The Battle.net login window was closed before finishing.");
+    }
+
+    /// <summary>The "ST" credential from Battle.net's final redirect to http://localhost:0/, or null for any other address.</summary>
+    internal static string? TryReadCredential(Uri address)
+    {
+        if (!address.IsAbsoluteUri || address.Host != "localhost" || string.IsNullOrEmpty(address.Query))
+        {
+            return null;
+        }
+
+        var st = System.Web.HttpUtility.ParseQueryString(address.Query)["ST"];
+        return string.IsNullOrEmpty(st) ? null : st;
     }
 }
