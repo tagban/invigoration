@@ -380,7 +380,7 @@
                      straight to Stimpak's own Person collection (see ChannelTabViewModel) — a
                      much shorter row than classic BNCS's above, since Stimpak's protocol surface
                      doesn't carry per-user operator flags, ping, or a statstring. -->
-                <ListBox Name="Sc2UserList" ItemsSource="{Binding SelectedChannel.Users}" Background="Transparent" BorderThickness="0" Padding="0,4"
+                <ListBox Name="Sc2UserList" ItemsSource="{Binding SelectedChannel.Users}" ScrollViewer.HorizontalScrollBarVisibility="Disabled" Background="Transparent" BorderThickness="0" Padding="0,4"
                          IsVisible="{Binding SupportsMultiChannel}">
                     <ListBox.ContextMenu>
                         <ContextMenu Opened="OnSc2UserContextMenuOpened">
@@ -390,7 +390,7 @@
                             <MenuItem Name="UserListCompact" Header="Compact" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
                                       IsVisible="{Binding IsSc2}" ToolTip.Tip="Small portraits, one line per person." />
                             <MenuItem Name="UserListFull" Header="Full" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
-                                      IsVisible="{Binding IsSc2}" ToolTip.Tip="Larger portraits, with each person's BattleTag and status under their name." />
+                                      IsVisible="{Binding IsSc2}" ToolTip.Tip="Larger portraits, with each person's BattleTag under their name." />
                             <!-- SC:R: the right-clicked member, by the BattleTag Battle.net sends with each one (OnSc2UserContextMenuOpened). -->
                             <Separator IsVisible="{Binding CanManageFriends}" />
                             <MenuItem Name="ScrUserWhisper" Header="Whisper" Click="OnScrUserWhisperClick" IsVisible="{Binding CanManageFriends}" />
@@ -402,11 +402,14 @@
                         <Style Selector="ListBoxItem">
                             <Setter Property="Padding" Value="8,1" />
                             <Setter Property="MinHeight" Value="0" />
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                         </Style>
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="stimpak:Person">
-                            <StackPanel Orientation="Horizontal" Spacing="4" ToolTip.Tip="{Binding ., Converter={x:Static conv:PersonDetailsTooltipConverter.Instance}}">
+                            <!-- A Grid rather than a horizontal StackPanel, so a long clan tag and name are cut
+                                 off with "..." at the list's edge instead of pushing the row out of view. -->
+                            <Grid ColumnDefinitions="Auto,*" ColumnSpacing="4" ToolTip.Tip="{Binding ., Converter={x:Static conv:PersonDetailsTooltipConverter.Instance}}">
                                 <!-- The picture (an SC2 portrait, or an SC:R member's game icon) with the presence
                                      dot on its bottom-right corner; SC:R has no presence, so no dot there. -->
                                 <Panel VerticalAlignment="Center">
@@ -432,13 +435,31 @@
                                 </Panel>
                                 <!-- Person.Name is "&lt;TAG&gt; Username" (tag prefixed) per Stimpak's own
                                      formatting — reordered to a trailing tag instead, per request. Under it, in
-                                     SC2's Full view, a light line with their BattleTag and status. -->
-                                <StackPanel VerticalAlignment="Center">
-                                    <TextBlock Foreground="White">
+                                     SC2's Full view, a smaller light line with their BattleTag. -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Foreground="White" TextTrimming="CharacterEllipsis"
+                                               FontSize="{Binding $parent[ListBox].((vm:BotTabViewModel)DataContext).UserListNameFontSize}">
+                                        <!-- SC2 clan tag, from presence (field 0x50004), before the name as the game shows it. -->
+                                        <Run Foreground="#C8A860" FontSize="10">
+                                            <Run.Text>
+                                                <MultiBinding Converter="{x:Static conv:PersonClanTagConverter.Instance}">
+                                                    <Binding Path="." />
+                                                    <Binding Path="$parent[ListBox].((vm:BotTabViewModel)DataContext).IconVersion" />
+                                                </MultiBinding>
+                                            </Run.Text>
+                                        </Run>
                                         <Run Text="{Binding ., Converter={x:Static conv:NameCodeConverter.Instance}}" />
-                                        <Run Text="{Binding ., Converter={x:Static conv:NameCodeConverter.Instance}, ConverterParameter=code}" Foreground="#6A6A6A" />
+                                        <!-- No "#123" code for SC2, as in the game's own chat. -->
+                                        <Run Foreground="#6A6A6A">
+                                            <Run.Text>
+                                                <MultiBinding Converter="{x:Static conv:PersonNameCodeConverter.Instance}">
+                                                    <Binding Path="." />
+                                                    <Binding Path="$parent[ListBox].((vm:BotTabViewModel)DataContext).IsSc2" />
+                                                </MultiBinding>
+                                            </Run.Text>
+                                        </Run>
                                     </TextBlock>
-                                    <TextBlock Foreground="#A0A0A0" FontSize="10"
+                                    <TextBlock Foreground="#A0A0A0" FontSize="10" TextTrimming="CharacterEllipsis"
                                                IsVisible="{Binding $parent[ListBox].((vm:BotTabViewModel)DataContext).ShowsMemberDetail}">
                                         <TextBlock.Text>
                                             <MultiBinding Converter="{x:Static conv:PersonDetailConverter.Instance}">
@@ -448,7 +469,7 @@
                                         </TextBlock.Text>
                                     </TextBlock>
                                 </StackPanel>
-                            </StackPanel>
+                            </Grid>
                         </DataTemplate>
                     </ListBox.ItemTemplate>
                 </ListBox>

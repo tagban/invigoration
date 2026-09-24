@@ -34,6 +34,9 @@ public sealed class PresenceTracker
     public const uint FieldSocialAccountId = 0x0001_001b;
     public const uint FieldInGame = 0x50002;
 
+    /// <summary>The SC2 clan tag: a count of byte pairs, a 0/1 odd-byte flag, then that many UTF-8 bytes. From ncarrillo/superiority (MIT).</summary>
+    public const uint FieldClanTag = 0x50004;
+
     /// <summary>The game account a friend is on: region u8, program FourCC u32 (big-endian, e.g. "\0Fen", "BSAp", "\0\0S1"), id u32. Seen live 2026-09-24.</summary>
     public const uint FieldGameAccount = 0x10018;
 
@@ -285,6 +288,31 @@ public sealed class PresenceTracker
         Value(presenceId, FieldGameAccountName) is { Length: > 10 } value && value[9] + 2 <= value.Length - 10
             ? System.Text.Encoding.UTF8.GetString(value, 10, value[9] + 2)
             : null;
+
+    /// <summary>The member's SC2 clan tag (field 0x50004), without brackets, or null.</summary>
+    public string? ClanTagFor(uint presenceId)
+    {
+        if (Value(presenceId, FieldClanTag) is not { Length: >= 2 } value || value[1] > 1)
+        {
+            return null;
+        }
+
+        var length = value[0] * 2 + value[1];
+        if (value.Length - 2 != length)
+        {
+            return null;
+        }
+
+        try
+        {
+            var tag = new System.Text.UTF8Encoding(false, true).GetString(value, 2, length).Trim();
+            return tag.Length > 0 ? tag : null;
+        }
+        catch (System.Text.DecoderFallbackException)
+        {
+            return null;
+        }
+    }
 
     public string? ProgramFor(FriendEntry friend) => PresenceIdFor(friend) is { } presenceId ? ProgramFor(presenceId) : null;
 

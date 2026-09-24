@@ -208,6 +208,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         OnPropertyChanged(nameof(ShowsMemberDetail));
     }
 
+    /// <summary>The user list's name size: a notch smaller for SC2, whose clan tags make names long. SC:R has none.</summary>
+    public double UserListNameFontSize => IsSc2 ? 12 : 14;
+
     /// <summary>Whether this bot shows SC2 portraits (as opposed to SC:R's classic game icons, which follow icon sets).</summary>
     public bool IsSc2 => Config.Product == BncsProduct.Sc2;
 
@@ -374,6 +377,8 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         OnPropertyChanged(nameof(SupportsClan));
         OnPropertyChanged(nameof(IsSingleChannel));
         OnPropertyChanged(nameof(IsSc2));
+        OnPropertyChanged(nameof(UserListNameFontSize));
+        OnPropertyChanged(nameof(CanManageFriends));
         OnPropertyChanged(nameof(PortraitSize));
         OnPropertyChanged(nameof(ShowsMemberDetail));
         RefreshTheme();
@@ -707,7 +712,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         if (SupportsMultiChannel && e.ChannelIndex is { } channelIndex)
         {
             var channel = Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex);
-            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon(e.Username), Config.ShowUserIconsInChat, IsSc2 && Config.FullChatPortraits);
+            channel?.HandleChatEvent(e, Engine.Palette, ResolveSc2UserIcon(e.Username), Config.ShowUserIconsInChat, IsSc2 && Config.FullChatPortraits, hideNameCodes: IsSc2);
             if (IsUnreadWorthy(e.Type))
             {
                 if (channel is not null && channel != SelectedChannel)

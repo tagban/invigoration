@@ -28,6 +28,9 @@ public sealed class ChatLineViewModel
     /// <summary>How many leading segments are the speaker's name (with its dimmed code and ": "), shown as the Full layout's heading.</summary>
     public int NameSegments { get; }
 
+    /// <summary>The speaker's SC2 clan tag, without brackets, shown before their name in the Full layout; empty when none.</summary>
+    public string ClanTag { get; init; } = "";
+
     public ChatLineViewModel(IEnumerable<ChatLogSegment> segments, Bitmap? icon = null, bool largePicture = false, int nameSegments = 1)
     {
         Segments = segments.Select(s => new ChatSegmentViewModel(s.Text, s.Color)).ToList();

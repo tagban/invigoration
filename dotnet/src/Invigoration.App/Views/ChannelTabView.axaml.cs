@@ -135,6 +135,8 @@ public partial class ChannelTabView : UserControl
     /// A talk line with the speaker's portrait on the left and their name above the word-wrapped
     /// text (BotConfig.FullChatPortraits). Sized to the log's width, and resized with it.
     /// </summary>
+    private static readonly Avalonia.Media.IBrush ClanTagBrush = new Avalonia.Media.SolidColorBrush(Avalonia.Media.Color.FromRgb(0xC8, 0xA8, 0x60));
+
     private static Control LargePictureLine(SelectableTextBlock chatText, ChatLineViewModel line)
     {
         var text = new TextBlock { TextWrapping = Avalonia.Media.TextWrapping.Wrap, FontSize = chatText.FontSize };
@@ -143,8 +145,13 @@ public partial class ChannelTabView : UserControl
             text.Inlines!.Add(new Run(segment.Text) { Foreground = segment.Brush });
         }
 
-        // The name (and its dimmed code) as a bold heading, without the ": ".
-        var heading = new TextBlock { FontWeight = Avalonia.Media.FontWeight.Bold };
+        // The name (and its dimmed code) as a bold heading, without the ": ", after the clan tag.
+        var heading = new TextBlock { FontWeight = Avalonia.Media.FontWeight.Bold, TextWrapping = Avalonia.Media.TextWrapping.Wrap };
+        if (line.ClanTag.Length > 0)
+        {
+            heading.Inlines!.Add(new Run($"<{line.ClanTag}> ") { Foreground = ClanTagBrush, FontSize = Math.Max(9, chatText.FontSize - 2) });
+        }
+
         foreach (var segment in line.Segments.Take(line.NameSegments))
         {
             var part = segment.Text.TrimEnd(' ', ':');

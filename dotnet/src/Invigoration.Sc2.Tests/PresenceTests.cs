@@ -191,6 +191,17 @@ public class PresenceTests
     }
 
     [Fact]
+    public void Tracker_ReadsTheClanTag()
+    {
+        // Superiority's retail example: three byte pairs, no odd byte, "BURNIN".
+        var tracker = Announced();
+        tracker.Apply(new PresenceUpdateRecord(7, 8, true, Convert.FromHexString("03004255524E494E"), [], [ClanTag], [8]));
+
+        Assert.Equal("BURNIN", tracker.ClanTagFor(7));
+        Assert.Null(tracker.ClanTagFor(9));
+    }
+
+    [Fact]
     public void Tracker_MalformedUpdate_IsRejectedAndChangesNothing()
     {
         var tracker = Announced();

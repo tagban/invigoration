@@ -72,6 +72,7 @@ public static class NativeMemberPortraits
     private static readonly ConcurrentDictionary<string, (ushort Sheet, ushort Cell)> ByName = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, string> Details = new(StringComparer.OrdinalIgnoreCase);
     private static readonly ConcurrentDictionary<string, Stimpak.Presence> States = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string> ClanTags = new(StringComparer.OrdinalIgnoreCase);
     private static readonly Timer SaveTimer = new(_ => Save());
     private static int _loaded;
 
@@ -125,6 +126,18 @@ public static class NativeMemberPortraits
     }
 
     public static Stimpak.Presence? StateFor(string name) => States.TryGetValue(name, out var state) ? state : null;
+
+    /// <summary>A member's SC2 clan tag from presence, without brackets; an empty one clears it.</summary>
+    public static void SetClanTag(string name, string clanTag)
+    {
+        if (name.Length > 0 && (!ClanTags.TryGetValue(name, out var known) || known != clanTag))
+        {
+            ClanTags[name] = clanTag;
+            Changed?.Invoke();
+        }
+    }
+
+    public static string ClanTagFor(string name) => ClanTags.TryGetValue(name, out var tag) ? tag : "";
 
     private static void EnsureLoaded()
     {

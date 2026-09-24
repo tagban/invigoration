@@ -128,6 +128,33 @@ public sealed class PersonShowsPresenceConverter : IValueConverter
         throw new NotSupportedException();
 }
 
+/// <summary>A member's dimmed "#123" code for the user list, or "" when the bot hides codes (StarCraft II, whose own chat never shows them): the second value.</summary>
+public sealed class PersonNameCodeConverter : IMultiValueConverter
+{
+    public static readonly PersonNameCodeConverter Instance = new();
+
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture) =>
+        values.Count > 1 && values[1] is true ? "" : NameCodeConverter.Instance.Convert(values.Count > 0 ? values[0] : null, targetType, "code", culture);
+}
+
+/// <summary>An SC2 member's clan tag from presence, as "&lt;TAG&gt; " before their name, or "". The second value only makes it refresh (BotTabViewModel.IconVersion).</summary>
+public sealed class PersonClanTagConverter : IMultiValueConverter
+{
+    public static readonly PersonClanTagConverter Instance = new();
+
+    public object? Convert(IList<object?> values, Type targetType, object? parameter, CultureInfo culture)
+    {
+        if (values.Count == 0 || values[0] is not Person person)
+        {
+            return "";
+        }
+
+        // Only native SC2's, from presence: a tag Stimpak put on the Person is already shown after the name.
+        var tag = person.ClanTag is { Length: > 0 } ? "" : NativeMemberPortraits.ClanTagFor(PersonProductIconConverter.BareName(person, culture));
+        return tag.Length > 0 ? $"<{tag}> " : "";
+    }
+}
+
 /// <summary>The light detail line under an SC2 member's name in the Full user list (NativeMemberPortraits.DetailFor). The second value only makes it refresh (BotTabViewModel.IconVersion).</summary>
 public sealed class PersonDetailConverter : IMultiValueConverter
 {

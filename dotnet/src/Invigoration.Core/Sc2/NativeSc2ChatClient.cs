@@ -591,6 +591,7 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
                 }
 
                 NativeMemberPortraits.SetDetail(user.Name, MemberDetail(presenceId));
+                NativeMemberPortraits.SetClanTag(user.Name, _presence.ClanTagFor(presenceId) ?? "");
                 if (_presence.State(presenceId) is { } state)
                 {
                     NativeMemberPortraits.SetState(user.Name, state switch
@@ -606,30 +607,11 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         }
     }
 
-    /// <summary>What presence says about a member, for the user list's Full view: BattleTag, and in a game, away or busy.</summary>
-    private string MemberDetail(uint presenceId)
-    {
-        var parts = new List<string>();
-        if (_presence.BattleTagFor(presenceId) is { Length: > 0 } tag)
-        {
-            parts.Add(tag);
-        }
-
-        switch (_presence.State(presenceId))
-        {
-            case FriendPresence.InGame:
-                parts.Add("in a game");
-                break;
-            case FriendPresence.Away:
-                parts.Add("away");
-                break;
-            case FriendPresence.Busy:
-                parts.Add("busy");
-                break;
-        }
-
-        return string.Join(" · ", parts);
-    }
+    /// <summary>
+    /// The line under a member's name in the user list's Full view: their BattleTag. Whether
+    /// they're in a game, away or busy is already the dot on their portrait.
+    /// </summary>
+    private string MemberDetail(uint presenceId) => _presence.BattleTagFor(presenceId) ?? "";
 
     /// <summary>Sends the profile reads PortraitResolver allows (16 at once, 40 a second), four times a second.</summary>
     private async Task PumpPortraitsAsync(CancellationToken cancellationToken)

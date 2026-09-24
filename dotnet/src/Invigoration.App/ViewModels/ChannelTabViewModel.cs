@@ -3,6 +3,7 @@ using Avalonia.Media.Imaging;
 using CommunityToolkit.Mvvm.ComponentModel;
 using Invigoration.App.Models;
 using Invigoration.Core.Chat;
+using Invigoration.Core.Sc2;
 using Stimpak;
 
 namespace Invigoration.App.ViewModels;
@@ -56,7 +57,8 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
     /// <summary>The dim gray a name's "#1234" code is shown in.</summary>
     private static readonly RgbColor NameCodeColor = new(0x6A, 0x6A, 0x6A);
 
-    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null, bool showIcons = true, bool largePictures = false)
+    /// <param name="hideNameCodes">Leave out a name's "#123" code, as StarCraft II's own chat does.</param>
+    public void HandleChatEvent(ChatEvent e, ChatPalette palette, Bitmap? userIcon = null, bool showIcons = true, bool largePictures = false, bool hideNameCodes = false)
     {
         switch (e.Type)
         {
@@ -78,7 +80,7 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
                 var nameColor = palette.GetUserNameColor(e.Flags);
                 var (name, code) = NameParts.Split(e.Username);
                 var segments = new List<ChatLogSegment> { new(nameColor, name) };
-                if (code.Length > 0)
+                if (code.Length > 0 && !hideNameCodes)
                 {
                     segments.Add(new(NameCodeColor, code));
                 }
@@ -86,7 +88,10 @@ public sealed partial class ChannelTabViewModel(byte channelIndex, ChatChannel c
                 segments.Add(new(nameColor, ": "));
                 var nameSegments = segments.Count;
                 segments.AddRange(ChatColorFormatter.Parse(e.Text, palette.GetChatColor(e.Flags), palette));
-                ChatLines.Add(new ChatLineViewModel(segments, userIcon, largePictures, nameSegments));
+                ChatLines.Add(new ChatLineViewModel(segments, userIcon, largePictures, nameSegments)
+                {
+                    ClanTag = largePictures ? NativeMemberPortraits.ClanTagFor(e.Username) : "",
+                });
                 break;
 
             case ChatEventType.Emote:
