@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Documents;
 using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Layout;
 using Avalonia.Threading;
@@ -138,6 +139,43 @@ public partial class BotTabView : UserControl
                 _ = vm.Engine.SendChatCommandAsync($"/w {friend.Account} {text}");
             }
 
+            if (control.FindAncestorOfType<Popup>() is { } popup)
+            {
+                popup.IsOpen = false;
+            }
+        }
+    }
+
+    /// <summary>Opens this friend's thread in the Whispers tab, where replies to them land too.</summary>
+    private void OnFriendOpenWhispersClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: FriendEntryViewModel friend } control && DataContext is BotTabViewModel vm
+            && this.FindAncestorOfType<Window>()?.DataContext is MainWindowViewModel mainVm)
+        {
+            if (control.FindAncestorOfType<Popup>() is { } popup)
+            {
+                popup.IsOpen = false;
+            }
+
+            mainVm.FocusWhisperThread(vm, friend.Account);
+        }
+    }
+
+    /// <summary>First click of "Remove Friend...": the popup swaps it for a confirm button.</summary>
+    private void OnFriendRemoveClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: FriendEntryViewModel friend })
+        {
+            friend.ConfirmingRemove = true;
+        }
+    }
+
+    private void OnFriendRemoveConfirmClick(object? sender, RoutedEventArgs e)
+    {
+        if (sender is Control { DataContext: FriendEntryViewModel friend } control && DataContext is BotTabViewModel vm)
+        {
+            friend.ConfirmingRemove = false;
+            vm.RemoveFriend(friend);
             if (control.FindAncestorOfType<Popup>() is { } popup)
             {
                 popup.IsOpen = false;
@@ -321,6 +359,27 @@ public partial class BotTabView : UserControl
             };
         }
 
+        // SC:R: name the member and their BattleTag in the menu; without one, adding them can't work.
+        var person = (menu.PlacementTarget as ListBox)?.SelectedItem as Stimpak.Person;
+        var battleTag = person is null ? null : Invigoration.Core.Sc2.NativeMemberProducts.BattleTagFor(person.Name);
+        foreach (var item in menu.Items.OfType<MenuItem>())
+        {
+            switch (item.Name)
+            {
+                case "ScrUserWhisper":
+                    item.Header = person is null ? "Whisper" : $"Whisper {person.Name.Replace("_", "__")}";
+                    item.IsEnabled = person is not null;
+                    break;
+                case "ScrUserAddFriend":
+                    item.Header = battleTag is null ? "Add Friend" : $"Add Friend ({battleTag.Replace("_", "__")})";
+                    item.IsEnabled = battleTag is not null;
+                    break;
+                case "ScrUserCopyBattleTag":
+                    item.IsEnabled = battleTag is not null;
+                    break;
+            }
+        }
+
         iconSetMenu.Items.Clear();
         var current = MainWindowViewModel.IconSetNameFor(vm);
         foreach (var name in mainVm.IconSetNames)
@@ -328,6 +387,37 @@ public partial class BotTabView : UserControl
             var item = new MenuItem { Header = name.Replace("_", "__"), ToggleType = MenuItemToggleType.Radio, GroupName = "Sc2UserIconSet", IsChecked = name == current };
             item.Click += (_, _) => mainVm.UseIconSet(vm, name);
             iconSetMenu.Items.Add(item);
+        }
+    }
+
+    /// <summary>The SC:R member the user list's menu was opened on (right-clicking selects the row).</summary>
+    private (Stimpak.Person Person, string? BattleTag)? RightClickedScrMember() =>
+        this.FindControl<ListBox>("Sc2UserList")?.SelectedItem is Stimpak.Person person
+            ? (person, Invigoration.Core.Sc2.NativeMemberProducts.BattleTagFor(person.Name))
+            : null;
+
+    private void OnScrUserWhisperClick(object? sender, RoutedEventArgs e)
+    {
+        if (RightClickedScrMember() is { } member && DataContext is BotTabViewModel vm
+            && this.FindAncestorOfType<Window>()?.DataContext is MainWindowViewModel mainVm)
+        {
+            mainVm.FocusWhisperThread(vm, member.Person.Name);
+        }
+    }
+
+    private void OnScrUserAddFriendClick(object? sender, RoutedEventArgs e)
+    {
+        if (RightClickedScrMember() is { BattleTag: { } tag } && DataContext is BotTabViewModel vm)
+        {
+            vm.Engine.AddBattlenetFriend(tag);
+        }
+    }
+
+    private async void OnScrUserCopyBattleTagClick(object? sender, RoutedEventArgs e)
+    {
+        if (RightClickedScrMember() is { BattleTag: { } tag } && TopLevel.GetTopLevel(this)?.Clipboard is { } clipboard)
+        {
+            await clipboard.SetTextAsync(tag);
         }
     }
 

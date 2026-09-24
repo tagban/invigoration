@@ -304,6 +304,10 @@ public sealed class ScrConnection : IAsyncDisposable
     /// <summary>Sends a message built by <see cref="Chat"/> (a chat line, a whisper, a join).</summary>
     public Task SendAsync(byte[] message, CancellationToken cancellationToken) => _classic.SendAsync(message, true, cancellationToken);
 
+    /// <summary>A call to any classic service (Battle.net whispers, friends...); returns the reply's body.</summary>
+    public async Task<byte[]> RequestAsync(uint service, uint method, byte[] body, CancellationToken cancellationToken) =>
+        (await CallAsync(service, method, body, null, cancellationToken).ConfigureAwait(false)).Body;
+
     private async Task<ClassicRpc> CallAsync(uint service, uint method, byte[] body, byte[]? trace, CancellationToken cancellationToken)
     {
         var (message, token) = _chat.Call(service, method, body, trace);

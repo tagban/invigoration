@@ -380,7 +380,7 @@
                      straight to Stimpak's own Person collection (see ChannelTabViewModel) — a
                      much shorter row than classic BNCS's above, since Stimpak's protocol surface
                      doesn't carry per-user operator flags, ping, or a statstring. -->
-                <ListBox ItemsSource="{Binding SelectedChannel.Users}" Background="Transparent" BorderThickness="0" Padding="0,4"
+                <ListBox Name="Sc2UserList" ItemsSource="{Binding SelectedChannel.Users}" Background="Transparent" BorderThickness="0" Padding="0,4"
                          IsVisible="{Binding SupportsMultiChannel}">
                     <ListBox.ContextMenu>
                         <ContextMenu Opened="OnSc2UserContextMenuOpened">
@@ -391,6 +391,11 @@
                                       IsVisible="{Binding IsSc2}" ToolTip.Tip="Small portraits, one line per person." />
                             <MenuItem Name="UserListFull" Header="Full" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
                                       IsVisible="{Binding IsSc2}" ToolTip.Tip="Larger portraits, with each person's BattleTag and status under their name." />
+                            <!-- SC:R: the right-clicked member, by the BattleTag Battle.net sends with each one (OnSc2UserContextMenuOpened). -->
+                            <Separator IsVisible="{Binding CanManageFriends}" />
+                            <MenuItem Name="ScrUserWhisper" Header="Whisper" Click="OnScrUserWhisperClick" IsVisible="{Binding CanManageFriends}" />
+                            <MenuItem Name="ScrUserAddFriend" Header="Add Friend" Click="OnScrUserAddFriendClick" IsVisible="{Binding CanManageFriends}" />
+                            <MenuItem Name="ScrUserCopyBattleTag" Header="Copy BattleTag" Click="OnScrUserCopyBattleTagClick" IsVisible="{Binding CanManageFriends}" />
                         </ContextMenu>
                     </ListBox.ContextMenu>
                     <ListBox.Styles>
@@ -458,6 +463,35 @@
                     </Border>
                 </TabItem.Header>
                 <DockPanel>
+                    <!-- Battle.net friends on an SC:R bot: send a request by BattleTag, and answer ones received. -->
+                    <DockPanel DockPanel.Dock="Top" Margin="4,4,4,0" IsVisible="{Binding CanManageFriends}">
+                        <Button DockPanel.Dock="Right" Content="Add" Command="{Binding AddFriendCommand}"
+                                Padding="8,2" FontSize="11" Margin="6,0,0,0" />
+                        <TextBox Text="{Binding NewFriendBattleTag}" PlaceholderText="Add a friend: Name#1234" FontSize="11"
+                                 MinHeight="0" Padding="6,2">
+                            <TextBox.KeyBindings>
+                                <KeyBinding Gesture="Enter" Command="{Binding AddFriendCommand}" />
+                            </TextBox.KeyBindings>
+                        </TextBox>
+                    </DockPanel>
+                    <ItemsControl DockPanel.Dock="Top" ItemsSource="{Binding FriendInvitations}" Margin="4,4,4,0"
+                                  IsVisible="{Binding HasFriendInvitations}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="models:FriendInvitationViewModel">
+                                <DockPanel Margin="4,2">
+                                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" IsVisible="{Binding CanAnswer}">
+                                        <Button Content="Accept" Padding="8,1" FontSize="11"
+                                                Command="{Binding $parent[ItemsControl].((vm:BotTabViewModel)DataContext).AcceptFriendInvitationCommand}"
+                                                CommandParameter="{Binding}" />
+                                        <Button Content="Decline" Padding="8,1" FontSize="11"
+                                                Command="{Binding $parent[ItemsControl].((vm:BotTabViewModel)DataContext).DeclineFriendInvitationCommand}"
+                                                CommandParameter="{Binding}" />
+                                    </StackPanel>
+                                    <TextBlock Text="{Binding Caption}" FontSize="11" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
                     <DockPanel DockPanel.Dock="Top" Margin="4">
                         <Button DockPanel.Dock="Right" Content="Refresh" Command="{Binding RefreshFriendsCommand}"
                                 Padding="8,2" FontSize="11" IsVisible="{Binding !SupportsMultiChannel}" />
@@ -498,16 +532,32 @@
                                                 <TextBox PlaceholderText="Message..." Text="{Binding WhisperDraft}" />
                                                 <Button Content="Send" HorizontalAlignment="Right" Padding="10,3"
                                                         Click="OnSendInlineWhisperClick" />
-                                                <Separator />
+                                                <Button Content="Open in Whispers" HorizontalAlignment="Stretch" Padding="10,3"
+                                                        Click="OnFriendOpenWhispersClick" />
+                                                <Button Content="Remove Friend..." HorizontalAlignment="Stretch" Padding="10,3"
+                                                        Click="OnFriendRemoveClick">
+                                                    <Button.IsVisible>
+                                                        <MultiBinding Converter="{x:Static BoolConverters.And}">
+                                                            <Binding Path="CanRemove" />
+                                                            <Binding Path="!ConfirmingRemove" />
+                                                        </MultiBinding>
+                                                    </Button.IsVisible>
+                                                </Button>
+                                                <Button HorizontalAlignment="Stretch" Padding="10,3" Foreground="#FF8080"
+                                                        Content="{Binding Account, StringFormat='Yes, remove {0}'}"
+                                                        Click="OnFriendRemoveConfirmClick" IsVisible="{Binding ConfirmingRemove}" />
+                                                <!-- Classic Battle.net only: Battle.net 2.0 friends (ModernStyle) have no
+                                                     classic profile, clan rank or squelch. -->
+                                                <Separator IsVisible="{Binding !ModernStyle}" />
                                                 <Button Content="Profile Info" HorizontalAlignment="Stretch" Padding="10,3"
-                                                        Click="OnFriendProfileInfoClick" />
+                                                        Click="OnFriendProfileInfoClick" IsVisible="{Binding !ModernStyle}" />
                                                 <Button Content="Clan Rank" HorizontalAlignment="Stretch" Padding="10,3"
-                                                        Click="OnFriendClanRankClick" />
+                                                        Click="OnFriendClanRankClick" IsVisible="{Binding !ModernStyle}" />
                                                 <Button Content="Squelch" HorizontalAlignment="Stretch" Padding="10,3"
-                                                        Click="OnFriendSquelchClick" />
-                                                <Separator />
-                                                <TextBlock Text="Set clan rank:" FontSize="11" Opacity="0.7" />
-                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6">
+                                                        Click="OnFriendSquelchClick" IsVisible="{Binding !ModernStyle}" />
+                                                <Separator IsVisible="{Binding !ModernStyle}" />
+                                                <TextBlock Text="Set clan rank:" FontSize="11" Opacity="0.7" IsVisible="{Binding !ModernStyle}" />
+                                                <Grid ColumnDefinitions="*,Auto" ColumnSpacing="6" IsVisible="{Binding !ModernStyle}">
                                                     <ComboBox Grid.Column="0" HorizontalAlignment="Stretch" Loaded="OnClanRankComboLoaded" />
                                                     <Button Grid.Column="1" Content="Set" Click="OnFriendSetClanRankClick" />
                                                 </Grid>

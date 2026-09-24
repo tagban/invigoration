@@ -126,7 +126,7 @@ public static class ScrToons
     /// <summary>
     /// The character on <paramref name="gateway"/> called <paramref name="characterName"/>, or the
     /// first one on that gateway when no name is given. Throws a message fit to show the user when
-    /// there isn't one: Invigoration can't create characters yet.
+    /// there isn't one.
     /// </summary>
     public static ScrToon Choose(IReadOnlyList<ScrToon> toons, uint gateway, string? characterName)
     {
@@ -143,7 +143,7 @@ public static class ScrToons
         var what = string.IsNullOrWhiteSpace(characterName) ? "no character" : $"no character called {characterName.Trim()}";
         throw new ScrCharacterException(
             $"This Battle.net account has {what} on {ScrGateways.NameOf(gateway)}. {elsewhere} " +
-            "Pick one in the bot's settings, or create one on that gateway once in StarCraft: Remastered itself.");
+            "Pick one in the bot's settings, or make one there with New character.");
     }
 }
 

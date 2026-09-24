@@ -113,6 +113,51 @@ public sealed partial class BotEngine
 
     private readonly Dictionary<string, FriendEntry> _sc2Friends = new();
 
+    /// <summary>Pending Battle.net friend requests, from a native client that reports them (SC:R).</summary>
+    public event Action<IReadOnlyList<FriendInvitation>>? FriendInvitationsUpdated;
+
+    /// <summary>Whether this bot can change its Battle.net friends list: a connected SC:R bot, so far.</summary>
+    public bool CanManageBattlenetFriends => _sc2Client is IBattlenetFriendsClient;
+
+    /// <summary>Sends a Battle.net friend request to <paramref name="battleTag"/>. False if it isn't a BattleTag or can't be sent.</summary>
+    public bool AddBattlenetFriend(string battleTag)
+    {
+        var tag = battleTag.Trim();
+        var hash = tag.IndexOf('#');
+        if (hash <= 0 || hash == tag.Length - 1 || tag.Contains(' '))
+        {
+            LogError("Friend requests go to a BattleTag, like Name#1234.");
+            return false;
+        }
+
+        return WithFriendsClient(c => c.AddFriend(tag), $"send {tag} a friend request");
+    }
+
+    public bool RemoveBattlenetFriend(string battleTag) => WithFriendsClient(c => c.RemoveFriend(battleTag), $"remove {battleTag}");
+
+    public bool AnswerFriendInvitation(ulong invitationId, bool accept) =>
+        WithFriendsClient(c => c.AnswerInvitation(invitationId, accept), accept ? "accept the friend request" : "decline the friend request");
+
+    private bool WithFriendsClient(Action<IBattlenetFriendsClient> action, string what)
+    {
+        if (_sc2Client is not IBattlenetFriendsClient client)
+        {
+            LogError($"Can't {what}: only a connected StarCraft: Remastered bot can change Battle.net friends so far.");
+            return false;
+        }
+
+        try
+        {
+            action(client);
+            return true;
+        }
+        catch (StimpakException ex)
+        {
+            LogError($"Couldn't {what}: {ex.Message}");
+            return false;
+        }
+    }
+
     /// <summary>The account's public-channel catalog, cached from the last PublicChannelsReceived so a channel name (from the "join" bot-command) can be resolved to the id JoinPublic needs.</summary>
     private IReadOnlyList<ChatChannel> _sc2PublicChannelCatalog = [];
 
@@ -394,6 +439,7 @@ public sealed partial class BotEngine
         CloseSc2Channels();
         _sc2InChat = false;
         _sc2Friends.Clear();
+        FriendInvitationsUpdated?.Invoke([]);
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
         _sc2PublicChannelCatalog = [];
@@ -779,6 +825,10 @@ public sealed partial class BotEngine
 
             case NativeChatEvent native:
                 await HandleChatEvent(native.Event).ConfigureAwait(false);
+                break;
+
+            case NativeInvitationsEvent invitations:
+                FriendInvitationsUpdated?.Invoke(invitations.Invitations);
                 break;
 
             case NativeFriendsEvent friends:

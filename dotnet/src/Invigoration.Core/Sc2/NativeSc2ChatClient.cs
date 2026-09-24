@@ -161,10 +161,41 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
     /// </summary>
     public void SendWhisper(string name, string body)
     {
+        // A friend by the name the Friends list shows: addressed by their presence, or their
+        // account, as ncarrillo/superiority (MIT) does, so their SC2 character's name isn't needed.
+        if (FriendWhisperTarget(name) is { } friend)
+        {
+            Send(ChatCommands.ChatWhisper(friend, body), "whisper " + name);
+            Emit(new WhisperReceived(name, body, true));
+            return;
+        }
+
         var target = FindMember(name) ?? _self
             ?? throw new StimpakException("Can't whisper before a character is selected.", null!);
         Send(ChatCommands.ChatWhisper(new WhisperTarget.ToonName(name, target.Region, target.ProgramId, target.Realm), body), "whisper " + name);
         Emit(new WhisperReceived(name, body, true));
+    }
+
+    /// <summary>How to whisper the friend the Friends list shows as <paramref name="name"/>, or null for someone who isn't one.</summary>
+    private WhisperTarget? FriendWhisperTarget(string name)
+    {
+        lock (_sync)
+        {
+            foreach (var friend in _friends.Values)
+            {
+                if (friend.Identity is not Sc2FriendIdentity.Account account
+                    || !ToFriendEntry(friend).Account.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                return _presence.PresenceIdFor(friend) is { } presenceId
+                    ? new WhisperTarget.Presence(presenceId)
+                    : new WhisperTarget.Account(account.AccountId);
+            }
+        }
+
+        return null;
     }
 
     public void SubmitAuth(ulong authId, string token)

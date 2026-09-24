@@ -12,6 +12,18 @@ namespace Invigoration.Core.Sc2;
 public static class NativeMemberProducts
 {
     private static readonly ConcurrentDictionary<string, string> ByName = new(StringComparer.OrdinalIgnoreCase);
+    private static readonly ConcurrentDictionary<string, string> BattleTags = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>An SC:R member's BattleTag, which Battle.net sends with each channel member.</summary>
+    public static void SetBattleTag(string name, string battleTag)
+    {
+        if (name.Length > 0 && battleTag.Contains('#'))
+        {
+            BattleTags[name] = battleTag;
+        }
+    }
+
+    public static string? BattleTagFor(string name) => BattleTags.TryGetValue(name, out var tag) ? tag : null;
 
     public static void Set(string name, string programId)
     {

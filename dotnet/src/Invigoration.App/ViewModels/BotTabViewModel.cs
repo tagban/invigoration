@@ -389,6 +389,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         Engine.SelfChatSent += OnSelfChatSent;
         Engine.ChatMessage += OnChatMessage;
         Engine.FriendsListUpdated += OnFriendsListUpdated;
+        Engine.FriendInvitationsUpdated += OnFriendInvitationsUpdated;
         Engine.BncsConnected += () => Dispatcher.UIThread.Post(() =>
         {
             IsConnected = true;
@@ -843,7 +844,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     /// <summary>Finds or creates an empty thread for a peer with no message appended — for the right-click "Whisper" action (BotTabView.axaml.cs/MainWindowViewModel.FocusWhisperThread), which just needs somewhere to open a compose box, not a logged message.</summary>
     public WhisperThreadViewModel GetOrCreateWhisperThread(string peer)
     {
-        var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
+        var thread = WhisperThreads.FirstOrDefault(t => string.Equals(t.Peer, peer, StringComparison.OrdinalIgnoreCase));
         if (thread is null)
         {
             thread = new WhisperThreadViewModel(this, peer);
@@ -861,7 +862,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             return null;
         }
 
-        var thread = WhisperThreads.FirstOrDefault(t => t.Peer == peer);
+        var thread = WhisperThreads.FirstOrDefault(t => string.Equals(t.Peer, peer, StringComparison.OrdinalIgnoreCase));
         if (thread is null)
         {
             thread = new WhisperThreadViewModel(this, peer);
@@ -944,6 +945,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             friend.ModernStyle = SupportsMultiChannel;
             friend.ShowRealName = Config.ShowFriendRealNames;
             friend.ShowOffline = Config.ShowOfflineFriends;
+            friend.CanRemove = CanManageFriends;
         }
 
         // Online-first, otherwise stable (OrderByDescending doesn't reorder two friends that
@@ -1117,6 +1119,46 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         }
     }
 
+    /// <summary>Whether the Friends tab can add, remove and answer Battle.net friends: SC:R bots, so far (SC2's commands aren't mapped).</summary>
+    public bool CanManageFriends => IsSingleChannel;
+
+    /// <summary>Pending Battle.net friend requests, to this bot's account or sent from it.</summary>
+    public ObservableCollection<FriendInvitationViewModel> FriendInvitations { get; } = [];
+
+    /// <summary>The Friends tab's "Add friend" box.</summary>
+    [ObservableProperty]
+    public partial string NewFriendBattleTag { get; set; } = "";
+
+    [RelayCommand]
+    private void AddFriend()
+    {
+        if (Engine.AddBattlenetFriend(NewFriendBattleTag))
+        {
+            NewFriendBattleTag = "";
+        }
+    }
+
+    [RelayCommand]
+    private void AcceptFriendInvitation(FriendInvitationViewModel invitation) => Engine.AnswerFriendInvitation(invitation.Id, accept: true);
+
+    [RelayCommand]
+    private void DeclineFriendInvitation(FriendInvitationViewModel invitation) => Engine.AnswerFriendInvitation(invitation.Id, accept: false);
+
+    public void RemoveFriend(FriendEntryViewModel friend) => Engine.RemoveBattlenetFriend(friend.Account);
+
+    private void OnFriendInvitationsUpdated(IReadOnlyList<Invigoration.Core.Sc2.FriendInvitation> invitations) => Dispatcher.UIThread.Post(() =>
+    {
+        FriendInvitations.Clear();
+        foreach (var invitation in invitations)
+        {
+            FriendInvitations.Add(new FriendInvitationViewModel(invitation.Id, invitation.BattleTag, invitation.Sent));
+        }
+
+        OnPropertyChanged(nameof(HasFriendInvitations));
+    });
+
+    public bool HasFriendInvitations => FriendInvitations.Count > 0;
+
     /// <summary>The Friends tab's "Real names" checkbox (Battle.net 2.0 friends only). Saved with the bot's config.</summary>
     public bool ShowFriendRealNames
     {
@@ -1224,6 +1266,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         Engine.SelfChatSent -= OnSelfChatSent;
         Engine.ChatMessage -= OnChatMessage;
         Engine.FriendsListUpdated -= OnFriendsListUpdated;
+        Engine.FriendInvitationsUpdated -= OnFriendInvitationsUpdated;
         Engine.Sc2ChannelJoined -= OnSc2ChannelJoined;
         Engine.Sc2ChannelLeft -= OnSc2ChannelLeft;
         Engine.Sc2ChannelJoinRejected -= OnSc2ChannelJoinRejected;

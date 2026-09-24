@@ -383,6 +383,24 @@ public sealed class AuroraClient : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        // Leaving properly: ConnectionService.RequestDisconnect (method 7, no reply), as a Battle.net
+        // client does when it logs out. Just dropping the socket leaves the account's SC:R session
+        // live for 20-50 seconds, and a new sign-in stalls until it ends.
+        if (_socket.State == WebSocketState.Open)
+        {
+            try
+            {
+                using var goodbye = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+                var header = new JsonObject { ["method_id"] = 7, ["service_hash"] = ConnectionService, ["service_id"] = 0, ["token"] = _nextToken++ };
+                await WriteAsync(new JsonArray(header, new JsonObject { ["error_code"] = 0 }), goodbye.Token).ConfigureAwait(false);
+                _trace("-> RequestDisconnect");
+            }
+            catch (Exception ex) when (ex is WebSocketException or OperationCanceledException or ObjectDisposedException)
+            {
+                // Already going.
+            }
+        }
+
         _stop.Cancel();
         try
         {

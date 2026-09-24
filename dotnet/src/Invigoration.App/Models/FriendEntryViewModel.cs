@@ -60,6 +60,14 @@ public partial class FriendEntryViewModel(string account) : ObservableObject
 
     public bool IsListed => IsOnline || ShowOffline;
 
+    /// <summary>Whether the bot can remove this friend (a Battle.net friend on an SC:R bot).</summary>
+    [ObservableProperty]
+    public partial bool CanRemove { get; set; }
+
+    /// <summary>"Remove Friend" was clicked once; the popup now asks to confirm.</summary>
+    [ObservableProperty]
+    public partial bool ConfirmingRemove { get; set; }
+
     private bool UsesRealName => ShowRealName && RealName.Length > 0;
 
     public string DisplayName => UsesRealName ? RealName : Account;

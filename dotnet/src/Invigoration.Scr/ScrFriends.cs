@@ -10,10 +10,90 @@ namespace Invigoration.Scr;
 /// <param name="Busy">Field 7, likewise; taken to be busy. Not confirmed.</param>
 public sealed record ScrFriend(ulong AccountId, string BattleTag, string Program, bool Online, bool Away, bool Busy, string RealName = "", string Detail = "");
 
+/// <summary>A friend request (AuroraFriends.InvitationUpdated), answered by its <see cref="Id"/>.</summary>
+public sealed record ScrInvitation(ulong Id, string BattleTag);
+
 public static class ScrFriends
 {
     public const uint Service = 0xAA4E1E00;
     public const uint FriendUpdatedMethod = 0xEC7E2FD1;
+
+    // From the retail client's library, where each is registered next to its name.
+    public const uint SendInvitationMethod = 0xF7C61139;
+    public const uint RemoveFriendMethod = 0xCA10E52C;
+    public const uint AcceptInvitationMethod = 0xF7E2F4AB;
+    public const uint DeclineInvitationMethod = 0xE10265CB;
+    public const uint InvitationUpdatedMethod = 0x4A8E2E5E;
+
+    /// <summary>SendInvitation: {1: BattleTag}. The reply carries one string, meaning unknown.</summary>
+    public static byte[] SendInvitationRequest(string battleTag)
+    {
+        var request = new ProtoWriter();
+        request.WriteString(1, battleTag);
+        return request.ToArray();
+    }
+
+    /// <summary>RemoveFriend: {1: account ID}, a plain varint (unlike a whisper's fixed32).</summary>
+    public static byte[] RemoveFriendRequest(uint accountId)
+    {
+        var request = new ProtoWriter();
+        request.WriteUInt32(1, accountId);
+        return request.ToArray();
+    }
+
+    /// <summary>AcceptInvitation and DeclineInvitation: {1: invitation ID}.</summary>
+    public static byte[] AnswerInvitationRequest(ulong invitationId)
+    {
+        var request = new ProtoWriter();
+        request.WriteUInt64(1, invitationId);
+        return request.ToArray();
+    }
+
+    /// <summary>InvitationUpdated: {1: {1: invitation ID, 2: BattleTag}, 2: removed}.</summary>
+    public static (ScrInvitation Invitation, bool Removed)? DecodeInvitation(byte[] body)
+    {
+        ScrInvitation? invitation = null;
+        var removed = false;
+        var outer = new ProtoReader(body);
+        while (outer.HasMore)
+        {
+            var (field, type) = outer.ReadTag();
+            if (field == 1 && type == WireType.LengthDelimited)
+            {
+                ulong id = 0;
+                var tag = "";
+                var r = new ProtoReader(outer.ReadLengthDelimited());
+                while (r.HasMore)
+                {
+                    var (inner, innerType) = r.ReadTag();
+                    switch (inner)
+                    {
+                        case 1 when innerType == WireType.Varint:
+                            id = r.ReadVarint();
+                            break;
+                        case 2 when innerType == WireType.LengthDelimited:
+                            tag = r.ReadString();
+                            break;
+                        default:
+                            r.Skip(innerType);
+                            break;
+                    }
+                }
+
+                invitation = new ScrInvitation(id, tag);
+            }
+            else if (field == 2 && type == WireType.Varint)
+            {
+                removed = outer.ReadVarint() != 0;
+            }
+            else
+            {
+                outer.Skip(type);
+            }
+        }
+
+        return invitation is { Id: > 0 } ? (invitation, removed) : null;
+    }
 
     /// <summary>
     /// FriendUpdated: {1: {1: account ID, 2: BattleTag, 3: real name, 4: program, 5: online,

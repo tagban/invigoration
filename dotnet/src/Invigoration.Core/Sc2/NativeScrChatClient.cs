@@ -21,7 +21,7 @@ namespace Invigoration.Core.Sc2;
 /// instances, and a name is what a reconnect needs to join it again. Members arrive as whole lists
 /// in channel-list updates; joins and leaves are worked out by comparing them.
 /// </remarks>
-public sealed class NativeScrChatClient : ISc2ChatClient
+public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClient
 {
     /// <summary>The program code this client signs in as.</summary>
     public const string Program = ScrProtocol.ProgramCode;
@@ -47,6 +47,9 @@ public sealed class NativeScrChatClient : ISc2ChatClient
     private uint _nextHandle;
     private StreamWriter? _protocolLog;
     private readonly Dictionary<ulong, ScrFriend> _friends = new();
+    private readonly List<(uint AccountId, string Text)> _sentWhispers = [];
+    private readonly Dictionary<ulong, ScrInvitation> _invitations = new();
+    private readonly HashSet<string> _invited = new(StringComparer.OrdinalIgnoreCase);
     private Timer? _friendsTimer;
     private bool _everJoined;
     private readonly HashSet<string> _describedMembers = new(StringComparer.OrdinalIgnoreCase);
@@ -135,10 +138,154 @@ public sealed class NativeScrChatClient : ISc2ChatClient
         Emit(new MessageReceived(ChannelIndex, UserFor(_connection?.Toon?.Name ?? ""), body));
     }
 
+    /// <summary>
+    /// A Battle.net friend's BattleTag gets a Battle.net whisper, which reaches them whatever game
+    /// they're in; any other name is a character, whispered in classic chat.
+    /// </summary>
     public void SendWhisper(string name, string body)
     {
+        if (FriendAccount(name) is { } friend)
+        {
+            lock (_sync)
+            {
+                _sentWhispers.Add((friend.AccountId, body));
+                if (_sentWhispers.Count > 20)
+                {
+                    _sentWhispers.RemoveAt(0);
+                }
+            }
+
+            Enqueue(
+                (c, token) => c.RequestAsync(ScrWhispers.Service, ScrWhispers.SendWhisperMethod, ScrWhispers.SendRequest(friend.AccountId, body), token),
+                "whisper " + friend.BattleTag);
+            Emit(new WhisperReceived(friend.BattleTag, body, true));
+            return;
+        }
+
         Send(c => c.Chat.Whisper(name, body), "whisper " + name);
         Emit(new WhisperReceived(name, body, true));
+    }
+
+    /// <summary>The Battle.net friend with this BattleTag, if there is one.</summary>
+    private (uint AccountId, string BattleTag)? FriendAccount(string name)
+    {
+        if (!name.Contains('#'))
+        {
+            return null;
+        }
+
+        lock (_sync)
+        {
+            return _friends.Values.FirstOrDefault(f => f.BattleTag.Equals(name.Trim(), StringComparison.OrdinalIgnoreCase)) is { } friend
+                ? ((uint)friend.AccountId, friend.BattleTag)
+                : null;
+        }
+    }
+
+    /// <summary>
+    /// A Battle.net whisper to or from us. Battle.net echoes the ones we send, including from
+    /// StarCraft: Remastered itself or the Battle.net app; ours are already shown.
+    /// </summary>
+    private void HandleBattlenetWhisper(ScrWhisper whisper)
+    {
+        string who;
+        lock (_sync)
+        {
+            if (whisper.Outgoing && _sentWhispers.Remove((whisper.AccountId, whisper.Text)))
+            {
+                return;
+            }
+
+            who = _friends.TryGetValue(whisper.AccountId, out var friend) ? friend.BattleTag
+                : BattlenetFriendDirectory.Find(_profileId, whisper.AccountId)?.BattleTag
+                ?? $"Battle.net account {whisper.AccountId}";
+        }
+
+        Emit(new WhisperReceived(who, whisper.Text, whisper.Outgoing));
+    }
+
+    public void AddFriend(string battleTag)
+    {
+        var tag = battleTag.Trim();
+        lock (_sync)
+        {
+            _invited.Add(tag);
+        }
+
+        Enqueue(
+            async (c, token) =>
+            {
+                var reply = await c.RequestAsync(ScrFriends.Service, ScrFriends.SendInvitationMethod, ScrFriends.SendInvitationRequest(tag), token).ConfigureAwait(false);
+                Trace($"Friend request to {tag} sent; reply {Convert.ToHexString(reply)}.");
+                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Friend request sent to {tag}.")));
+            },
+            "send a friend request to " + tag);
+    }
+
+    public void RemoveFriend(string battleTag)
+    {
+        var friend = FriendAccount(battleTag)
+            ?? throw new StimpakException($"{battleTag} isn't on this account's Battle.net friends list.", null!);
+        Enqueue(
+            async (c, token) =>
+            {
+                var reply = await c.RequestAsync(ScrFriends.Service, ScrFriends.RemoveFriendMethod, ScrFriends.RemoveFriendRequest(friend.AccountId), token).ConfigureAwait(false);
+                Trace($"Removed {friend.BattleTag} (account {friend.AccountId}); reply {Convert.ToHexString(reply)}.");
+                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Removed {friend.BattleTag} from your Battle.net friends.")));
+            },
+            "remove " + friend.BattleTag + " from friends");
+    }
+
+    public void AnswerInvitation(ulong invitationId, bool accept)
+    {
+        string who;
+        lock (_sync)
+        {
+            who = _invitations.TryGetValue(invitationId, out var invitation) ? invitation.BattleTag : $"request {invitationId}";
+        }
+
+        Enqueue(
+            async (c, token) =>
+            {
+                var method = accept ? ScrFriends.AcceptInvitationMethod : ScrFriends.DeclineInvitationMethod;
+                var reply = await c.RequestAsync(ScrFriends.Service, method, ScrFriends.AnswerInvitationRequest(invitationId), token).ConfigureAwait(false);
+                Trace($"{(accept ? "Accepted" : "Declined")} {who}'s friend request; reply {Convert.ToHexString(reply)}.");
+            },
+            (accept ? "accept " : "decline ") + who + "'s friend request");
+    }
+
+    /// <summary>
+    /// A friend request came or went. Battle.net's update doesn't say which way a request goes, so
+    /// ones to BattleTags this bot invited count as sent.
+    /// </summary>
+    private void HandleInvitation(ScrInvitation invitation, bool removed)
+    {
+        Trace($"Friend request {invitation.Id} {(removed ? "gone" : "from/to")} {invitation.BattleTag}.");
+        bool isNew;
+        bool sent;
+        List<FriendInvitation> all;
+        lock (_sync)
+        {
+            sent = _invited.Contains(invitation.BattleTag);
+            isNew = !removed && _invitations.TryAdd(invitation.Id, invitation);
+            if (removed)
+            {
+                _invitations.Remove(invitation.Id);
+            }
+
+            all = _invitations.Values
+                .Select(i => new FriendInvitation(i.Id, i.BattleTag, _invited.Contains(i.BattleTag)))
+                .OrderBy(i => i.BattleTag, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        if (isNew && !sent && _everJoined)
+        {
+            Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0,
+                $"{invitation.BattleTag} sent you a Battle.net friend request. Accept or decline it on the Friends tab.")));
+        }
+
+        Emit(new NativeInvitationsEvent(all));
     }
 
     public void SubmitAuth(ulong authId, string token)
@@ -253,6 +400,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient
                 _members.Clear();
                 _channel = null;
                 _friends.Clear();
+                _invitations.Clear();
                 _friendsTimer?.Dispose();
                 _friendsTimer = null;
                 BattlenetFriendDirectory.ForgetActivity(_profileId);
@@ -267,12 +415,13 @@ public sealed class NativeScrChatClient : ISc2ChatClient
     /// <summary>
     /// Signs in and starts the game session, trying again if Battle.net drops the connection
     /// during startup. It does that while it still considers the account's last SC:R session live
-    /// (the character list never comes): a retry 5 seconds later stalled the same way, one about
-    /// 50 seconds later went through. So the retries wait 30, then 60 seconds.
+    /// (the character list never comes) for 20-50 seconds after it ends, so the retries come every
+    /// 10 seconds, six at most.
     /// </summary>
     private async Task<ScrConnection> ConnectWithRetryAsync(string homeChannel, CancellationToken cancellationToken)
     {
-        TimeSpan[] waits = [TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(60)];
+        // Battle.net lets go of the last session 20-50 seconds after it ends; retry every 10 until then.
+        TimeSpan[] waits = [.. Enumerable.Repeat(TimeSpan.FromSeconds(10), 6)];
         for (var attempt = 0; ; attempt++)
         {
             try
@@ -361,6 +510,18 @@ public sealed class NativeScrChatClient : ISc2ChatClient
                     }
                 }
 
+                break;
+
+            case ScrChatEvent.Unhandled { Service: ScrFriends.Service, Method: ScrFriends.InvitationUpdatedMethod } invitationUpdate:
+                if (ScrFriends.DecodeInvitation(invitationUpdate.Body) is var (invitation, gone))
+                {
+                    HandleInvitation(invitation, gone);
+                }
+
+                break;
+
+            case ScrChatEvent.Unhandled { Service: ScrWhispers.Service } aurora when ScrWhispers.Decode(aurora.Method, aurora.Body) is { } whisper:
+                HandleBattlenetWhisper(whisper);
                 break;
 
             case ScrChatEvent.Unhandled unhandled:
@@ -461,6 +622,10 @@ public sealed class NativeScrChatClient : ISc2ChatClient
             // and every one but Diablo II comes with its code; so no code means Diablo II. Whether
             // it's Lord of Destruction isn't said, so it's the plain Diablo II icon.
             NativeMemberProducts.Set(member.Name, member.Attributes.TryGetValue("program_id", out var program) ? program : "D2DV");
+            if (member.Attributes.TryGetValue("battle_tag", out var battleTag))
+            {
+                NativeMemberProducts.SetBattleTag(member.Name, battleTag);
+            }
 
             // What each member carries, once per name, to learn what other games send (icons).
             if (_describedMembers.Add(member.Name))
