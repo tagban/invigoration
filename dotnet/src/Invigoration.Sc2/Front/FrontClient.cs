@@ -34,6 +34,9 @@ public sealed class FrontClient : IAsyncDisposable
     private static readonly uint GameUtilitiesServiceHash = ServiceHash.Compute(FrontServices.GameUtilities);
 
     private readonly ClientWebSocket _socket = new();
+
+    /// <summary>ClientWebSocket allows one send at a time; Echo replies and requests can now overlap.</summary>
+    private readonly SemaphoreSlim _sendLock = new(1, 1);
     private uint _nextToken = 1;
     private bool _connected;
 
@@ -73,9 +76,26 @@ public sealed class FrontClient : IAsyncDisposable
         var verificationResponseSeen = false;
         LogonResult? result = null;
 
-        while (!(logonResponseSeen && result is not null && (verificationToken is null || verificationResponseSeen)))
+        // The web sign-in runs alongside the connection, not instead of it: Battle.net keeps
+        // sending Echo keepalives while the user types, and one left unanswered gets the
+        // connection dropped, which leaves the sign-in page spinning with nothing to finish.
+        Task<(Header Header, byte[] Body)>? receiving = null;
+        Task<byte[]>? signingIn = null;
+
+        while (!(logonResponseSeen && result is not null && (verificationToken is null || verificationResponseSeen) && signingIn is null))
         {
-            var (header, body) = await ReceiveApplicationFrameAsync(cancellationToken).ConfigureAwait(false);
+            receiving ??= ReceiveApplicationFrameAsync(cancellationToken);
+            if (signingIn is not null && await Task.WhenAny(receiving, signingIn).ConfigureAwait(false) == signingIn)
+            {
+                var credential = await signingIn.ConfigureAwait(false);
+                signingIn = null;
+                verificationToken = await RequestAsync(AuthenticationServiceHash, 7,
+                    new VerifyWebCredentialsRequest { WebCredentials = credential }.Encode(), cancellationToken).ConfigureAwait(false);
+                continue;
+            }
+
+            var (header, body) = await receiving.ConfigureAwait(false);
+            receiving = null;
 
             if (header.ServiceId == ResponseServiceId)
             {
@@ -122,16 +142,13 @@ public sealed class FrontClient : IAsyncDisposable
             }
             else if (header.ServiceHash == ChallengeListenerHash && header.MethodId == 3)
             {
-                if (verificationToken is not null)
+                if (verificationToken is not null || signingIn is not null)
                 {
                     throw new InvalidOperationException("Battle.net issued more than one web challenge.");
                 }
 
                 var challenge = ChallengeExternalRequest.Decode(body);
-                var url = challenge.GetValidatedWebAuthUrl();
-                var credential = await challengeHandler(url, cancellationToken).ConfigureAwait(false);
-                verificationToken = await RequestAsync(AuthenticationServiceHash, 7,
-                    new VerifyWebCredentialsRequest { WebCredentials = credential }.Encode(), cancellationToken).ConfigureAwait(false);
+                signingIn = challengeHandler(challenge.GetValidatedWebAuthUrl(), cancellationToken);
             }
             else if (header.ServiceHash == ChallengeListenerHash && header.MethodId == 4)
             {
@@ -150,10 +167,18 @@ public sealed class FrontClient : IAsyncDisposable
         return result!;
     }
 
-    public async Task<byte[]> GenerateWebCredentialsAsync(CancellationToken cancellationToken = default)
+    public Task<byte[]> GenerateWebCredentialsAsync(CancellationToken cancellationToken = default) =>
+        GenerateWebCredentialsAsync("S2", cancellationToken);
+
+    /// <summary>
+    /// Asks for a reusable sign-in for <paramref name="program"/> ("S2", "S1", "W3", "OSI", "Fen"):
+    /// the "keep me signed in" value a later logon presents as cached_web_credentials. Battle.net
+    /// issues one per game, so a single signed-in session can collect one for each.
+    /// </summary>
+    public async Task<byte[]> GenerateWebCredentialsAsync(string program, CancellationToken cancellationToken = default)
     {
         RequireConnected();
-        var token = await RequestAsync(AuthenticationServiceHash, 8, new GenerateWebCredentialsRequest { Program = FourCc.Encode("S2") }.Encode(), cancellationToken).ConfigureAwait(false);
+        var token = await RequestAsync(AuthenticationServiceHash, 8, new GenerateWebCredentialsRequest { Program = FourCc.Encode(program) }.Encode(), cancellationToken).ConfigureAwait(false);
         var (_, body) = await AwaitResponseAsync(token, "AuthenticationService.GenerateWebCredentials", cancellationToken).ConfigureAwait(false);
         var response = GenerateWebCredentialsResponse.Decode(body);
         return response.WebCredentials ?? throw new InvalidOperationException("GenerateWebCredentials returned no credential.");
@@ -191,7 +216,15 @@ public sealed class FrontClient : IAsyncDisposable
     private async Task SendAsync(Header header, byte[] body, CancellationToken cancellationToken)
     {
         var frame = FrontFrame.Encode(header, body);
-        await _socket.SendAsync(frame, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken).ConfigureAwait(false);
+        await _sendLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            await _socket.SendAsync(frame, WebSocketMessageType.Binary, endOfMessage: true, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _sendLock.Release();
+        }
     }
 
     /// <summary>Reads exactly one Front RPC message: one binary WebSocket message, reassembled across however many fragments the transport chose to split it into.</summary>

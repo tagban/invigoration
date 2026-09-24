@@ -12,16 +12,16 @@ public sealed record ToonBlockEntry(ToonFullName Toon, bool IsRemove);
 /// <summary>
 /// Decoded payload of ToonBlockNotify (Friends slot, command 33) — the
 /// account's toon-block-list snapshot/update, sent unprompted during
-/// ChatBootstrap alongside FriendsList/ToonsOfFriends. Field widths (7-bit
-/// array length capped at 64, and each entry's Battlenet::Toon::FullName +
-/// 1-bit Add/Remove choice) were confirmed bit-exact against a real captured
-/// record using the extracted retail schema (types 2724/2725/2729/2732/1053)
-/// — see the "extract-bsn-metadata" tool and decode_hex example in
-/// ncarrillo/superiority's repo. Notably, Battlenet::Toon::Name's length
-/// field here is only 5 bits (bias +2, cap 25 chars) — narrower than the
-/// 7-bit display-name field used elsewhere in this file — and its bytes
-/// must be read byte-aligned (<see cref="DecodeGeneratedUtf8"/> already does
-/// this), not as a raw unaligned bit run.
+/// ChatBootstrap alongside FriendsList/ToonsOfFriends. A 7-bit entry count
+/// (capped at 64), then per entry the 1-bit Add/Remove choice FIRST, then a
+/// Battlenet::Toon::FullName (region, program, realm, then a 7-bit name
+/// length biased +2, byte-aligned). This decoder used to read the name with
+/// a 5-bit length and the choice bit after it, which turned the one real
+/// capture into program 10650 and the name "\x02TrumpFl". The order and width
+/// here read the same bytes as region 1, program "S2", realm 1 and a 16-byte
+/// name starting "TrumpFlat"; the capture stops partway through that name.
+/// The 7-bit width is the one the real ToonsOfFriends capture confirms for
+/// the same Battlenet::Toon::FullName type.
 /// </summary>
 public sealed record ToonBlockNotifyRecord(IReadOnlyList<ToonBlockEntry> Entries, bool? Complete);
 
@@ -35,14 +35,10 @@ public sealed record ToonBlockNotifyRecord(IReadOnlyList<ToonBlockEntry> Entries
 /// <see cref="ChatRecordDecoder"/> and <see cref="MembershipChangeDecoder"/> —
 /// see <see cref="RecordStream"/>'s remarks on why this is necessary at all.
 ///
-/// One field could not be recovered this way: FriendContainer5::Account's
-/// optional m_fullName (an AccountFullName — given/surname) is read upstream
-/// via the fully generic, schema-blob-driven codec path
-/// (Protocol::codec().decode_reflected_traced_from), not a hand-traced
-/// sequence of fixed-width reads — unlike everything else in this file,
-/// there is no fixed bit layout to port for it. <see cref="DecodeFriendAccount"/>
-/// throws if that field's presence bit is ever set, rather than silently
-/// desyncing the stream past an unknown-width structure.
+/// FriendContainer5::Account's optional m_fullName (an AccountFullName) is
+/// two strings, given name then surname, each an 8-bit byte count followed
+/// by byte-aligned UTF-8. It used to be treated as unknowable without SC2's
+/// embedded schema; <see cref="DecodeAccountFullName"/> now reads it.
 /// </summary>
 public static class FriendsRecordDecoder
 {
@@ -57,11 +53,11 @@ public static class FriendsRecordDecoder
         var entries = new List<ToonBlockEntry>(count);
         for (var i = 0; i < count; i++)
         {
+            var isRemove = reader.Read(1) != 0;
             var region = (byte)reader.Read(8);
             var programId = (uint)reader.Read(32);
             var realm = (uint)reader.Read(32);
-            var name = DecodeGeneratedUtf8(reader, lengthBits: 5, minimumBytes: 2, maximumBytes: 33, maximumCharacters: 25);
-            var isRemove = reader.Read(1) != 0;
+            var name = DecodeGeneratedUtf8(reader, lengthBits: 7, minimumBytes: 2, maximumBytes: 100, maximumCharacters: 25);
             entries.Add(new ToonBlockEntry(new ToonFullName(region, programId, realm, name), isRemove));
         }
 
@@ -155,13 +151,7 @@ public static class FriendsRecordDecoder
     private static FriendEntry DecodeFriendAccount(BitReader reader)
     {
         var accountId = (uint)reader.Read(32);
-        if (reader.Read(1) != 0)
-        {
-            throw new NotSupportedException(
-                "This friend has a full name (AccountFullName) set, and that field's wire layout " +
-                "is only known via SC2's embedded runtime schema — see this decoder's remarks.");
-        }
-
+        var fullName = reader.Read(1) != 0 ? DecodeAccountFullName(reader) : null;
         var displayName = DecodeOptionalGeneratedUtf8(reader, lengthBits: 7, minimumBytes: 0, maximumBytes: 108, maximumCharacters: 27);
         var profile = DecodeProfileRecordAddress(reader);
         DiscardCustomMessage(reader);
@@ -169,7 +159,15 @@ public static class FriendsRecordDecoder
         ReadS32(reader); // last_online — not carried on FriendEntry, matching upstream.
         reader.Read(64); // account_serial — discarded, matching upstream.
         reader.Read(32); // game_account_id — discarded, matching upstream.
-        return new FriendEntry(new FriendIdentity.Account(accountId), displayName, null, note, profile, null);
+        return new FriendEntry(new FriendIdentity.Account(accountId), displayName, fullName, note, profile, null);
+    }
+
+    /// <summary>AccountFullName: given name, then surname, each an 8-bit byte count and byte-aligned UTF-8. Joined with a space for display; either half may be empty.</summary>
+    private static string DecodeAccountFullName(BitReader reader)
+    {
+        var given = DecodeGeneratedUtf8(reader, lengthBits: 8, minimumBytes: 0, maximumBytes: 255, maximumCharacters: 255);
+        var surname = DecodeGeneratedUtf8(reader, lengthBits: 8, minimumBytes: 0, maximumBytes: 255, maximumCharacters: 255);
+        return $"{given} {surname}".Trim();
     }
 
     private static FriendEntry DecodeFriendPersistentPresenceUpdate(BitReader reader)

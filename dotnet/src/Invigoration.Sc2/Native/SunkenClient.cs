@@ -27,7 +27,7 @@ public static class SunkenClient
     private const byte AuthProofCommand = 2;
     private const byte AuthResumeCommand = 1;
 
-    public static async Task<SunkenSession> ConnectAsync(SunkenHandoff handoff, int defaultPort = 1119, Action<string>? onStage = null, CancellationToken cancellationToken = default)
+    public static async Task<SunkenSession> ConnectAsync(SunkenHandoff handoff, int defaultPort = 1119, Action<string>? onStage = null, CancellationToken cancellationToken = default, Func<Task>? afterTcpConnect = null)
     {
         if (handoff.LogonResponse is not { Length: > 0 } logonResponseBlob)
         {
@@ -56,6 +56,13 @@ public static class SunkenClient
         var tcpClient = new TcpClient { NoDelay = true };
         await tcpClient.ConnectAsync(host, port, cancellationToken).ConfigureAwait(false);
         onStage?.Invoke("TCP connected.");
+
+        // Sunken's socket is opened while Front is still up; Front is closed next, and only then
+        // does the ResumeRequest go out. That's the order the retail client uses.
+        if (afterTcpConnect is not null)
+        {
+            await afterTcpConnect().ConfigureAwait(false);
+        }
 
         var peerAddress = ((IPEndPoint)tcpClient.Client.RemoteEndPoint!).Address;
         var thumbprintContext = NativeCrypto.ThumbprintContextForPeer(peerAddress.ToString());

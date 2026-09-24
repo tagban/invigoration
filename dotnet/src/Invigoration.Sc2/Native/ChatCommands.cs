@@ -27,6 +27,7 @@ public static class ChatCommands
     private const byte ChatInviteDeclineCommand = 6;
     private const byte ChatMessageCommand = 11;
     private const byte ChatWhisperSendCommand = 19;
+    private const byte ChatChannelListRequestCommand = 21;
     private const byte ToonSelectCommand = 5;
     private const byte CacheGetStreamItemsCommand = 9;
 
@@ -49,6 +50,14 @@ public static class ChatCommands
         writer.Write(FourCc.Encode(locale), 32);
         writer.Write(channelNameId, 16);
         writer.Write(token, 32);
+        writer.Align();
+        return writer.ToBytes();
+    }
+
+    /// <summary>Asks for the public channel list (Chat 21, no payload). The answer is Chat 22.</summary>
+    public static byte[] ChatChannelListRequest()
+    {
+        var writer = RecordWriter(ChatChannelListRequestCommand, ChatSlot);
         writer.Align();
         return writer.ToBytes();
     }

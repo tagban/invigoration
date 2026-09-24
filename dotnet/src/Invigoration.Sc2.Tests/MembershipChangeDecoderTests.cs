@@ -95,7 +95,7 @@ public class MembershipChangeDecoderTests
         writer.Write(FourCc.Encode("S2"), 32); // programId
         writer.Write(1, 32); // realm
         var name = "Tagban"u8.ToArray();
-        writer.Write((ulong)(name.Length - 2), 5); // byte count, biased -2
+        writer.Write((ulong)(name.Length - 2), 7); // byte count, biased -2
         writer.WriteBytes(name, aligned: true);
         writer.Align();
 

@@ -58,6 +58,20 @@ public class NativeRecordDispatcherTests
         var reader = new BitReader(writer.ToBytes());
         var routing = RoutingHeader.Decode(reader);
 
-        Assert.Throws<InvalidOperationException>(() => NativeRecordDispatcher.Decode(routing.CommandId, routing.ServiceSlot, reader));
+        var unknown = Assert.Throws<UnknownNativeRecordException>(() => NativeRecordDispatcher.Decode(routing.CommandId, routing.ServiceSlot, reader));
+        Assert.Equal((ChatCommands.ToonSlot, (byte)63), (unknown.Slot!.Value, unknown.Command));
+    }
+
+    [Fact]
+    public async Task UnknownRoute_ItsBufferCanBeDiscarded_AndTheNextRecordDecodes()
+    {
+        // The friend invitation that ended the first live session: slot 3, command 28, no decoder.
+        var unknown = Convert.FromHexString("5C130E4A6164654861776B23313733343100000001204100000000000000000000000099F23640758776CA01");
+        var stream = new RecordStream(new MemoryStream(unknown));
+        await stream.FillAsync();
+
+        Assert.Throws<UnknownNativeRecordException>(() => stream.TryDecodeRecord(NativeRecordDispatcher.Decode, out _));
+        Assert.Equal(unknown.Length, stream.DiscardPending());
+        Assert.Equal("", stream.PendingHex());
     }
 }

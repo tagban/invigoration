@@ -183,13 +183,13 @@ public static class MembershipChangeDecoder
         return reader.ReadBytes(byteCount, aligned: true);
     }
 
-    /// <summary>Battlenet::Toon::FullName — "metadata order", so declared order (region, programId, realm, name) IS the wire order. A 5-bit length field biased by +2 (raw 0..23 maps to 2..25 bytes).</summary>
+    /// <summary>Battlenet::Toon::FullName — "metadata order", so declared order (region, programId, realm, name) IS the wire order. A 7-bit length field biased by +2 (2..100 UTF-8 bytes), the same width every other toon name on this connection uses. This used to read 5 bits, which a real ToonBlockNotify capture disproved (see FriendsRecordDecoder.DecodeToonBlockNotify) — with 5, the first member to join a channel would desync the whole stream.</summary>
     private static ToonFullName DecodeToonFullName(BitReader reader)
     {
         var region = (byte)reader.Read(8);
         var programId = (uint)reader.Read(32);
         var realm = (uint)reader.Read(32);
-        var byteCount = (int)reader.Read(5) + 2;
+        var byteCount = (int)reader.Read(7) + 2;
         var nameBytes = reader.ReadBytes(byteCount, aligned: true);
         var name = Encoding.UTF8.GetString(nameBytes);
         return new ToonFullName(region, programId, realm, name);

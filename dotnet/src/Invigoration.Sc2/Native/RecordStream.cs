@@ -101,5 +101,17 @@ public sealed class RecordStream : IDisposable
     /// <summary>Diagnostic-only: hex dump of the buffered-but-not-yet-consumed bytes, for capturing a real record this project doesn't have a decoder for yet.</summary>
     public string PendingHex() => Convert.ToHexString(_inbound.ToArray());
 
+    /// <summary>
+    /// Throws away everything received but not yet decoded, and says how many bytes that was. Only
+    /// for a record nobody can decode: without its length, the next record can't be found inside
+    /// the buffer, but one that arrived on its own ends where the buffer does.
+    /// </summary>
+    public int DiscardPending()
+    {
+        var count = _inbound.Count;
+        _inbound.Clear();
+        return count;
+    }
+
     public void Dispose() => _stream.Dispose();
 }

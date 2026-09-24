@@ -35,32 +35,42 @@ public class FriendsRecordDecoderTests
         Assert.Equal(313, reader.Position);
     }
 
+    /// <summary>
+    /// The one real ToonBlockNotify capture (Friends slot, command 33) stops
+    /// partway through its toon name: the name's length says 16 bytes, but only
+    /// "TrumpFlat" (9) was saved. Its header still reads cleanly as region 1,
+    /// program "S2", realm 1, which the old 5-bit, choice-bit-last layout got
+    /// wrong (program 10650). A cut-off record must read as "wait for more
+    /// bytes", never as a finished, garbled one.
+    /// </summary>
+    private const string TruncatedToonBlockCapture = "61030101000a660200000019025472756d70466c6174";
+
     [Fact]
-    public void DecodeToonBlockNotify_RetailVector_DecodesAtExactBoundary()
+    public async Task DecodeToonBlockNotify_TruncatedRetailCapture_WaitsForTheRestOfTheName()
     {
-        // Real captured ToonBlockNotify record (Friends slot, command 33): one
-        // entry (a toon being removed from the account's block list), no
-        // trailing "complete" flag. Field widths cross-checked bit-exact
-        // against the extracted retail SC2 schema (types 2724/2725/2729/2732/
-        // 1053) via ncarrillo/superiority's inspect_native_record/decode_hex
-        // tooling, which independently reports the same region/program id/
-        // realm/name/update values this decoder computes.
-        var packet = Convert.FromHexString("61030101000a660200000019025472756d70466c6174");
+        using var stream = new RecordStream(new MemoryStream(Convert.FromHexString(TruncatedToonBlockCapture)));
+        await stream.FillAsync();
+
+        Assert.False(stream.TryDecodeRecord(NativeRecordDispatcher.Decode, out _));
+    }
+
+    [Fact]
+    public void DecodeToonBlockNotify_RetailCaptureCompleted_ReadsChoiceBitThenFullName()
+    {
+        // The real capture, completed with a made-up 7-byte name tail
+        // ("#123456", making the 16 bytes its length field promises) and a
+        // zero byte for the absent "complete" flag. Only the tail is invented.
+        var packet = Convert.FromHexString(TruncatedToonBlockCapture + "23313233343536" + "00");
         var reader = new BitReader(packet);
         RoutingHeader.Decode(reader);
 
         var record = FriendsRecordDecoder.DecodeToonBlockNotify(reader);
 
         Assert.Null(record.Complete);
-        Assert.Single(record.Entries);
-        var entry = record.Entries[0];
-        Assert.True(entry.IsRemove);
-        // The name's first byte is a literal 0x02 (STX) control character, not
-        // a display artifact — confirmed byte-for-byte against the retail
-        // capture, and the reference tool's own debug print just doesn't
-        // render it visibly.
-        Assert.Equal(new ToonFullName(1, 10650, 1, (char)2 + "TrumpFl"), entry.Toon);
-        Assert.Equal(162, reader.Position);
+        var entry = Assert.Single(record.Entries);
+        Assert.False(entry.IsRemove);
+        Assert.Equal(new ToonFullName(1, FourCc.Encode("S2"), 1, "TrumpFlat#123456"), entry.Toon);
+        Assert.Equal(233, reader.Position);
     }
 
     [Fact]
@@ -127,7 +137,7 @@ public class FriendsRecordDecoderTests
     }
 
     [Fact]
-    public void DecodeFriendsList_AccountWithFullNamePresent_ThrowsRatherThanDesync()
+    public void DecodeFriendsList_AccountWithFullName_ReadsBothHalvesAndStaysInStep()
     {
         var writer = new BitWriter();
         RoutingHeader.Encode(writer, commandId: 30, serviceSlot: 3);
@@ -136,12 +146,30 @@ public class FriendsRecordDecoderTests
         writer.Write(0, 2); // operation: Add
         writer.Write(1, 2); // container choice: Account
         writer.Write(1u, 32); // m_accountId
-        writer.Write(1, 1); // m_fullName: present (unsupported)
+        writer.Write(1, 1); // m_fullName: present
+        writer.Write(3, 8);
+        writer.WriteBytes("Jim"u8.ToArray(), aligned: true);
+        writer.Write(6, 8);
+        writer.WriteBytes("Raynor"u8.ToArray(), aligned: true);
+        writer.Write(1, 1); // display_name: present
+        writer.Write(5, 7);
+        writer.WriteBytes("Jimmy"u8.ToArray(), aligned: true);
+        writer.Write(0, 32); // m_profile.m_label
+        writer.Write(0, 64); // m_profile.m_id
+        writer.Write(0, 1); // custom message: absent
+        writer.Write(0, 1); // note: absent
+        writer.Write(0x8000_0000, 32); // last_online
+        writer.Write(0, 64); // account_serial
+        writer.Write(0, 32); // game_account_id
         writer.Align();
 
         var reader = new BitReader(writer.ToBytes());
         RoutingHeader.Decode(reader);
 
-        Assert.Throws<NotSupportedException>(() => FriendsRecordDecoder.DecodeFriendsList(reader));
+        var list = FriendsRecordDecoder.DecodeFriendsList(reader);
+
+        var entry = Assert.Single(list.Updates).Entry;
+        Assert.Equal("Jim Raynor", entry.FullName);
+        Assert.Equal("Jimmy", entry.DisplayName);
     }
 }
