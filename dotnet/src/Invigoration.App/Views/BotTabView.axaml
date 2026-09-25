@@ -7,6 +7,7 @@
              xmlns:views="using:Invigoration.App.Views"
              xmlns:conv="using:Invigoration.App.Converters"
              xmlns:models="using:Invigoration.App.Models"
+             xmlns:sc2core="using:Invigoration.Core.Sc2"
              mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="500"
              x:Class="Invigoration.App.Views.BotTabView"
              x:DataType="vm:BotTabViewModel">
@@ -88,6 +89,55 @@
                                     <Button Grid.Column="1" Content="Join" Command="{Binding JoinPrivateChannelCommand}" />
                                 </Grid>
                             </StackPanel>
+                        </Flyout>
+                    </Button.Flyout>
+                </Button>
+                <!-- SC2: the Battle.net clans and groups the bot's character is in, with their members
+                     (BotTabViewModel.Clubs); Open Chat joins one's chat as a channel tab. -->
+                <Button Content="Clans &amp; Groups" Padding="8,2" FontSize="12" Margin="4,0,0,0" IsVisible="{Binding HasClubs}"
+                        ToolTip.Tip="Your StarCraft II clans and groups, with their members">
+                    <Button.Flyout>
+                        <Flyout Placement="BottomEdgeAlignedLeft">
+                            <ScrollViewer MaxHeight="420" Width="300">
+                                <ItemsControl ItemsSource="{Binding Clubs}">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="models:BattlenetClubViewModel">
+                                            <StackPanel Margin="4,4">
+                                                <DockPanel>
+                                                    <!-- + / − folds the member list away; it starts folded. -->
+                                                    <ToggleButton DockPanel.Dock="Left" Content="{Binding ExpandGlyph}" IsChecked="{Binding IsExpanded}"
+                                                                  IsEnabled="{Binding HasMembers}" Width="22" Height="22" Padding="0" Margin="0,0,6,0"
+                                                                  HorizontalContentAlignment="Center" VerticalContentAlignment="Center" VerticalAlignment="Center"
+                                                                  ToolTip.Tip="Show or hide the members" />
+                                                    <Button DockPanel.Dock="Right" Content="Open Chat" Padding="8,2" FontSize="11" VerticalAlignment="Center"
+                                                            Command="{Binding $parent[ItemsControl].((vm:BotTabViewModel)DataContext).OpenClubChatCommand}"
+                                                            CommandParameter="{Binding}" />
+                                                    <StackPanel VerticalAlignment="Center">
+                                                        <TextBlock Text="{Binding Title}" Foreground="White" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Details}" Foreground="#A0A0A0" FontSize="11" TextTrimming="CharacterEllipsis" />
+                                                        <TextBlock Text="{Binding Club.Description}" Foreground="#C0C0C0" FontSize="11" TextWrapping="Wrap" Margin="0,2,0,0"
+                                                                   IsVisible="{Binding HasDescription}" />
+                                                    </StackPanel>
+                                                </DockPanel>
+                                                <!-- Everyone in it, online or not, highest rank first. -->
+                                                <ItemsControl ItemsSource="{Binding Members}" Margin="28,4,0,0" IsVisible="{Binding ShowsMembers}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="sc2core:BattlenetClubMember">
+                                                            <Grid ColumnDefinitions="72,*,Auto" Margin="0,1">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Rank}" Foreground="#C8A860" FontSize="11" />
+                                                                <TextBlock Grid.Column="1" Text="{Binding Name, Converter={x:Static conv:NameCodeConverter.Instance}}" Foreground="White" FontSize="12" TextTrimming="CharacterEllipsis" />
+                                                                <!-- Pushed by Battle.net as it changes (online, in a game, in chat, offline); blank until it says. -->
+                                                                <TextBlock Grid.Column="2" Text="{Binding Status}" FontSize="10" Margin="6,0,0,0" VerticalAlignment="Center"
+                                                                           Foreground="{Binding IsOnline, Converter={x:Static conv:ClubMemberStatusBrushConverter.Instance}}" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </ScrollViewer>
                         </Flyout>
                     </Button.Flyout>
                 </Button>
@@ -291,7 +341,11 @@
                                                   ToggleType="CheckBox" Click="OnToggleLadderIconsClick"
                                                   ToolTip.Tip="When on, players show ladder badges (StarCraft stars, Warcraft II axes, Warcraft III tiers, Diablo dots). When off, everyone shows their plain game logo." />
                                         <!-- Filled when the menu opens (OnUserContextMenuOpened), same list as the Bot menu's. -->
-                                        <MenuItem Name="UserIconSetMenu" Header="Icon Set" />
+                                        <!-- The placeholder makes it a submenu from the start: an item with no children
+                                             is a plain command, so clicking it only closed the menu. -->
+                                        <MenuItem Name="UserIconSetMenu" Header="Icon Set">
+                                            <MenuItem Header="..." IsEnabled="False" />
+                                        </MenuItem>
                                     </ContextMenu>
                                 </Panel.ContextMenu>
                             <!-- Character dock tile, Diablo II lobby style: a full-body figure standing on
@@ -386,7 +440,9 @@
                         <ContextMenu Opened="OnSc2UserContextMenuOpened">
                             <!-- Filled when the menu opens, same list as the Bot menu's. -->
                             <!-- SC:R only: its members show classic game icons, which follow icon sets. SC2 shows portraits. -->
-                            <MenuItem Name="Sc2UserIconSetMenu" Header="Icon Set" IsVisible="{Binding !IsSc2}" />
+                            <MenuItem Name="Sc2UserIconSetMenu" Header="Icon Set" IsVisible="{Binding !IsSc2}">
+                                <MenuItem Header="..." IsEnabled="False" />
+                            </MenuItem>
                             <MenuItem Name="UserListCompact" Header="Compact" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
                                       IsVisible="{Binding IsSc2}" ToolTip.Tip="Small portraits, one line per person." />
                             <MenuItem Name="UserListFull" Header="Full" ToggleType="Radio" GroupName="UserListStyle" Click="OnUserListStyleClick"
@@ -394,6 +450,9 @@
                             <!-- SC:R: the right-clicked member, by the BattleTag Battle.net sends with each one (OnSc2UserContextMenuOpened). -->
                             <Separator IsVisible="{Binding CanManageFriends}" />
                             <MenuItem Name="ScrUserWhisper" Header="Whisper" Click="OnScrUserWhisperClick" IsVisible="{Binding CanManageFriends}" />
+                            <MenuItem Name="ScrUserStats" Header="Stats" Click="OnScrUserStatsClick" IsVisible="{Binding CanManageFriends}" />
+                            <MenuItem Name="ScrUserWhois" Header="Check if Online" Click="OnScrUserWhoisClick" IsVisible="{Binding CanManageFriends}"
+                                      ToolTip.Tip="Asks Battle.net (/whois). Someone listed here who isn't really logged on is hidden." />
                             <MenuItem Name="ScrUserAddFriend" Header="Add Friend" Click="OnScrUserAddFriendClick" IsVisible="{Binding CanManageFriends}" />
                             <MenuItem Name="ScrUserCopyBattleTag" Header="Copy BattleTag" Click="OnScrUserCopyBattleTagClick" IsVisible="{Binding CanManageFriends}" />
                         </ContextMenu>
@@ -661,7 +720,7 @@
         <Grid Grid.Row="{Binding Theme.InputRow}" Grid.Column="0" Grid.ColumnSpan="{Binding Theme.InputColumnSpan}"
               Margin="{Binding Theme.InputMargin}" ColumnDefinitions="*,Auto,Auto">
             <!-- Tinted with the scheme's Highlight color, thickening on focus, so it's obvious this box has focus before you type. -->
-            <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" PlaceholderText="Type a message or /command..."
+            <TextBox Grid.Column="0" Name="InputBox" Text="{Binding InputText}" MaxLength="{Binding InputMaxLength}" PlaceholderText="Type a message or /command..."
                      Classes="chatInput" Classes.themed="{Binding Theme.HasFrame}"
                      BorderBrush="{Binding HighlightBrush}" BorderThickness="1">
                 <TextBox.Styles>
@@ -669,6 +728,12 @@
                         <Setter Property="BorderThickness" Value="2" />
                     </Style>
                 </TextBox.Styles>
+                <!-- The message length limit (SC2 255, classic Battle.net and SC:R 223), counted as you type; orange near the end. -->
+                <TextBox.InnerRightContent>
+                    <TextBlock Text="{Binding InputCounter}" FontSize="10" Margin="4,0,6,0" VerticalAlignment="Center"
+                               Foreground="{Binding InputNearLimit, Converter={x:Static conv:InputCounterBrushConverter.Instance}}"
+                               IsVisible="{Binding InputCounter, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                </TextBox.InnerRightContent>
             </TextBox>
             <Button Grid.Column="1" Content="Send" Command="{Binding SendCommand}" Margin="8,0,0,0"
                     Classes.themed="{Binding Theme.HasFrame}" VerticalAlignment="Stretch" />

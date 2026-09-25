@@ -29,3 +29,25 @@ public interface IBattlenetFriendsClient
 
     void AnswerInvitation(ulong invitationId, bool accept);
 }
+
+/// <summary>A StarCraft II club (clan or group) the bot's character belongs to, as the Clans tab shows it.</summary>
+/// <param name="Tag">The clan tag, without brackets; null for groups and clans without one.</param>
+/// <param name="Rank">The character's rank in it: Owner, Officer, Member...</param>
+public sealed record BattlenetClub(uint Id, string Name, string? Tag, bool IsClan, string Rank, uint Members, uint Online)
+{
+    /// <summary>Everyone in it, online or not, highest rank first; empty until Battle.net has sent the list.</summary>
+    public IReadOnlyList<BattlenetClubMember> Roster { get; init; } = [];
+
+    /// <summary>The club's description, once Battle.net has sent it (after subscribing).</summary>
+    public string Description { get; init; } = "";
+}
+
+/// <summary>A club member: their character's name (or "#id" until it's known), rank, and status once Battle.net has said.</summary>
+/// <param name="Status">"Online", "In a game", "In chat" or "Offline"; empty while unknown.</param>
+public sealed record BattlenetClubMember(string Name, string Rank, byte RankValue, string Status = "")
+{
+    public bool IsOnline => Status is "Online" or "In a game" or "In chat";
+}
+
+/// <summary>A native client's clubs, all of them. Replaces the previous list.</summary>
+public sealed record NativeClubsEvent(IReadOnlyList<BattlenetClub> Clubs) : SC2Event;

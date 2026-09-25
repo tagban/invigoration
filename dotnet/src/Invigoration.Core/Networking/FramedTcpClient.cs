@@ -55,7 +55,7 @@ public abstract class FramedTcpClient : IAsyncDisposable
     /// </summary>
     protected abstract int? TryGetFrameLength(IReadOnlyList<byte> buffer);
 
-    /// <summary>Connects directly to host:port, or — when <paramref name="proxy"/> is given — connects to the proxy first and tunnels to host:port through it (SOCKS5 or HTTP CONNECT), so the target server sees the proxy's IP instead of this machine's.</summary>
+    /// <summary>Connects directly to host:port, or — when <paramref name="proxy"/> is given — connects to the proxy first and tunnels to host:port through it (SOCKS5, SOCKS4/4a or HTTP CONNECT), so the target server sees the proxy's IP instead of this machine's.</summary>
     public async Task ConnectAsync(string host, int port, CancellationToken cancellationToken = default, ProxyOptions? proxy = null)
     {
         Close();
@@ -75,6 +75,11 @@ public abstract class FramedTcpClient : IAsyncDisposable
                 {
                     case ProxyProtocol.Socks5:
                         await Socks5Connector.NegotiateAsync(stream, host, port, proxy.Username, proxy.Password, cancellationToken)
+                            .ConfigureAwait(false);
+                        break;
+
+                    case ProxyProtocol.Socks4:
+                        await Socks4Connector.NegotiateAsync(stream, host, port, proxy.Username, cancellationToken)
                             .ConfigureAwait(false);
                         break;
 

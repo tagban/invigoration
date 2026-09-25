@@ -317,6 +317,10 @@ public partial class MainWindowViewModel : ViewModelBase
         }
     }
 
+    /// <summary>The notice's "Don't check for updates": turns checking off (UpdateSettingsStore), which also hides the notice.</summary>
+    [RelayCommand]
+    private void StopUpdateChecks() => IsUpdateCheckEnabled = false;
+
     /// <summary>Hides this version's notice for good; a later release is newer than what's remembered, so it announces itself on its own.</summary>
     [RelayCommand]
     private void DismissUpdateNotice()

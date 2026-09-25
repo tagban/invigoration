@@ -50,6 +50,27 @@ public abstract record NativeChatRecord
 
     public sealed record ToonSelected(ToonSelectedRecord Value) : NativeChatRecord;
 
+    /// <summary>Club slot 13, command 46: our character's clubs (GetToonClubsResponse).</summary>
+    public sealed record ToonClubs(ToonClubsRecord Value) : NativeChatRecord;
+
+    /// <summary>Club slot 13, command 54: a club invitation, or an answer to one (InviteAction).</summary>
+    public sealed record ClubInvite(ClubInviteRecord Value) : NativeChatRecord;
+
+    /// <summary>Club slot 13, command 50: members joined, left, or changed rank or status.</summary>
+    public sealed record ClubMemberChanges(ClubMemberChangesRecord Value) : NativeChatRecord;
+
+    /// <summary>Club slot 13, command 57, at sign-in: the rules for club names and tags.</summary>
+    public sealed record ClubSettings(ClubSettingsRecord Value) : NativeChatRecord;
+
+    /// <summary>Club slot 13, command 45: a page of a club's members.</summary>
+    public sealed record ClubRoster(ClubRosterRecord Value) : NativeChatRecord;
+
+    /// <summary>Club slot 13, command 49: changes to clubs we follow (a full sync right after subscribing).</summary>
+    public sealed record ClubChanges(ClubChangesRecord Value) : NativeChatRecord;
+
+    /// <summary>Profile slot 14, command 2: names for character handles.</summary>
+    public sealed record ToonNames(ToonNamesRecord Value) : NativeChatRecord;
+
     public sealed record ToonList(ToonListRecord Value) : NativeChatRecord;
 
     /// <summary>
@@ -196,13 +217,34 @@ public static class NativeRecordDispatcher
             (ChatCommands.CacheSlot, CacheGetStreamItemsCommand) => SkipCacheStreamItems(reader),
             (S2MasterSlot, 27) => Consumed(reader, StartupRecordDecoder.SkipCurrentSeason, serviceSlot, commandId),
             (PartySlot, 0) => Consumed(reader, r => r.SkipToRecordByte(recordStart, 18), serviceSlot, commandId),
-            (S2MapsSlot, 50) => Consumed(reader, r => r.SkipToRecordByte(recordStart, 38), serviceSlot, commandId),
-            (S2MapsSlot, 57) => Consumed(reader, StartupRecordDecoder.SkipClubSettings, serviceSlot, commandId),
+            (S2MapsSlot, ClubCommands.GetToonClubsCommand) => new NativeChatRecord.ToonClubs(Club(() => ClubCommands.DecodeToonClubs(reader), commandId)),
+            (S2MapsSlot, ClubCommands.InviteActionCommand) => new NativeChatRecord.ClubInvite(Club(() => ClubCommands.DecodeInviteAction(reader), commandId)),
+            (S2MapsSlot, ClubCommands.GetRosterCommand) => new NativeChatRecord.ClubRoster(Club(() => ClubCommands.DecodeRoster(reader), commandId)),
+            (ProfileSlot, ClubCommands.ResolveToonNamesCommand) => new NativeChatRecord.ToonNames(Club(() => ClubCommands.DecodeToonNames(reader), commandId, ProfileSlot)),
+            (S2MapsSlot, ClubCommands.ClubChangeNotificationCommand) => new NativeChatRecord.ClubChanges(Club(() => ClubCommands.DecodeClubChanges(reader), commandId)),
+            (S2MapsSlot, ClubCommands.MemberChangeNotificationCommand) => new NativeChatRecord.ClubMemberChanges(Club(() => ClubCommands.DecodeMemberChanges(reader), commandId)),
+            (S2MapsSlot, ClubCommands.ClubSettingsCommand) => new NativeChatRecord.ClubSettings(Club(() => ClubCommands.DecodeClubSettings(reader), commandId)),
             (ProfileSlot, ChatCommands.ProfileReadCommand) => new NativeChatRecord.ProfileRead(ProfileRecordDecoder.DecodeProfileRead(reader)),
             (ProfileSlot, 4) => Consumed(reader, StartupRecordDecoder.SkipProfileSettings, serviceSlot, commandId),
 
             _ => throw new UnknownNativeRecordException(serviceSlot, commandId),
         };
+    }
+
+    /// <summary>
+    /// A club record read by schema. If its layout turns out wrong it's treated as unknown (the
+    /// buffer is dropped) rather than ending the session: clubs are optional.
+    /// </summary>
+    private static T Club<T>(Func<T> decode, byte commandId, byte slot = S2MapsSlot)
+    {
+        try
+        {
+            return decode();
+        }
+        catch (Exception ex) when (ex is Bsn.BsnException or InvalidCastException or NullReferenceException)
+        {
+            throw new UnknownNativeRecordException(slot, commandId);
+        }
     }
 
     private static NativeChatRecord.Sc2Consumed Consumed(BitReader reader, Action<BitReader> read, byte? slot, byte command)

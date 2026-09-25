@@ -23,6 +23,9 @@ public static class NativeMemberProducts
         }
     }
 
+    /// <summary>An SC:R member's program code as sent (SEXP, STAR, W2BN...), or null.</summary>
+    public static string? ProgramFor(string name) => ByName.TryGetValue(name, out var program) ? program : null;
+
     public static string? BattleTagFor(string name) => BattleTags.TryGetValue(name, out var tag) ? tag : null;
 
     public static void Set(string name, string programId)

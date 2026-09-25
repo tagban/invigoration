@@ -304,6 +304,31 @@ public sealed class ScrConnection : IAsyncDisposable
     /// <summary>Sends a message built by <see cref="Chat"/> (a chat line, a whisper, a join).</summary>
     public Task SendAsync(byte[] message, CancellationToken cancellationToken) => _classic.SendAsync(message, true, cancellationToken);
 
+    /// <summary>
+    /// Sends a call to any classic service and returns, without waiting for it, a task for the
+    /// reply's body: so a slow answer doesn't hold up the sends queued after it.
+    /// </summary>
+    public async Task<Task<byte[]>> SendRequestAsync(uint service, uint method, byte[] body, CancellationToken cancellationToken, TimeSpan? timeout = null)
+    {
+        var (message, token) = _chat.Call(service, method, body, null);
+        var waiter = new TaskCompletionSource<ClassicRpc>(TaskCreationOptions.RunContinuationsAsynchronously);
+        lock (_pending)
+        {
+            _pending[token] = waiter;
+        }
+
+        _trace($"-> call {service:X8}/{method:X8} #{token} ({body.Length} bytes)");
+        await SendAsync(message, cancellationToken).ConfigureAwait(false);
+        return ReplyBodyAsync(waiter.Task, token, timeout ?? StepTimeout, cancellationToken);
+    }
+
+    private async Task<byte[]> ReplyBodyAsync(Task<ClassicRpc> reply, uint token, TimeSpan timeout, CancellationToken cancellationToken)
+    {
+        var rpc = await reply.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
+        _trace($"<- reply #{token} ({rpc.Body.Length} bytes)");
+        return rpc.Body;
+    }
+
     /// <summary>A call to any classic service (Battle.net whispers, friends...); returns the reply's body.</summary>
     public async Task<byte[]> RequestAsync(uint service, uint method, byte[] body, CancellationToken cancellationToken) =>
         (await CallAsync(service, method, body, null, cancellationToken).ConfigureAwait(false)).Body;

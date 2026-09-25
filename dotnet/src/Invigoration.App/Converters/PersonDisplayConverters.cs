@@ -1,6 +1,7 @@
 using System;
 using System.Globalization;
 using Avalonia.Data.Converters;
+using Avalonia.Media;
 using Invigoration.App.Models;
 using Invigoration.App.Views;
 using Invigoration.Core.Sc2;
@@ -197,6 +198,34 @@ public sealed class NameCodeConverter : IValueConverter
         var (main, code) = Invigoration.Core.Chat.NameParts.Split(name);
         return parameter as string == "code" ? code : main;
     }
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>A clan member's status text: green when online, grey otherwise.</summary>
+public sealed class ClubMemberStatusBrushConverter : IValueConverter
+{
+    public static readonly ClubMemberStatusBrushConverter Instance = new();
+
+    private static readonly IBrush Online = new SolidColorBrush(Color.FromRgb(0x6C, 0xC0, 0x6C));
+    private static readonly IBrush Other = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is true ? Online : Other;
+
+    public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
+        throw new NotSupportedException();
+}
+
+/// <summary>The send box's character counter: grey, orange near the limit.</summary>
+public sealed class InputCounterBrushConverter : IValueConverter
+{
+    public static readonly InputCounterBrushConverter Instance = new();
+
+    private static readonly IBrush Near = new SolidColorBrush(Color.FromRgb(0xE8, 0x9A, 0x3C));
+    private static readonly IBrush Normal = new SolidColorBrush(Color.FromRgb(0x80, 0x80, 0x80));
+
+    public object Convert(object? value, Type targetType, object? parameter, CultureInfo culture) => value is true ? Near : Normal;
 
     public object ConvertBack(object? value, Type targetType, object? parameter, CultureInfo culture) =>
         throw new NotSupportedException();

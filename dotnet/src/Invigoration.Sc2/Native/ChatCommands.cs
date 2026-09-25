@@ -273,6 +273,32 @@ public static class ChatCommands
         }
     }
 
+    /// <summary>Most characters (and UTF-8 bytes) one chat message or whisper can carry.</summary>
+    public const int MaxMessageCharacters = 255;
+
+    public const int MaxMessageBytes = 1020;
+
+    /// <summary>Text cut to what one chat message or whisper can carry (255 characters, 1020 UTF-8 bytes); shorter text is unchanged.</summary>
+    public static string CutToMessage(string text)
+    {
+        var length = 0;
+        var characters = 0;
+        var bytes = 0;
+        foreach (var rune in text.EnumerateRunes())
+        {
+            if (characters == MaxMessageCharacters || bytes + rune.Utf8SequenceLength > MaxMessageBytes)
+            {
+                return text[..length];
+            }
+
+            characters++;
+            bytes += rune.Utf8SequenceLength;
+            length += rune.Utf16SequenceLength;
+        }
+
+        return text;
+    }
+
     /// <summary>
     /// Writes a bit-packed length prefix followed by the byte-aligned UTF-8 body — no minimum-byte
     /// offset is applied here (unlike the decoder side's <c>decode_generated_utf8</c>, which adds

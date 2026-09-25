@@ -352,8 +352,89 @@ public partial class ConfigViewModel : ObservableObject
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsSocks5Proxy))]
+    [NotifyPropertyChangedFor(nameof(IsSocks4Proxy))]
     [NotifyPropertyChangedFor(nameof(IsHttpProxy))]
+    [NotifyPropertyChangedFor(nameof(ShowsProxyPassword))]
     public partial ProxyProtocol ProxyProtocol { get; set; }
+
+    public bool IsSocks4Proxy
+    {
+        get => ProxyProtocol == ProxyProtocol.Socks4;
+        set
+        {
+            if (value)
+            {
+                ProxyProtocol = ProxyProtocol.Socks4;
+            }
+        }
+    }
+
+    /// <summary>SOCKS4 has no password, only a user ID.</summary>
+    public bool ShowsProxyPassword => ProxyProtocol != ProxyProtocol.Socks4;
+
+    // Mirrored like ProxyEnabled, so pasting an address can fill them in.
+    [ObservableProperty]
+    public partial string ProxyHost { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ProxyPort { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ProxyUsername { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ProxyPassword { get; set; } = "";
+
+    /// <summary>
+    /// A whole proxy address pasted in any common form: socks5://user:pass@host:port,
+    /// user:pass@host:port, user:pass:host:port or host:port:user:pass. It fills in the fields
+    /// below (and the protocol, when it names one); <see cref="ProxyAddressStatus"/> says what was read.
+    /// </summary>
+    [ObservableProperty]
+    public partial string ProxyAddress { get; set; } = "";
+
+    [ObservableProperty]
+    public partial string ProxyAddressStatus { get; set; } = "";
+
+    partial void OnProxyAddressChanged(string value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            ProxyAddressStatus = "";
+            return;
+        }
+
+        if (!ProxyAddressParser.TryParse(value, out var address, out var error))
+        {
+            ProxyAddressStatus = error;
+            return;
+        }
+
+        if (address.Protocol is { } protocol)
+        {
+            ProxyProtocol = protocol;
+        }
+
+        ProxyHost = address.Host;
+        ProxyPort = address.Port.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        ProxyUsername = address.Username ?? "";
+        ProxyPassword = address.Password ?? "";
+        ProxyAddressStatus = "Read as " + ProxyAddressParser.Describe(address, ProxyProtocol) + ".";
+    }
+
+    partial void OnProxyHostChanged(string value) => Config.ProxyHost = value.Trim();
+
+    partial void OnProxyPortChanged(string value)
+    {
+        if (int.TryParse(value, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var port) && port is > 0 and <= 65535)
+        {
+            Config.ProxyPort = port;
+        }
+    }
+
+    partial void OnProxyUsernameChanged(string value) => Config.ProxyUsername = value;
+
+    partial void OnProxyPasswordChanged(string value) => Config.ProxyPassword = value;
 
     public bool IsSocks5Proxy
     {
@@ -499,6 +580,10 @@ public partial class ConfigViewModel : ObservableObject
         SelectedGroupIcon = AvailableGroupIcons.FirstOrDefault(o => o.Key == TabGroupIconStore.GetIconKey(TabGroup)) ?? NoGroupIconSentinel;
         ProxyEnabled = config.ProxyEnabled;
         ProxyProtocol = config.ProxyProtocol;
+        ProxyHost = config.ProxyHost;
+        ProxyPort = config.ProxyPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        ProxyUsername = config.ProxyUsername;
+        ProxyPassword = config.ProxyPassword;
         SelectedOfficialServer = BncsProduct.OfficialBattlenetServers.Contains(config.BattlenetServer)
             ? config.BattlenetServer
             : OtherServerOption;

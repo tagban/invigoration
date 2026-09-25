@@ -332,25 +332,34 @@
                 </StackPanel>
             </Expander>
 
-            <!-- Proxy: routes this bot's connections (BNCS/BNLS/realm) through a SOCKS5 or HTTP CONNECT proxy -->
+            <!-- Proxy: routes this bot's connections (BNCS/BNLS/realm) through a SOCKS5, SOCKS4/4a or HTTP CONNECT proxy -->
             <Expander Header="Proxy" HorizontalAlignment="Stretch">
                 <StackPanel Margin="8" Spacing="8">
                     <CheckBox Content="Route this bot's connections through a proxy" IsChecked="{Binding ProxyEnabled}" />
                     <StackPanel IsVisible="{Binding ProxyEnabled}" Spacing="8">
+                        <!-- Paste a whole address in any common form; it fills in everything below. -->
+                        <TextBox PlaceholderText="Paste an address: socks5://user:pass@host:port, user:pass@host:port, host:port:user:pass..."
+                                 Text="{Binding ProxyAddress}" />
+                        <TextBlock Classes="hint" Text="{Binding ProxyAddressStatus}"
+                                   IsVisible="{Binding ProxyAddressStatus, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <RadioButton GroupName="ProxyProtocol" Content="SOCKS5" IsChecked="{Binding IsSocks5Proxy}" />
-                            <RadioButton GroupName="ProxyProtocol" Content="HTTP CONNECT" IsChecked="{Binding IsHttpProxy}" />
+                            <RadioButton GroupName="ProxyProtocol" Content="SOCKS4" IsChecked="{Binding IsSocks4Proxy}"
+                                         ToolTip.Tip="SOCKS4, or SOCKS4a when the server is given by name. No password: a username is sent as the user ID." />
+                            <RadioButton GroupName="ProxyProtocol" Content="HTTP" IsChecked="{Binding IsHttpProxy}"
+                                         ToolTip.Tip="An HTTP proxy, used with CONNECT." />
                         </StackPanel>
                         <Grid ColumnDefinitions="*,Auto" ColumnSpacing="12">
-                            <TextBox Grid.Column="0" PlaceholderText="Proxy host" Text="{Binding Config.ProxyHost}" />
-                            <TextBox Grid.Column="1" PlaceholderText="Port" Width="90" Text="{Binding Config.ProxyPort}" />
+                            <TextBox Grid.Column="0" PlaceholderText="Proxy host" Text="{Binding ProxyHost}" />
+                            <TextBox Grid.Column="1" PlaceholderText="Port" Width="90" Text="{Binding ProxyPort}" />
                         </Grid>
                         <Grid ColumnDefinitions="*,*" ColumnSpacing="12">
-                            <TextBox Grid.Column="0" PlaceholderText="Username (optional)" Text="{Binding Config.ProxyUsername}" />
-                            <TextBox Grid.Column="1" PlaceholderText="Password" Text="{Binding Config.ProxyPassword}" PasswordChar="*" />
+                            <TextBox Grid.Column="0" PlaceholderText="Username (optional)" Text="{Binding ProxyUsername}" />
+                            <TextBox Grid.Column="1" PlaceholderText="Password" Text="{Binding ProxyPassword}" PasswordChar="*"
+                                     IsVisible="{Binding ShowsProxyPassword}" />
                         </Grid>
                         <TextBlock Classes="hint"
-                                   Text="Applies to every connection this bot makes. Each bot can use a different proxy, so several bots don't all come from one IP — useful when a server limits connections per IP." />
+                                   Text="Applies to this bot's classic Battle.net, BNLS and realm connections. Each bot can use a different proxy, so several bots don't all come from one IP — useful when a server limits connections per IP." />
                     </StackPanel>
                 </StackPanel>
             </Expander>

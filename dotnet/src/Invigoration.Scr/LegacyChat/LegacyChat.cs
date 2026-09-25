@@ -125,7 +125,7 @@ public static class LegacyChatRequests
 }
 
 /// <summary>A member of an SC:R channel.</summary>
-public sealed record ScrMember(string Name, ulong Flags, IReadOnlyDictionary<string, string> Attributes);
+public sealed record ScrMember(string Name, ulong Flags, IReadOnlyDictionary<string, string> Attributes, byte[]? Raw = null);
 
 /// <summary>An SC:R channel as LegacyChat describes it.</summary>
 public sealed record ScrChannel(ulong Id, string InternalName, string DisplayName, IReadOnlyList<ScrMember> Members);
@@ -372,7 +372,7 @@ public static class LegacyChatCallbacks
             }
         }
 
-        return new ScrMember(name, flags, attributes);
+        return new ScrMember(name, flags, attributes, data);
     }
 
     private static (string Name, string Value) DecodeAttribute(byte[] data)

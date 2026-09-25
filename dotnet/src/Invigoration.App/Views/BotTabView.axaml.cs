@@ -23,6 +23,10 @@ public partial class BotTabView : UserControl
         InitializeComponent();
         DataContextChanged += (_, _) => AttachChatLog();
 
+        // Right-clicking a row doesn't select it, and the SC2/SC:R user list's menu acts on the
+        // selected row: select it first, so Whisper, Stats and the rest know who was clicked.
+        this.FindControl<ListBox>("Sc2UserList")?.AddHandler(PointerPressedEvent, OnSc2UserListPointerPressed, Avalonia.Interactivity.RoutingStrategies.Tunnel, handledEventsToo: true);
+
         var inputBox = this.FindControl<TextBox>("InputBox");
         if (inputBox is not null)
         {
@@ -366,6 +370,13 @@ public partial class BotTabView : UserControl
         {
             switch (item.Name)
             {
+                case "ScrUserWhois":
+                    item.IsEnabled = person is not null;
+                    break;
+                case "ScrUserStats":
+                    item.Header = person is null ? "Stats" : $"Stats for {person.Name.Replace("_", "__")}";
+                    item.IsEnabled = person is not null;
+                    break;
                 case "ScrUserWhisper":
                     item.Header = person is null ? "Whisper" : $"Whisper {person.Name.Replace("_", "__")}";
                     item.IsEnabled = person is not null;
@@ -390,6 +401,15 @@ public partial class BotTabView : UserControl
         }
     }
 
+    private static void OnSc2UserListPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is ListBox list && e.GetCurrentPoint(list).Properties.IsRightButtonPressed
+            && (e.Source as Visual)?.FindAncestorOfType<ListBoxItem>(includeSelf: true) is { DataContext: { } person })
+        {
+            list.SelectedItem = person;
+        }
+    }
+
     /// <summary>The SC:R member the user list's menu was opened on (right-clicking selects the row).</summary>
     private (Stimpak.Person Person, string? BattleTag)? RightClickedScrMember() =>
         this.FindControl<ListBox>("Sc2UserList")?.SelectedItem is Stimpak.Person person
@@ -402,6 +422,22 @@ public partial class BotTabView : UserControl
             && this.FindAncestorOfType<Window>()?.DataContext is MainWindowViewModel mainVm)
         {
             mainVm.FocusWhisperThread(vm, member.Person.Name);
+        }
+    }
+
+    private void OnScrUserWhoisClick(object? sender, RoutedEventArgs e)
+    {
+        if (RightClickedScrMember() is { } member && DataContext is BotTabViewModel vm)
+        {
+            _ = vm.Engine.SendChatCommandAsync($"/whois {member.Person.Name}");
+        }
+    }
+
+    private void OnScrUserStatsClick(object? sender, RoutedEventArgs e)
+    {
+        if (RightClickedScrMember() is { } member && DataContext is BotTabViewModel vm)
+        {
+            _ = vm.Engine.SendChatCommandAsync($"/stats {member.Person.Name}");
         }
     }
 

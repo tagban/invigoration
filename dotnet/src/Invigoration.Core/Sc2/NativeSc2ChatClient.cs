@@ -68,6 +68,15 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
     private bool _disposed;
     private byte[]? _presented;
     private readonly Dictionary<Sc2FriendIdentity, Sc2Friend> _friends = new();
+    private readonly Dictionary<uint, ToonClub> _clubs = new();
+    private readonly HashSet<uint> _pendingClubChats = new();
+    private readonly Dictionary<uint, List<(ToonHandleValue Member, byte Rank)>> _rosters = new();
+    private readonly Dictionary<uint, int> _rosterRequests = new();
+    private readonly Dictionary<ToonHandleValue, string> _toonNames = new();
+    private readonly Dictionary<ToonHandleValue, byte> _memberStatus = new();
+    private readonly HashSet<uint> _rosterSubscriptions = new();
+    private readonly Dictionary<uint, string> _clubDescriptions = new();
+    private Timer? _clubsTimer;
     private PresenceTracker _presence = new();
     private readonly HashSet<uint> _askedFriendToons = new();
     private PortraitResolver _portraits = new();
@@ -143,7 +152,6 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
     /// </summary>
     public void SendMessage(byte channelIndex, string body)
     {
-        Send(ChatCommands.ChatMessage(channelIndex, body), "send message");
         User self;
         lock (_sync)
         {
@@ -151,6 +159,7 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
             self = new User(handle, null, _self?.Name ?? "", "", Presence.Available);
         }
 
+        Send(ChatCommands.ChatMessage(channelIndex, body), "send message");
         Emit(new MessageReceived(channelIndex, self, body));
     }
 
@@ -308,6 +317,16 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
         lock (_sync)
         {
             _friends.Clear();
+            _clubs.Clear();
+            _pendingClubChats.Clear();
+            _rosters.Clear();
+            _rosterRequests.Clear();
+            _toonNames.Clear();
+            _memberStatus.Clear();
+            _rosterSubscriptions.Clear();
+            _clubDescriptions.Clear();
+            _clubsTimer?.Dispose();
+            _clubsTimer = null;
             _presence = new PresenceTracker();
             _portraits = new PortraitResolver();
             _presenceUpdatesLogged = 0;
@@ -476,9 +495,63 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
                     // reply carries IDs, not names, so the known public channels are offered by name.
                     Emit(new PublicChannelsReceived(KnownPublicChannels.Select(c => (ChatChannel)new PublicChannel(c.Key, c.Value)).ToList()));
                     Send(ChatCommands.ChatChannelListRequest(), "ask for the public channel list");
+                    Send(ClubCommands.GetToonClubs(0, selected.Value.Handle), "ask for this character's clans and groups");
                     foreach (var target in channels)
                     {
                         JoinTarget(target);
+                    }
+
+                    break;
+
+                case NativeChatRecord.ToonClubs clubs:
+                    HandleClubs(clubs.Value);
+                    break;
+
+                case NativeChatRecord.ClubRoster roster:
+                    HandleRoster(roster.Value);
+                    break;
+
+                case NativeChatRecord.ToonNames names:
+                    HandleToonNames(names.Value);
+                    break;
+
+                case NativeChatRecord.ClubChanges clubChanges:
+                    lock (_sync)
+                    {
+                        foreach (var change in clubChanges.Value.Changes)
+                        {
+                            _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    club {change.ClubId} {change.Part} (change {change.ChangeType}){(change.Text is { } text ? ": " + text : "")}");
+                            if (change.Part == "Description" && change.Text is { } description)
+                            {
+                                _clubDescriptions[change.ClubId] = description;
+                            }
+                        }
+
+                        _clubsTimer ??= new Timer(_ => EmitClubs());
+                        _clubsTimer.Change(TimeSpan.FromMilliseconds(300), Timeout.InfiniteTimeSpan);
+                    }
+
+                    break;
+
+                case NativeChatRecord.ClubMemberChanges changes:
+                    foreach (var change in changes.Value.Changes)
+                    {
+                        Trace($"Club {change.ClubId} member {change.Member.Id}: change {change.ChangeType}, rank {change.OldRank}->{change.NewRank}, status {change.Status}.");
+                    }
+
+                    HandleMemberChanges(changes.Value);
+                    break;
+
+                case NativeChatRecord.ClubSettings settings:
+                    Trace($"Club rules: names {settings.Value.NameRegex}, tags {settings.Value.TagRegex}.");
+                    break;
+
+                case NativeChatRecord.ClubInvite invite:
+                    Trace($"Club invitation record: club {invite.Value.ClubId}, code {invite.Value.Code}, result {invite.Value.Result}.");
+                    if (invite.Value.Code == 0)
+                    {
+                        Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0,
+                            $"You've been invited to a StarCraft II clan or group (#{invite.Value.ClubId}).")));
                     }
 
                     break;
@@ -917,10 +990,280 @@ public sealed class NativeSc2ChatClient : ISc2ChatClient
                 JoinPrivate(priv.Name);
                 break;
             case GroupChannelTarget group:
-                Trace($"Skipping group channel {group.ClubId}: groups aren't supported by the native connection yet.");
+                JoinClubChat(group.ClubId);
                 break;
         }
     }
+
+    /// <summary>
+    /// The character's clans and groups (GetToonClubsResponse), asked for once it's selected. Each
+    /// clan's chat is joined, as the game does; a group's only when asked for.
+    /// </summary>
+    private void HandleClubs(ToonClubsRecord record)
+    {
+        if (record.Error is { } error)
+        {
+            Trace($"Battle.net couldn't list this character's clubs: error {error}.");
+            return;
+        }
+
+        lock (_sync)
+        {
+            foreach (var club in record.Clubs)
+            {
+                _clubs[club.Summary.Id] = club;
+            }
+        }
+
+        foreach (var club in record.Clubs)
+        {
+            var summary = club.Summary;
+            Trace($"Club {summary.Id}: {(summary.IsClan ? "clan" : "group")} {ClubChannelName(summary)}, category {summary.Category}, flags 0x{summary.Flags:X}, {summary.MemberCount} members; our rank {ClubRanks.Describe(club.Rank)}; online {club.Online}/{club.InGame}/{club.InChat}.");
+        }
+
+        EmitClubs();
+        foreach (var club in record.Clubs)
+        {
+            lock (_sync)
+            {
+                _rosters[club.Summary.Id] = [];
+                _rosterRequests[club.Summary.Id] = 0;
+            }
+
+            RequestRosterPage(club.Summary.Id, 0);
+        }
+
+        foreach (var club in record.Clubs.Where(c => c.Summary.IsClan || _pendingClubChats.Contains(c.Summary.Id)))
+        {
+            JoinClubChat(club.Summary.Id);
+        }
+    }
+
+    /// <summary>Joins a club's chat (a join request with the club locator). Waits for the club list if it hasn't come yet.</summary>
+    public void JoinClubChat(uint clubId)
+    {
+        GroupChannel channel;
+        lock (_sync)
+        {
+            if (!_clubs.TryGetValue(clubId, out var club))
+            {
+                _pendingClubChats.Add(clubId);
+                return;
+            }
+
+            _pendingClubChats.Remove(clubId);
+            var joinedOrJoining = _channels.Values.Select(c => c.Channel).Concat(_pendingJoins.Values)
+                .Any(c => c is GroupChannel group && group.ClubId == clubId);
+            if (joinedOrJoining)
+            {
+                return;
+            }
+
+            channel = new GroupChannel(clubId, ClubChannelName(club.Summary));
+        }
+
+        Send(ChatCommands.ChatJoinClub(clubId, NewJoinToken(channel)), "join " + channel.Name);
+    }
+
+    private static string ClubChannelName(ClubSummary summary) =>
+        summary.Tag is { Length: > 0 } tag ? $"<{tag}> {summary.Name}" : summary.Name;
+
+    /// <summary>Most members a roster reply carries; a shorter page is the last.</summary>
+    private const int RosterPageSize = 200;
+
+    /// <summary>More requests for one club than this means something's wrong; stop rather than keep asking.</summary>
+    private const int MaxRosterRequests = 10;
+
+    /// <summary>Asks for a page of a club's members. The token carries the club id: the reply only hands the token back.</summary>
+    private void RequestRosterPage(uint clubId, uint offset)
+    {
+        lock (_sync)
+        {
+            if (!_rosterRequests.TryGetValue(clubId, out var sent) || sent >= MaxRosterRequests)
+            {
+                Trace($"Club {clubId}: stopped asking for members after {sent} request(s).");
+                return;
+            }
+
+            _rosterRequests[clubId] = sent + 1;
+        }
+
+        Send(ClubCommands.GetRoster(clubId, clubId, offset), $"ask for club {clubId}'s members from {offset}");
+    }
+
+    /// <summary>
+    /// A page of a club's members. Battle.net never sets the reply's last-page flag, so a page with
+    /// fewer than 200 members is the last. The first reply is often empty (the list isn't loaded yet),
+    /// so an empty first page is asked for once more, a second later. Then the names it doesn't know.
+    /// </summary>
+    private void HandleRoster(ClubRosterRecord page)
+    {
+        var clubId = page.Token;
+        if (page.Error is { } error)
+        {
+            Trace($"Battle.net couldn't list club {clubId}'s members: error {error}.");
+            return;
+        }
+
+        List<ToonHandleValue> unnamed;
+        int count;
+        int sent;
+        lock (_sync)
+        {
+            if (!_rosters.TryGetValue(clubId, out var roster))
+            {
+                return;
+            }
+
+            roster.AddRange(page.Members);
+            count = roster.Count;
+            sent = _rosterRequests.GetValueOrDefault(clubId);
+            unnamed = [.. roster.Select(m => m.Member).Where(h => !_toonNames.ContainsKey(h)).Distinct()];
+        }
+
+        Trace($"Club {clubId}: {page.Members.Count} member(s) in this page, {count} so far.");
+        if (count == 0 && sent == 1)
+        {
+            _ = Task.Delay(TimeSpan.FromSeconds(1)).ContinueWith(_ => RequestRosterPage(clubId, 0), TaskScheduler.Default);
+            return;
+        }
+
+        if (page.Members.Count >= RosterPageSize)
+        {
+            RequestRosterPage(clubId, (uint)count);
+            return;
+        }
+
+        foreach (var chunk in unnamed.Chunk(ClubCommands.MaxNamesPerRequest))
+        {
+            Send(ClubCommands.ResolveToonNames(chunk), $"look up {chunk.Length} member name(s)");
+        }
+
+        // Then, once per club, have member changes (status included) pushed as they happen.
+        bool subscribe;
+        lock (_sync)
+        {
+            subscribe = _rosterSubscriptions.Add(clubId);
+        }
+
+        if (subscribe)
+        {
+            Send(ClubCommands.SubscribeToRosters([clubId]), $"follow club {clubId}'s member changes");
+        }
+
+        EmitClubs();
+    }
+
+    /// <summary>
+    /// Pushed member changes (after subscribing): status (0 offline, 1 online, 2 in a game, 3 in
+    /// chat), rank, and members joining or leaving. Shown with the next batched Clans update.
+    /// </summary>
+    private void HandleMemberChanges(ClubMemberChangesRecord record)
+    {
+        List<ToonHandleValue> unnamed = [];
+        lock (_sync)
+        {
+            foreach (var change in record.Changes)
+            {
+                if (!_rosters.TryGetValue(change.ClubId, out var roster))
+                {
+                    continue;
+                }
+
+                var at = roster.FindIndex(m => m.Member == change.Member);
+                if (change.Status is { } status)
+                {
+                    _memberStatus[change.Member] = status;
+                }
+
+                if (change.ChangeType == 2)
+                {
+                    if (at >= 0)
+                    {
+                        roster.RemoveAt(at);
+                    }
+                }
+                else if (change.NewRank is { } rank)
+                {
+                    if (at >= 0)
+                    {
+                        roster[at] = (change.Member, rank);
+                    }
+                    else
+                    {
+                        roster.Add((change.Member, rank));
+                        if (!_toonNames.ContainsKey(change.Member))
+                        {
+                            unnamed.Add(change.Member);
+                        }
+                    }
+                }
+            }
+
+            // Changes come in bursts: redraw the Clans list once they settle.
+            _clubsTimer ??= new Timer(_ => EmitClubs());
+            _clubsTimer.Change(TimeSpan.FromMilliseconds(300), Timeout.InfiniteTimeSpan);
+        }
+
+        foreach (var chunk in unnamed.Chunk(ClubCommands.MaxNamesPerRequest))
+        {
+            Send(ClubCommands.ResolveToonNames(chunk), $"look up {chunk.Length} new member name(s)");
+        }
+    }
+
+    private void HandleToonNames(ToonNamesRecord record)
+    {
+        lock (_sync)
+        {
+            foreach (var (handle, name, _, result) in record.Names)
+            {
+                if (result == 0 && name is { Length: > 0 })
+                {
+                    _toonNames[handle] = name;
+                }
+            }
+        }
+
+        EmitClubs();
+    }
+
+    /// <summary>The clubs with their members, as the Clans tab shows them.</summary>
+    private void EmitClubs()
+    {
+        List<BattlenetClub> clubs;
+        lock (_sync)
+        {
+            clubs = _clubs.Values.Select(club => ToBattlenetClub(club) with
+                {
+                    Description = _clubDescriptions.GetValueOrDefault(club.Summary.Id, ""),
+                    Roster = _rosters.TryGetValue(club.Summary.Id, out var roster)
+                        ? [.. roster
+                            .Select(m => new BattlenetClubMember(
+                                _toonNames.TryGetValue(m.Member, out var name) ? name : $"#{m.Member.Id}",
+                                ClubRanks.Describe(m.Rank),
+                                m.Rank,
+                                _memberStatus.TryGetValue(m.Member, out var status) ? StatusName(status) : ""))
+                            .OrderByDescending(m => m.IsOnline).ThenByDescending(m => m.RankValue).ThenBy(m => m.Name, StringComparer.OrdinalIgnoreCase)]
+                        : [],
+                })
+                .OrderByDescending(c => c.IsClan).ThenBy(c => c.Name, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        Emit(new NativeClubsEvent(clubs));
+    }
+
+    private static string StatusName(byte status) => status switch
+    {
+        0 => "Offline",
+        1 => "Online",
+        2 => "In a game",
+        3 => "In chat",
+        _ => "",
+    };
+
+    private static BattlenetClub ToBattlenetClub(ToonClub club) => new(
+        club.Summary.Id, club.Summary.Name, club.Summary.Tag, club.Summary.IsClan, ClubRanks.Describe(club.Rank), club.Summary.MemberCount, club.Online);
 
     private static PublicChannel PublicChannelFor(ushort id) =>
         new(id, KnownPublicChannels.TryGetValue(id, out var name) ? name : $"Channel {id}");

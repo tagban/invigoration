@@ -208,6 +208,18 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         OnPropertyChanged(nameof(ShowsMemberDetail));
     }
 
+    /// <summary>
+    /// The send box's limit: StarCraft II's 255 characters per message; classic Battle.net's 223
+    /// (ChatLineSplitter.MaxLineLength), which SC:R's classic chat shares; none for WC3:R, whose
+    /// limit isn't known.
+    /// </summary>
+    public int InputMaxLength => Config.Product switch
+    {
+        BncsProduct.Sc2 => Invigoration.Sc2.Native.ChatCommands.MaxMessageCharacters,
+        BncsProduct.Wc3Reforged => 0,
+        _ => ChatLineSplitter.MaxLineLength,
+    };
+
     /// <summary>The user list's name size: a notch smaller for SC2, whose clan tags make names long. SC:R has none.</summary>
     public double UserListNameFontSize => IsSc2 ? 12 : 14;
 
@@ -264,7 +276,15 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
     public bool SupportsClan => Config.ClanFeatureEnabled && Invigoration.Core.Clan.ClanRosterStore.Members.Any(m => m.IsClanMember);
 
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(InputCounter))]
+    [NotifyPropertyChangedFor(nameof(InputNearLimit))]
     public partial string InputText { get; set; } = "";
+
+    /// <summary>"123/255" inside the send box where messages have a length limit; "" otherwise.</summary>
+    public string InputCounter => InputMaxLength > 0 ? $"{InputText.Length}/{InputMaxLength}" : "";
+
+    /// <summary>Within 15 characters of the limit: the counter turns orange.</summary>
+    public bool InputNearLimit => InputMaxLength > 0 && InputText.Length >= InputMaxLength - 15;
 
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanConnect), nameof(CanDisconnect), nameof(StatusDotBrush))]
@@ -378,6 +398,8 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         OnPropertyChanged(nameof(IsSingleChannel));
         OnPropertyChanged(nameof(IsSc2));
         OnPropertyChanged(nameof(UserListNameFontSize));
+        OnPropertyChanged(nameof(InputMaxLength));
+        OnPropertyChanged(nameof(InputCounter));
         OnPropertyChanged(nameof(CanManageFriends));
         OnPropertyChanged(nameof(PortraitSize));
         OnPropertyChanged(nameof(ShowsMemberDetail));
@@ -395,6 +417,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         Engine.ChatMessage += OnChatMessage;
         Engine.FriendsListUpdated += OnFriendsListUpdated;
         Engine.FriendInvitationsUpdated += OnFriendInvitationsUpdated;
+        Engine.ClubsUpdated += OnClubsUpdated;
         Engine.BncsConnected += () => Dispatcher.UIThread.Post(() =>
         {
             IsConnected = true;
@@ -740,6 +763,9 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
             // ignored; a tab left over from an earlier session is replaced, since a reconnect
             // reuses channel numbers and the old tab's roster belongs to the old session.
             var tab = new ChannelTabViewModel(channelIndex, channel, users);
+
+            // A new channel's log would otherwise start empty, which reads like nothing happened.
+            tab.ChatLines.Add(new ChatLineViewModel($"Entered {channel.Name}.", Engine.Palette.Info));
             if (Channels.FirstOrDefault(c => c.ChannelIndex == channelIndex) is { } existing)
             {
                 if (ReferenceEquals(existing.Users, users))
@@ -1124,6 +1150,27 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         }
     }
 
+    /// <summary>The Clans tab: the StarCraft II clans and groups this bot's character is in.</summary>
+    public ObservableCollection<BattlenetClubViewModel> Clubs { get; } = [];
+
+    public bool HasClubs => Clubs.Count > 0;
+
+    [RelayCommand]
+    private void OpenClubChat(BattlenetClubViewModel club) => Engine.JoinClubChat(club.Club.Id);
+
+    private void OnClubsUpdated(IReadOnlyList<BattlenetClub> clubs) => Dispatcher.UIThread.Post(() =>
+    {
+        // Rebuilt on every update; keep open whichever lists were open.
+        var open = Clubs.Where(c => c.IsExpanded).Select(c => c.Club.Id).ToHashSet();
+        Clubs.Clear();
+        foreach (var club in clubs)
+        {
+            Clubs.Add(new BattlenetClubViewModel(club) { IsExpanded = open.Contains(club.Id) });
+        }
+
+        OnPropertyChanged(nameof(HasClubs));
+    });
+
     /// <summary>Whether the Friends tab can add, remove and answer Battle.net friends: SC:R bots, so far (SC2's commands aren't mapped).</summary>
     public bool CanManageFriends => IsSingleChannel;
 
@@ -1272,6 +1319,7 @@ public partial class BotTabViewModel : ViewModelBase, IAsyncDisposable, IThemedS
         Engine.ChatMessage -= OnChatMessage;
         Engine.FriendsListUpdated -= OnFriendsListUpdated;
         Engine.FriendInvitationsUpdated -= OnFriendInvitationsUpdated;
+        Engine.ClubsUpdated -= OnClubsUpdated;
         Engine.Sc2ChannelJoined -= OnSc2ChannelJoined;
         Engine.Sc2ChannelLeft -= OnSc2ChannelLeft;
         Engine.Sc2ChannelJoinRejected -= OnSc2ChannelJoinRejected;

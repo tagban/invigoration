@@ -50,6 +50,8 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
     private readonly List<(uint AccountId, string Text)> _sentWhispers = [];
     private readonly Dictionary<ulong, ScrInvitation> _invitations = new();
     private readonly HashSet<string> _invited = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> _ghosts = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Queue<(string Name, DateTime Sent)> _whoisChecks = new();
     private Timer? _friendsTimer;
     private bool _everJoined;
     private readonly HashSet<string> _describedMembers = new(StringComparer.OrdinalIgnoreCase);
@@ -128,8 +130,25 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
     {
         // Slash commands (/whois, /kick, /ban, /designate...) go to the server as commands; its
         // answer comes back as an info or error line.
+        // "/stats Name": the character's stats, by the game's own ToonProfile call.
+        if (body.Equals("/stats", StringComparison.OrdinalIgnoreCase) || body.StartsWith("/stats ", StringComparison.OrdinalIgnoreCase))
+        {
+            var name = body.Length > 7 ? body[7..].Trim() : _connection?.Toon?.Name ?? "";
+            RequestStats(name);
+            return;
+        }
+
         if (body.StartsWith('/') && body.Length > 1)
         {
+            var words = body.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+            if (words.Length == 2 && words[0].ToLowerInvariant() is "/whois" or "/where" or "/whereis")
+            {
+                lock (_sync)
+                {
+                    _whoisChecks.Enqueue((words[1].Trim(), DateTime.UtcNow));
+                }
+            }
+
             Send(c => c.Chat.SlashCommand(body), "send " + body.Split(' ')[0]);
             return;
         }
@@ -164,6 +183,66 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
 
         Send(c => c.Chat.Whisper(name, body), "whisper " + name);
         Emit(new WhisperReceived(name, body, true));
+    }
+
+    /// <summary>
+    /// Asks for a character's stats (ToonProfile.GetStats) and shows them. Sent as the game sends
+    /// it: no program, the gateway, the name, ".*" and 0xFFFFFFFF; then without the gateway, for
+    /// a character on another one. Every reply is logged.
+    /// </summary>
+    public void RequestStats(string characterName)
+    {
+        var name = characterName.Trim();
+        if (name.Length == 0)
+        {
+            return;
+        }
+
+        (string? Program, uint Gateway)[] tries = [(null, _gateway), (null, 0u)];
+        RequestStats(name, tries, 0, answered: false);
+    }
+
+    /// <summary>One try: the request goes through the send queue, the reply is awaited outside it.</summary>
+    private void RequestStats(string name, (string? Program, uint Gateway)[] tries, int attempt, bool answered)
+    {
+        var (program, gateway) = tries[attempt];
+        var label = $"{program ?? "no program"}, gateway {(gateway == 0 ? "none" : gateway)}";
+        Enqueue(
+            async (c, token) =>
+            {
+                var reply = await c.SendRequestAsync(ScrStats.Service, ScrStats.GetStatsMethod, ScrStats.Request(name, program, gateway), token, TimeSpan.FromSeconds(10)).ConfigureAwait(false);
+                _ = Task.Run(async () =>
+                {
+                    try
+                    {
+                        var body = await reply.ConfigureAwait(false);
+                        answered = true;
+                        var (stats, status) = ScrStats.Decode(body);
+                        Trace($"GetStats {name} ({label}): status {status}, {stats.Count} stat(s), body {Convert.ToHexString(body)}");
+                        if (stats.Count > 0)
+                        {
+                            Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Stats for {name}: {ScrStats.Describe(stats)}.", ChannelIndex)));
+                            return;
+                        }
+                    }
+                    catch (Exception ex) when (ex is TimeoutException or InvalidOperationException or OperationCanceledException)
+                    {
+                        Trace($"GetStats {name} ({label}): {ex.Message}");
+                    }
+
+                    if (attempt + 1 < tries.Length && _connection is not null)
+                    {
+                        RequestStats(name, tries, attempt + 1, answered);
+                    }
+                    else
+                    {
+                        Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, answered
+                            ? $"Battle.net has no stats on record for {name}."
+                            : $"Battle.net didn't answer a stats request for {name}.", ChannelIndex)));
+                    }
+                });
+            },
+            $"ask for {name}'s stats ({label})");
     }
 
     /// <summary>The Battle.net friend with this BattleTag, if there is one.</summary>
@@ -217,7 +296,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
             {
                 var reply = await c.RequestAsync(ScrFriends.Service, ScrFriends.SendInvitationMethod, ScrFriends.SendInvitationRequest(tag), token).ConfigureAwait(false);
                 Trace($"Friend request to {tag} sent; reply {Convert.ToHexString(reply)}.");
-                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Friend request sent to {tag}.")));
+                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Friend request sent to {tag}.", ChannelIndex)));
             },
             "send a friend request to " + tag);
     }
@@ -231,7 +310,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
             {
                 var reply = await c.RequestAsync(ScrFriends.Service, ScrFriends.RemoveFriendMethod, ScrFriends.RemoveFriendRequest(friend.AccountId), token).ConfigureAwait(false);
                 Trace($"Removed {friend.BattleTag} (account {friend.AccountId}); reply {Convert.ToHexString(reply)}.");
-                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Removed {friend.BattleTag} from your Battle.net friends.")));
+                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, $"Removed {friend.BattleTag} from your Battle.net friends.", ChannelIndex)));
             },
             "remove " + friend.BattleTag + " from friends");
     }
@@ -282,7 +361,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
         if (isNew && !sent && _everJoined)
         {
             Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0,
-                $"{invitation.BattleTag} sent you a Battle.net friend request. Accept or decline it on the Friends tab.")));
+                $"{invitation.BattleTag} sent you a Battle.net friend request. Accept or decline it on the Friends tab.", ChannelIndex)));
         }
 
         Emit(new NativeInvitationsEvent(all));
@@ -447,7 +526,7 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
                 var wait = waits[attempt];
                 Trace($"Battle.net dropped the connection during startup ({ex.Message}), likely still closing this account's last StarCraft: Remastered session. Trying again in {wait.TotalSeconds:0} seconds.");
                 Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0,
-                    $"Battle.net is still closing this account's last StarCraft: Remastered session. Trying again in {wait.TotalSeconds:0} seconds.")));
+                    $"Battle.net is still closing this account's last StarCraft: Remastered session. Trying again in {wait.TotalSeconds:0} seconds.", ChannelIndex)));
                 await Task.Delay(wait, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -631,7 +710,8 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
             if (_describedMembers.Add(member.Name))
             {
                 _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    member {member.Name}: flags {member.Flags}; "
-                    + string.Join(", ", member.Attributes.Where(a => a.Key != "battle_tag").Select(a => $"{a.Key}={a.Value}")));
+                    + string.Join(", ", member.Attributes.Where(a => a.Key != "battle_tag").Select(a => $"{a.Key}={a.Value}"))
+                    + $"; battle tag {(member.Attributes.ContainsKey("battle_tag") ? "yes" : "no")}; raw {Convert.ToHexString(member.Raw ?? [])}");
             }
         }
 
@@ -640,6 +720,9 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
         bool initial;
         lock (_sync)
         {
+            // A hidden stuck login stays hidden while the server lists it; once it's gone, forget it.
+            _ghosts.RemoveWhere(g => !now.Contains(g));
+            now.ExceptWith(_ghosts);
             initial = !_rosterLoaded;
             _rosterLoaded = true;
             foreach (var name in now.Where(n => !_members.ContainsKey(n)))
@@ -673,6 +756,65 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
         }
     }
 
+    /// <summary>
+    /// Pairs a server line with the /whois the user asked for most recently: "That user is not
+    /// logged on." names nobody, "X is using Y in Z." names them. A member the server calls offline
+    /// is a stuck login still listed in the channel (one caught by a server reset stays until the
+    /// next reboot), and is hidden. Nothing is checked unless the user asks.
+    /// </summary>
+    private void CheckWhoisAnswer(string text)
+    {
+        (string Name, DateTime Sent) check;
+        lock (_sync)
+        {
+            while (_whoisChecks.Count > 0 && DateTime.UtcNow - _whoisChecks.Peek().Sent > TimeSpan.FromSeconds(10))
+            {
+                _whoisChecks.Dequeue();
+            }
+
+            if (_whoisChecks.Count == 0)
+            {
+                return;
+            }
+
+            check = _whoisChecks.Peek();
+            var offline = text.StartsWith("That user is not logged on", StringComparison.OrdinalIgnoreCase);
+            var online = text.StartsWith(check.Name + " is using", StringComparison.OrdinalIgnoreCase);
+            if (!offline && !online)
+            {
+                return;
+            }
+
+            _whoisChecks.Dequeue();
+            if (online)
+            {
+                return;
+            }
+        }
+
+        HideGhost(check.Name);
+    }
+
+    /// <summary>Takes a stuck login out of the user list, until the server itself stops listing it.</summary>
+    private void HideGhost(string name)
+    {
+        User? member;
+        lock (_sync)
+        {
+            if (!_members.Remove(name, out member))
+            {
+                return;
+            }
+
+            _ghosts.Add(name);
+        }
+
+        Trace($"{name} is listed in the channel but not logged on; hiding it.");
+        Emit(new MemberLeft(ChannelIndex, member));
+        Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0,
+            $"{name} is listed here but isn't really logged on (a stuck login), so it's hidden from the user list.", ChannelIndex)));
+    }
+
     private void HandleMessage(ScrMessage message)
     {
         var sender = message.Sender ?? "";
@@ -691,10 +833,10 @@ public sealed class NativeScrChatClient : ISc2ChatClient, IBattlenetFriendsClien
                 Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Broadcast, sender.Length > 0 ? sender : "Battle.net", 0, 0, message.Text, ChannelIndex)));
                 break;
             case ScrMessageKind.Information:
-                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Info, "", 0, 0, message.Text, ChannelIndex)));
-                break;
             case ScrMessageKind.Error:
-                Emit(new NativeChatEvent(new ChatEvent(ChatEventType.Error, "", 0, 0, message.Text, ChannelIndex)));
+                _protocolLog?.WriteLine($"{DateTime.Now:HH:mm:ss.fff}    {message.Kind}: {message.Text}");
+                CheckWhoisAnswer(message.Text);
+                Emit(new NativeChatEvent(new ChatEvent(message.Kind == ScrMessageKind.Error ? ChatEventType.Error : ChatEventType.Info, "", 0, 0, message.Text, ChannelIndex)));
                 break;
         }
     }

@@ -113,6 +113,22 @@ public sealed partial class BotEngine
 
     private readonly Dictionary<string, FriendEntry> _sc2Friends = new();
 
+    /// <summary>The StarCraft II clans and groups the bot's character belongs to (native SC2 only).</summary>
+    public event Action<IReadOnlyList<BattlenetClub>>? ClubsUpdated;
+
+    /// <summary>Opens a StarCraft II clan's or group's chat as a channel tab.</summary>
+    public void JoinClubChat(uint clubId)
+    {
+        if (_sc2Client is NativeSc2ChatClient native)
+        {
+            native.JoinClubChat(clubId);
+        }
+        else
+        {
+            LogError("Clan chat needs Invigoration's own StarCraft II connection.");
+        }
+    }
+
     /// <summary>Pending Battle.net friend requests, from a native client that reports them (SC:R).</summary>
     public event Action<IReadOnlyList<FriendInvitation>>? FriendInvitationsUpdated;
 
@@ -440,6 +456,7 @@ public sealed partial class BotEngine
         _sc2InChat = false;
         _sc2Friends.Clear();
         FriendInvitationsUpdated?.Invoke([]);
+        ClubsUpdated?.Invoke([]);
         _sc2ActiveChannelIndex = null;
         _sc2TriviaChannelIndex = null;
         _sc2PublicChannelCatalog = [];
@@ -827,6 +844,10 @@ public sealed partial class BotEngine
                 await HandleChatEvent(native.Event).ConfigureAwait(false);
                 break;
 
+            case NativeClubsEvent clubs:
+                ClubsUpdated?.Invoke(clubs.Clubs);
+                break;
+
             case NativeInvitationsEvent invitations:
                 FriendInvitationsUpdated?.Invoke(invitations.Invitations);
                 break;
@@ -998,11 +1019,18 @@ public sealed partial class BotEngine
 
         if (TryParseSc2Whisper(body, out var target, out var message))
         {
+            // StarCraft II's limit is 255 characters; anything longer is cut there. (SC:R whispers
+            // to a BattleTag go through Battle.net, not classic chat.)
+            if (client is not NativeScrChatClient)
+            {
+                message = Invigoration.Sc2.Native.ChatCommands.CutToMessage(message);
+            }
+
             try
             {
                 client.SendWhisper(target, message);
             }
-            catch (StimpakException ex)
+            catch (Exception ex) when (ex is StimpakException or ArgumentException)
             {
                 LogError($"Could not whisper {target}: {ex.Message}");
             }
@@ -1018,11 +1046,30 @@ public sealed partial class BotEngine
 
         body = TranslateSc2EmoteText(body);
 
+        // StarCraft II chat has no slash commands beyond /w and /me (handled above), so anything
+        // else would go out as a plain chat line. SC:R's server has its own; those pass through.
+        // "//text" sends a line that starts with a slash.
+        if (client is not NativeScrChatClient && body.StartsWith('/'))
+        {
+            if (!body.StartsWith("//", StringComparison.Ordinal))
+            {
+                LogError($"StarCraft II chat has no {body.Split(' ')[0]} command, so it wasn't sent. Start with // to send a line beginning with /.");
+                return Task.CompletedTask;
+            }
+
+            body = body[1..];
+        }
+
+        // StarCraft II's limit is 255 characters, SC:R's classic chat 223; anything longer is cut there.
+        body = client is NativeScrChatClient
+            ? body[..Math.Min(body.Length, ChatLineSplitter.MaxLineLength)]
+            : Invigoration.Sc2.Native.ChatCommands.CutToMessage(body);
+
         try
         {
             client.SendMessage(idx, body);
         }
-        catch (StimpakException ex)
+        catch (Exception ex) when (ex is StimpakException or ArgumentException)
         {
             LogError($"Could not send: {ex.Message}");
         }
