@@ -8,7 +8,11 @@
              x:Class="Invigoration.App.Views.HotlineSessionView"
              x:DataType="vm:HotlineSessionViewModel">
 
-    <Grid ColumnDefinitions="*,232" RowDefinitions="Auto,Auto,*,Auto">
+    <Grid RowDefinitions="Auto,Auto,*,Auto">
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="*" />
+            <ColumnDefinition Width="280" MinWidth="120" MaxWidth="600" />
+        </Grid.ColumnDefinitions>
         <!-- Who you are on this server, in the space the server-name bar used to take (the tab
              already says which server this is). The preview is drawn exactly like a Users-list
              row — same panel color, icon behind, name over it at the same offset and in the same
@@ -297,7 +301,8 @@
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:HotlineUserRowViewModel">
-                            <Grid Height="18">
+                            <!-- ClipToBounds: a wide icon runs past the list's edge rather than shrinking. -->
+                            <Grid Height="18" ClipToBounds="True">
                                 <Grid.ContextMenu>
                                     <!-- A preset palette rather than a full color-picker popup — simpler and more reliable inside a menu, and matches the classic IRC-client "highlight this person" idiom this was modeled on. -->
                                     <ContextMenu>
@@ -333,7 +338,11 @@
                                         </MenuItem>
                                     </ContextMenu>
                                 </Grid.ContextMenu>
-                                <Image Source="{Binding Icon}" Height="18" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                <!-- Drawn at its own size (18 pixels tall), never scaled: scaling a wide icon down to
+                                     the list's width made it shorter than the row, leaving gaps between icons that
+                                     are meant to join up (some are one picture split across three rows). -->
+                                <Image Source="{Binding Icon}" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                       RenderOptions.BitmapInterpolationMode="None" />
                                 <TextBlock Text="{Binding Name}" Foreground="{Binding DisplayBrush}" Margin="33,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontWeight="Bold" />
                             </Grid>
                         </DataTemplate>
@@ -361,7 +370,8 @@
                     </ListBox.Styles>
                     <ListBox.ItemTemplate>
                         <DataTemplate x:DataType="vm:HotlineGhostUserViewModel">
-                            <Grid Height="18">
+                            <!-- ClipToBounds: a wide icon runs past the list's edge rather than shrinking. -->
+                            <Grid Height="18" ClipToBounds="True">
                                 <Grid.ContextMenu>
                                     <ContextMenu>
                                         <MenuItem Header="Highlight Color">
@@ -394,7 +404,11 @@
                                         </MenuItem>
                                     </ContextMenu>
                                 </Grid.ContextMenu>
-                                <Image Source="{Binding Icon}" Height="18" Stretch="Uniform" HorizontalAlignment="Left" VerticalAlignment="Center" />
+                                <!-- Drawn at its own size (18 pixels tall), never scaled: scaling a wide icon down to
+                                     the list's width made it shorter than the row, leaving gaps between icons that
+                                     are meant to join up (some are one picture split across three rows). -->
+                                <Image Source="{Binding Icon}" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                       RenderOptions.BitmapInterpolationMode="None" />
                                 <TextBlock Text="{Binding Name}" Foreground="{Binding DisplayBrush}" Margin="20,0,0,0" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" FontWeight="Bold" />
                             </Grid>
                         </DataTemplate>
@@ -420,6 +434,8 @@
                 </StackPanel>
             </Grid>
         </Border>
+        <!-- Drag the Users panel's left edge to resize it; it opens at 280 (267 for the widest common icon plus margins). -->
+        <GridSplitter Grid.Row="2" Grid.Column="1" Width="4" HorizontalAlignment="Left" Background="Transparent" ResizeDirection="Columns" />
 
         <!-- Chat input belongs to chat: hidden while browsing Files or News, where a typed line
              would otherwise go silently to the channel. -->
