@@ -159,8 +159,10 @@ public static class SpotifyAuthorization
         {
             response = await http.PostAsync(TokenEndpoint, new FormUrlEncodedContent(form), cancellationToken).ConfigureAwait(false);
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !cancellationToken.IsCancellationRequested)
         {
+            // TaskCanceledException here is HttpClient.Timeout firing, not the caller's token —
+            // that case is excluded above so a real cancellation still propagates as one.
             throw new SpotifyAuthException($"Couldn't reach Spotify: {ex.Message}");
         }
 

@@ -85,6 +85,23 @@ public class SpotifyAuthorizationTests
         Assert.Contains("Refresh token revoked", ex.Message);
     }
 
+    /// <summary>
+    /// HttpClient.Timeout surfaces as TaskCanceledException, not HttpRequestException — a distinct
+    /// type that this call used to let through uncaught, crashing the whole app (see MainWindow's
+    /// title-update timer, which has nothing to catch it). It must become a SpotifyAuthException
+    /// like every other reachability failure.
+    /// </summary>
+    [Fact]
+    public async Task Refresh_ATimedOutRequest_IsReportedAsUnreachable()
+    {
+        var http = new SpotifyTestHttp((_, _) => throw new TaskCanceledException("The request was canceled due to the configured HttpClient.Timeout of 15 seconds elapsing."));
+
+        var ex = await Assert.ThrowsAsync<SpotifyAuthException>(() => SpotifyAuthorization.RefreshAsync(http.Client(), "my-client", "refresh-1"));
+
+        Assert.False(ex.SignInExpired);
+        Assert.Contains("Couldn't reach Spotify", ex.Message);
+    }
+
     private static int FreePort()
     {
         using var probe = new TcpListener(IPAddress.Loopback, 0);
